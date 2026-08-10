@@ -21,6 +21,7 @@ async function seed() {
     .insert(workspace)
     .values({ name: "Dev User's Workspace", type: "personal", ownerId: devUser.id })
     .returning();
+  if (!ws) throw new Error("workspace insert returned no row");
 
   await db.insert(workspaceMember).values({
     workspaceId: ws.id,

@@ -25,6 +25,7 @@ describe("provisionPersonalWorkspace", () => {
     const result = await provisionPersonalWorkspace({ userId, userName: "Test User" });
 
     const [ws] = await db.select().from(workspace).where(eq(workspace.id, result.workspaceId));
+    if (!ws) throw new Error("workspace not found");
     expect(ws.name).toBe("Test User's Workspace");
     expect(ws.type).toBe("personal");
     expect(ws.ownerId).toBe(userId);
@@ -33,10 +34,12 @@ describe("provisionPersonalWorkspace", () => {
       .select()
       .from(workspaceMember)
       .where(eq(workspaceMember.workspaceId, result.workspaceId));
+    if (!member) throw new Error("workspace member not found");
     expect(member.userId).toBe(userId);
     expect(member.role).toBe("owner");
 
     const [root] = await db.select().from(folder).where(eq(folder.id, result.rootFolderId));
+    if (!root) throw new Error("root folder not found");
     expect(root.workspaceId).toBe(result.workspaceId);
     expect(root.parentId).toBeNull();
     expect(root.name).toBe("root");

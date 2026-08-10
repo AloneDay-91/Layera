@@ -13,6 +13,7 @@ export async function provisionPersonalWorkspace(input: {
         ownerId: input.userId,
       })
       .returning();
+    if (!ws) throw new Error("workspace insert returned no row");
 
     await tx.insert(workspaceMember).values({
       workspaceId: ws.id,
@@ -28,6 +29,7 @@ export async function provisionPersonalWorkspace(input: {
         name: "root",
       })
       .returning();
+    if (!root) throw new Error("folder insert returned no row");
 
     return { workspaceId: ws.id, rootFolderId: root.id };
   });
