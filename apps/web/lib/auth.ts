@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { db } from "@filecloud/db";
+import { db, provisionPersonalWorkspace } from "@filecloud/db";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -12,4 +12,13 @@ export const auth = betterAuth({
   },
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL,
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          await provisionPersonalWorkspace({ userId: user.id, userName: user.name });
+        },
+      },
+    },
+  },
 });
