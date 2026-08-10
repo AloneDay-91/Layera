@@ -6,3 +6,5 @@ dist/
 *.log
 .turbo/
 .DS_Store
+.worktrees/
+.superpowers/
