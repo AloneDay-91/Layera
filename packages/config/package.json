@@ -1,0 +1,11 @@
+{
+  "name": "@filecloud/config",
+  "version": "0.0.0",
+  "private": true,
+  "main": "tsconfig.base.json",
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "eslint": "^9.18.0",
+    "typescript-eslint": "^8.20.0"
+  }
+}
