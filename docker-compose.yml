@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: filecloud
+      POSTGRES_PASSWORD: filecloud
+      POSTGRES_DB: filecloud
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-filecloud-admin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-filecloud-secret}
+    ports:
+      - "9010:9000"
+      - "9011:9001"
+    volumes:
+      - minio_data:/data
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.dev
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://filecloud:filecloud@postgres:5432/filecloud
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - minio
+    volumes:
+      - ./:/repo
+      - /repo/node_modules
+      - /repo/apps/web/.next
+
+volumes:
+  postgres_data:
+  minio_data:
