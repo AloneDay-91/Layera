@@ -18,3 +18,16 @@ Self-hosted file manager. See `CLAUDE.md` for the full product plan and
 Or run everything in Docker: `docker compose up --build`. The `web` service runs on
 `http://localhost:3000`, Postgres on `localhost:5432`, the MinIO S3 API on
 `http://localhost:9010`, and the MinIO console on `http://localhost:9011`.
+
+## Running tests
+
+The `@filecloud/db` package has an automated test that exercises workspace
+provisioning against a real database. It requires Postgres running and
+`DATABASE_URL` pointing at `localhost` (same pattern as the migration steps
+above):
+
+```bash
+docker compose up -d postgres
+export DATABASE_URL=postgresql://filecloud:filecloud@localhost:5432/filecloud
+pnpm test
+```

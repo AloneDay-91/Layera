@@ -6,10 +6,12 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
   },
   "devDependencies": {
     "@filecloud/config": "workspace:*",
+    "eslint": "^9.18.0",
     "typescript": "^5.7.0"
   }
 }

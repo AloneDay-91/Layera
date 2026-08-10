@@ -1,5 +1,5 @@
 {
-  "id": "35276f39-bae2-44eb-9412-6a0c4e39003b",
+  "id": "771b5731-b0e1-406d-abe2-fa9a0ca27e71",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -520,13 +520,26 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "folder_parent_id_folder_id_fk": {
+          "name": "folder_parent_id_folder_id_fk",
+          "tableFrom": "folder",
+          "tableTo": "folder",
+          "columnsFrom": [
+            "parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "folder_workspace_parent_name_unique": {
           "name": "folder_workspace_parent_name_unique",
-          "nullsNotDistinct": false,
+          "nullsNotDistinct": true,
           "columns": [
             "workspace_id",
             "parent_id",

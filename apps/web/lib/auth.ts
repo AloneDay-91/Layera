@@ -2,6 +2,11 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db, provisionPersonalWorkspace } from "@filecloud/db";
 
+const betterAuthSecret = process.env.BETTER_AUTH_SECRET;
+if (!betterAuthSecret) {
+  throw new Error("BETTER_AUTH_SECRET environment variable is required");
+}
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -10,7 +15,7 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: false,
   },
-  secret: process.env.BETTER_AUTH_SECRET,
+  secret: betterAuthSecret,
   baseURL: process.env.BETTER_AUTH_URL,
   databaseHooks: {
     user: {

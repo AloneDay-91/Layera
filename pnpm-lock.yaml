@@ -68,6 +68,9 @@ importers:
       '@filecloud/config':
         specifier: workspace:*
         version: link:../../packages/config
+      eslint:
+        specifier: ^9.18.0
+        version: 9.39.5(jiti@2.7.0)
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
@@ -105,6 +108,9 @@ importers:
       drizzle-kit:
         specifier: ^0.30.0
         version: 0.30.6
+      eslint:
+        specifier: ^9.18.0
+        version: 9.39.5(jiti@2.7.0)
       tsx:
         specifier: ^4.19.0
         version: 4.23.12
@@ -124,6 +130,9 @@ importers:
       '@filecloud/config':
         specifier: workspace:*
         version: link:../config
+      eslint:
+        specifier: ^9.18.0
+        version: 9.39.5(jiti@2.7.0)
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
@@ -133,6 +142,9 @@ importers:
       '@filecloud/config':
         specifier: workspace:*
         version: link:../config
+      eslint:
+        specifier: ^9.18.0
+        version: 9.39.5(jiti@2.7.0)
       typescript:
         specifier: ^5.7.0
         version: 5.9.3

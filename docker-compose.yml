@@ -41,6 +41,10 @@ services:
       - ./:/repo
       - /repo/node_modules
       - /repo/apps/web/.next
+      - /repo/apps/web/node_modules
+      - /repo/packages/db/node_modules
+      - /repo/packages/types/node_modules
+      - /repo/packages/storage/node_modules
 
 volumes:
   postgres_data:
