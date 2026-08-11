@@ -14,7 +14,7 @@ export function ComingSoon({
 }) {
   return (
     <div className="flex flex-1 items-center justify-center p-8">
-      <Empty icon={<IconComponent size={40} />} title={title} description={description} />
+      <Empty size="sm" icon={<IconComponent size={40} />} title={title} description={description} />
     </div>
   );
 }

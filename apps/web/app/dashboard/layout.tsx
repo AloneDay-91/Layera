@@ -7,5 +7,5 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!session) {
     redirect("/login");
   }
-  return <div>{children}</div>;
+  return <div className="h-full w-full">{children}</div>;
 }
