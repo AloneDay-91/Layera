@@ -4,8 +4,8 @@ import { forwardRef } from "react";
 import NextLink from "next/link";
 import { LinkProvider, type LinkComponentProps } from "@cloudflare/kumo";
 
-const AppLink = forwardRef<HTMLAnchorElement, LinkComponentProps>((props, ref) => (
-  <NextLink ref={ref} {...props} href={props.href ?? "#"} />
+const AppLink = forwardRef<HTMLAnchorElement, LinkComponentProps>(({ to, href, ...rest }, ref) => (
+  <NextLink ref={ref} {...rest} href={href ?? to ?? "#"} />
 ));
 AppLink.displayName = "AppLink";
 
