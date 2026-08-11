@@ -24,9 +24,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-mode="light" data-theme="fedramp">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-kumo-base text-kumo-default`}
       >
         <AppLinkProvider>{children}</AppLinkProvider>
       </body>

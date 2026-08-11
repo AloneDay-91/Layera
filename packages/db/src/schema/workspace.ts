@@ -1,9 +1,12 @@
 import { pgTable, text, timestamp, uuid, unique } from "drizzle-orm/pg-core";
 import type { WorkspaceRole, WorkspaceType } from "@filecloud/types";
-import { user } from "./auth";
+import { user, organization } from "./auth";
 
 export const workspace = pgTable("workspace", {
   id: uuid("id").primaryKey().defaultRandom(),
+  organizationId: text("organization_id").references(() => organization.id, {
+    onDelete: "cascade",
+  }),
   name: text("name").notNull(),
   type: text("type").$type<WorkspaceType>().notNull().default("personal"),
   ownerId: text("owner_id")
