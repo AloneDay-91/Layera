@@ -1,40 +1,45 @@
 "use client";
 
-import { DropdownMenu, Button, useKumoToastManager } from "@cloudflare/kumo";
-import { DotsThreeIcon, PencilSimpleIcon, ArrowsOutCardinalIcon, TrashIcon } from "@phosphor-icons/react";
+import { DropdownMenu, Button } from "@cloudflare/kumo";
+import { DotsThreeIcon, PencilSimpleIcon, ShareIcon, TrashIcon } from "@phosphor-icons/react";
 import type { MockItem } from "@/lib/mock-files";
 
-export function FileRowMenu({ item }: { item: MockItem }) {
-  const toasts = useKumoToastManager();
+type FileRowMenuProps = {
+  item: MockItem;
+  onRename?: (item: MockItem) => void;
+  onShare?: (item: MockItem) => void;
+  onDelete?: (item: MockItem) => void;
+};
 
-  function notImplemented(action: string) {
-    toasts.add({
-      title: "Bientôt disponible",
-      description: `"${action}" pour "${item.name}" n'est pas encore implémenté.`,
-    });
-  }
-
+export function FileRowMenu({ item, onRename, onShare, onDelete }: FileRowMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger>
         <Button
-          variant="secondary"
+          variant="ghost"
           shape="square"
+          size="sm"
           icon={DotsThreeIcon}
           aria-label={`Actions pour ${item.name}`}
         />
       </DropdownMenu.Trigger>
       <DropdownMenu.Content>
-        <DropdownMenu.Item icon={PencilSimpleIcon} onClick={() => notImplemented("Renommer")}>
-          Renommer
-        </DropdownMenu.Item>
-        <DropdownMenu.Item icon={ArrowsOutCardinalIcon} onClick={() => notImplemented("Déplacer")}>
-          Déplacer
-        </DropdownMenu.Item>
+        {onShare && (
+          <DropdownMenu.Item icon={ShareIcon} onClick={() => onShare(item)}>
+            Partager
+          </DropdownMenu.Item>
+        )}
+        {onRename && (
+          <DropdownMenu.Item icon={PencilSimpleIcon} onClick={() => onRename(item)}>
+            Renommer
+          </DropdownMenu.Item>
+        )}
         <DropdownMenu.Separator />
-        <DropdownMenu.Item variant="danger" icon={TrashIcon} onClick={() => notImplemented("Supprimer")}>
-          Supprimer
-        </DropdownMenu.Item>
+        {onDelete && (
+          <DropdownMenu.Item variant="danger" icon={TrashIcon} onClick={() => onDelete(item)}>
+            Supprimer
+          </DropdownMenu.Item>
+        )}
       </DropdownMenu.Content>
     </DropdownMenu>
   );
