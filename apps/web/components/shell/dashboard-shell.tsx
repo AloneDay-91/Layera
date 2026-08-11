@@ -10,9 +10,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <TooltipProvider>
         <Sidebar.Provider>
           <DashboardSidebar />
-          <div className="flex min-h-screen flex-1 flex-col">
+          <div className="flex min-h-screen min-w-0 flex-1 flex-col">
             <DashboardHeader />
-            <main className="flex flex-1 flex-col overflow-auto p-6">{children}</main>
+            <main className="flex min-w-0 flex-1 flex-col overflow-auto p-6">{children}</main>
           </div>
         </Sidebar.Provider>
       </TooltipProvider>
