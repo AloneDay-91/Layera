@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AppLinkProvider } from "@/components/shell/app-link-provider";
+import { AppProviders } from "@/components/shell/app-providers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -24,11 +24,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-mode="light" data-theme="fedramp">
+    <html lang="en" data-mode="light" className="h-full">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-kumo-base text-kumo-default`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-kumo-base text-kumo-default h-full`}
       >
-        <AppLinkProvider>{children}</AppLinkProvider>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

@@ -15,8 +15,5 @@
     "db:migrate": "pnpm --filter @filecloud/db migrate",
     "db:seed": "pnpm --filter @filecloud/db seed",
     "db:studio": "pnpm --filter @filecloud/db studio"
-  },
-  "dependencies": {
-    "@cloudflare/kumo": "^2.9.2"
   }
 }

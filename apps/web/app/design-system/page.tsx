@@ -55,7 +55,6 @@ import { Radio } from "@cloudflare/kumo/components/radio";
 import { Select } from "@cloudflare/kumo/components/select";
 import { SensitiveInput } from "@cloudflare/kumo/components/sensitive-input";
 import { Sidebar } from "@cloudflare/kumo/components/sidebar";
-import { Surface } from "@cloudflare/kumo/components/surface";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { Table } from "@cloudflare/kumo/components/table";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
@@ -417,7 +416,7 @@ function DesignSystemContent() {
                 />
               </div>
               <Dialog.Description>
-                Crée un lien public pour partager ce fichier avec d'autres
+                Crée un lien public pour partager ce fichier avec d&apos;autres
                 personnes.
               </Dialog.Description>
               <div className="mt-4">
@@ -460,25 +459,25 @@ function DesignSystemContent() {
           Layout
         </Text>
 
-        <Surface className="max-w-md p-6">
-          <Text bold>Contenu dans une Surface</Text>
+        <LayerCard className="max-w-md p-6">
+          <Text bold>Contenu dans une LayerCard</Text>
           <Text variant="secondary">
             Fond, bordure et ombre cohérents avec le design system.
           </Text>
-        </Surface>
+        </LayerCard>
 
         <Grid variant="2up" gap="base">
           <GridItem>
-            <Surface className="rounded-lg p-4">
+            <LayerCard className="p-4">
               <Text bold>Documents</Text>
               <Text variant="secondary">128 fichiers</Text>
-            </Surface>
+            </LayerCard>
           </GridItem>
           <GridItem>
-            <Surface className="rounded-lg p-4">
+            <LayerCard className="p-4">
               <Text bold>Images</Text>
               <Text variant="secondary">342 fichiers</Text>
-            </Surface>
+            </LayerCard>
           </GridItem>
         </Grid>
 
@@ -575,7 +574,7 @@ function DesignSystemContent() {
           <Popover.Content>
             <Popover.Title>Trier par</Popover.Title>
             <Popover.Description>
-              Choisis l'ordre d'affichage des fichiers.
+              Choisis l&apos;ordre d&apos;affichage des fichiers.
             </Popover.Description>
           </Popover.Content>
         </Popover>
