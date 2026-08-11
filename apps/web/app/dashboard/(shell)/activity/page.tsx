@@ -1,11 +1,11 @@
 "use client";
 
 import { Breadcrumbs } from "@cloudflare/kumo";
-import { StarIcon } from "@phosphor-icons/react";
+import { ActivityIcon } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/kumo/page-header";
 import { ComingSoon } from "@/components/shell/coming-soon";
 
-export default function FavoritesPage() {
+export default function ActivityPage() {
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
@@ -14,15 +14,15 @@ export default function FavoritesPage() {
           <Breadcrumbs>
             <Breadcrumbs.Link href="/dashboard">Mes fichiers</Breadcrumbs.Link>
             <Breadcrumbs.Separator />
-            <Breadcrumbs.Current>Favoris</Breadcrumbs.Current>
+            <Breadcrumbs.Current>Journaux d&apos;activité</Breadcrumbs.Current>
           </Breadcrumbs>
         }
-        title="Favoris"
+        title="Journaux d'activité"
       />
       <ComingSoon
-        icon={StarIcon}
-        title="Favoris bientôt disponibles"
-        description="Vous pourrez bientôt marquer des fichiers et dossiers comme favoris."
+        icon={ActivityIcon}
+        title="Journaux d'activité"
+        description="Historique des actions, créations, suppressions et partages."
       />
     </div>
   );
