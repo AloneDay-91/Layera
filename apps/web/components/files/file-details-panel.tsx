@@ -1,27 +1,36 @@
 "use client";
 
-import { Button } from "@cloudflare/kumo";
+import { useState } from "react";
+import { Button, Dialog, Text } from "@cloudflare/kumo";
 import { XIcon, ShareIcon, DownloadIcon } from "@phosphor-icons/react";
 import type { MockItem } from "@/lib/mock-files";
 import { formatFileSize } from "@/lib/mock-files";
-import { FilePreviewIcon } from "./file-preview";
+import { FilePreviewIcon, isPreviewableImage } from "./file-preview";
 
 export function FileDetailsPanel({
   item,
   onClose,
   onAction,
+  onShare,
 }: {
   item: MockItem;
   onClose: () => void;
   onAction: (action: string) => void;
+  onShare?: (item: MockItem) => void;
 }) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const previewable = isPreviewableImage(item);
+
   return (
-    <aside className="flex w-72 flex-shrink-0 flex-col gap-4 border-l border-gray-200 p-4">
+    <aside className="flex w-72 flex-shrink-0 flex-col gap-4 border-l border-kumo-line bg-kumo-base p-4 text-kumo-default">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium">Détails</h2>
+        <Text as="h2" bold>
+          Détails
+        </Text>
         <Button
           variant="secondary"
           shape="square"
+          size="sm"
           icon={XIcon}
           aria-label="Fermer le panneau"
           onClick={onClose}
@@ -29,37 +38,82 @@ export function FileDetailsPanel({
       </div>
 
       <div className="flex flex-col items-center gap-2 py-4">
-        <FilePreviewIcon item={item} size={48} />
-        <p className="break-all text-center text-sm font-medium">{item.name}</p>
+        {previewable ? (
+          <button
+            type="button"
+            onClick={() => setPreviewOpen(true)}
+            aria-label={`Prévisualiser ${item.name}`}
+            className="border-0 bg-transparent p-0"
+          >
+            <FilePreviewIcon item={item} size={96} />
+          </button>
+        ) : (
+          <FilePreviewIcon item={item} size={48} />
+        )}
+        <Text as="p" bold DANGEROUS_className="break-all text-center">
+          {item.name}
+        </Text>
       </div>
 
       <dl className="flex flex-col gap-2 text-sm">
         <div className="flex justify-between">
-          <dt className="text-gray-500">Type</dt>
-          <dd>{item.type === "folder" ? "Dossier" : item.mimeType ?? "Fichier"}</dd>
+          <Text as="dt" variant="secondary">Type</Text>
+          <dd className="font-medium text-kumo-default">{item.type === "folder" ? "Dossier" : item.mimeType ?? "Fichier"}</dd>
         </div>
         <div className="flex justify-between">
-          <dt className="text-gray-500">Taille</dt>
-          <dd>{formatFileSize(item.size)}</dd>
+          <Text as="dt" variant="secondary">Taille</Text>
+          <dd className="font-medium text-kumo-default">{formatFileSize(item.size)}</dd>
         </div>
         <div className="flex justify-between">
-          <dt className="text-gray-500">Propriétaire</dt>
-          <dd>{item.owner}</dd>
+          <Text as="dt" variant="secondary">Propriétaire</Text>
+          <dd className="font-medium text-kumo-default">{item.owner}</dd>
         </div>
         <div className="flex justify-between">
-          <dt className="text-gray-500">Modifié</dt>
-          <dd>{new Date(item.updatedAt).toLocaleDateString("fr-FR")}</dd>
+          <Text as="dt" variant="secondary">Modifié</Text>
+          <dd className="font-medium text-kumo-default">{new Date(item.updatedAt).toLocaleDateString("fr-FR")}</dd>
         </div>
       </dl>
 
       <div className="flex gap-2">
-        <Button variant="secondary" icon={ShareIcon} onClick={() => onAction("Partager")}>
+        {previewable && (
+          <Button variant="secondary" size="sm" onClick={() => setPreviewOpen(true)}>
+            Aperçu
+          </Button>
+        )}
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={ShareIcon}
+          onClick={() => (onShare ? onShare(item) : onAction("Partager"))}
+        >
           Partager
         </Button>
-        <Button variant="secondary" icon={DownloadIcon} onClick={() => onAction("Télécharger")}>
+        <Button variant="secondary" size="sm" icon={DownloadIcon} onClick={() => onAction("Télécharger")}>
           Télécharger
         </Button>
       </div>
+
+      {previewable && (
+        <Dialog.Root open={previewOpen} onOpenChange={setPreviewOpen}>
+          <Dialog size="xl" className="p-6">
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <Dialog.Title className="text-lg font-semibold break-all">{item.name}</Dialog.Title>
+              <Dialog.Close
+                aria-label="Fermer"
+                render={(props) => (
+                  <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Fermer" />
+                )}
+              />
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/api/files/content?id=${item.id}`}
+              alt={item.name}
+              className="max-h-[70vh] w-full rounded object-contain"
+            />
+          </Dialog>
+        </Dialog.Root>
+      )}
     </aside>
   );
 }
