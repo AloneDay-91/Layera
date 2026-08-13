@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Grid, GridItem, LayerCard, Text } from "@cloudflare/kumo";
+import { StarIcon } from "@phosphor-icons/react";
 import type { MockItem } from "@/lib/mock-files";
 import { formatFileSize } from "@/lib/mock-files";
 import { FilePreviewIcon } from "./file-preview";
@@ -11,6 +12,7 @@ type FileGridProps = {
   selectedItemId: string | null;
   onOpenFolder: (folderId: string) => void;
   onSelectItem: (itemId: string | null) => void;
+  onToggleFavorite?: (item: MockItem) => void;
   onMoveItem?: (draggedItem: { id: string; type: "file" | "folder"; name: string }, targetFolderId: string) => void;
 };
 
@@ -19,6 +21,7 @@ export function FileGrid({
   selectedItemId,
   onOpenFolder,
   onSelectItem,
+  onToggleFavorite,
   onMoveItem,
 }: FileGridProps) {
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
@@ -74,8 +77,26 @@ export function FileGrid({
               }
               onDragLeave={isFolder ? () => setDragOverFolderId(null) : undefined}
               onDrop={isFolder ? (e) => handleDropOnFolder(e, item.id) : undefined}
-              className="w-full"
+              className="relative w-full"
             >
+              {onToggleFavorite && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite(item);
+                  }}
+                  aria-label={item.isFavorite ? `Retirer "${item.name}" des favoris` : `Ajouter "${item.name}" aux favoris`}
+                  aria-pressed={item.isFavorite}
+                  className="absolute right-2 top-2 z-10 border-0 bg-transparent p-1"
+                >
+                  <StarIcon
+                    size={16}
+                    weight={item.isFavorite ? "fill" : "regular"}
+                    className={item.isFavorite ? "text-kumo-warning" : "text-kumo-subtle"}
+                  />
+                </button>
+              )}
               <LayerCard
                 render={<button type="button" />}
                 onClick={() => handleActivate(item)}

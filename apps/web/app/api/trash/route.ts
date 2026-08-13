@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { db, workspace, folder, file, trashItem, eq, and, isNull } from "@filecloud/db";
+import { db, workspace, folder, file, trashItem, favorite, eq, and, isNull } from "@filecloud/db";
 
 export async function GET() {
   try {
@@ -164,6 +164,7 @@ export async function DELETE(request: Request) {
           } else {
             await db.delete(folder).where(eq(folder.id, tRow.itemId));
           }
+          await db.delete(favorite).where(eq(favorite.itemId, tRow.itemId));
         }
         await db.delete(trashItem).where(eq(trashItem.workspaceId, wsRecord.id));
       }
@@ -177,6 +178,7 @@ export async function DELETE(request: Request) {
 
     // Supprimer définitivement
     await db.delete(trashItem).where(eq(trashItem.itemId, id));
+    await db.delete(favorite).where(eq(favorite.itemId, id));
     if (type === "file") {
       await db.delete(file).where(eq(file.id, id));
     } else {

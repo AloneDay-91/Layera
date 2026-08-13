@@ -6,3 +6,4 @@ export * from "./share-link";
 export * from "./upload";
 export * from "./trash-item";
 export * from "./audit-log";
+export * from "./favorite";

@@ -1,7 +1,7 @@
 "use client";
 
 import { DropdownMenu, Button } from "@cloudflare/kumo";
-import { DotsThreeIcon, PencilSimpleIcon, ShareIcon, TrashIcon } from "@phosphor-icons/react";
+import { DotsThreeIcon, PencilSimpleIcon, ShareIcon, StarIcon, TrashIcon } from "@phosphor-icons/react";
 import type { MockItem } from "@/lib/mock-files";
 
 type FileRowMenuProps = {
@@ -9,9 +9,10 @@ type FileRowMenuProps = {
   onRename?: (item: MockItem) => void;
   onShare?: (item: MockItem) => void;
   onDelete?: (item: MockItem) => void;
+  onToggleFavorite?: (item: MockItem) => void;
 };
 
-export function FileRowMenu({ item, onRename, onShare, onDelete }: FileRowMenuProps) {
+export function FileRowMenu({ item, onRename, onShare, onDelete, onToggleFavorite }: FileRowMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger>
@@ -24,6 +25,11 @@ export function FileRowMenu({ item, onRename, onShare, onDelete }: FileRowMenuPr
         />
       </DropdownMenu.Trigger>
       <DropdownMenu.Content>
+        {onToggleFavorite && (
+          <DropdownMenu.Item icon={StarIcon} onClick={() => onToggleFavorite(item)}>
+            {item.isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+          </DropdownMenu.Item>
+        )}
         {onShare && (
           <DropdownMenu.Item icon={ShareIcon} onClick={() => onShare(item)}>
             Partager

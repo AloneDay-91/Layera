@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { LayerCard, Table } from "@cloudflare/kumo";
+import { StarIcon } from "@phosphor-icons/react";
 import type { MockItem } from "@/lib/mock-files";
 import { formatFileSize } from "@/lib/mock-files";
 import { FilePreviewIcon } from "./file-preview";
@@ -15,6 +16,7 @@ type FileTableProps = {
   onRenameItem?: (item: MockItem) => void;
   onShareItem?: (item: MockItem) => void;
   onDeleteItem?: (item: MockItem) => void;
+  onToggleFavorite?: (item: MockItem) => void;
   onMoveItem?: (draggedItem: { id: string; type: "file" | "folder"; name: string }, targetFolderId: string) => void;
 };
 
@@ -26,6 +28,7 @@ export function FileTable({
   onRenameItem,
   onShareItem,
   onDeleteItem,
+  onToggleFavorite,
   onMoveItem,
 }: FileTableProps) {
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
@@ -65,6 +68,7 @@ export function FileTable({
       <Table>
         <Table.Header>
           <Table.Row>
+            <Table.Head></Table.Head>
             <Table.Head>Nom</Table.Head>
             <Table.Head>Propriétaire</Table.Head>
             <Table.Head>Modifié</Table.Head>
@@ -96,6 +100,26 @@ export function FileTable({
                 className={isDragOver ? "bg-kumo-tint border-2 border-dashed border-kumo-brand" : ""}
               >
                 <Table.Cell>
+                  {onToggleFavorite && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleFavorite(item);
+                      }}
+                      aria-label={item.isFavorite ? `Retirer "${item.name}" des favoris` : `Ajouter "${item.name}" aux favoris`}
+                      aria-pressed={item.isFavorite}
+                      className="flex items-center justify-center border-0 bg-transparent p-1"
+                    >
+                      <StarIcon
+                        size={16}
+                        weight={item.isFavorite ? "fill" : "regular"}
+                        className={item.isFavorite ? "text-kumo-warning" : "text-kumo-subtle"}
+                      />
+                    </button>
+                  )}
+                </Table.Cell>
+                <Table.Cell>
                   <button
                     type="button"
                     onClick={() => handleActivate(item)}
@@ -109,7 +133,13 @@ export function FileTable({
                 <Table.Cell>{new Date(item.updatedAt).toLocaleDateString("fr-FR")}</Table.Cell>
                 <Table.Cell>{formatFileSize(item.size)}</Table.Cell>
                 <Table.Cell>
-                  <FileRowMenu item={item} onRename={onRenameItem} onShare={onShareItem} onDelete={onDeleteItem} />
+                  <FileRowMenu
+                    item={item}
+                    onRename={onRenameItem}
+                    onShare={onShareItem}
+                    onDelete={onDeleteItem}
+                    onToggleFavorite={onToggleFavorite}
+                  />
                 </Table.Cell>
               </Table.Row>
             );

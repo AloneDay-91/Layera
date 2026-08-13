@@ -9,6 +9,7 @@ export type MockItem = {
   size: number | null;
   updatedAt: string;
   owner: string;
+  isFavorite?: boolean;
 };
 
 export const MOCK_ITEMS: MockItem[] = [

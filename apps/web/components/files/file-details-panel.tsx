@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button, Dialog, Text } from "@cloudflare/kumo";
-import { XIcon, ShareIcon, DownloadIcon } from "@phosphor-icons/react";
+import { XIcon, ShareIcon, DownloadIcon, StarIcon } from "@phosphor-icons/react";
 import type { MockItem } from "@/lib/mock-files";
 import { formatFileSize } from "@/lib/mock-files";
 import { FilePreviewIcon, isPreviewableImage } from "./file-preview";
@@ -12,11 +12,13 @@ export function FileDetailsPanel({
   onClose,
   onAction,
   onShare,
+  onToggleFavorite,
 }: {
   item: MockItem;
   onClose: () => void;
   onAction: (action: string) => void;
   onShare?: (item: MockItem) => void;
+  onToggleFavorite?: (item: MockItem) => void;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const previewable = isPreviewableImage(item);
@@ -74,10 +76,20 @@ export function FileDetailsPanel({
         </div>
       </dl>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {previewable && (
           <Button variant="secondary" size="sm" onClick={() => setPreviewOpen(true)}>
             Aperçu
+          </Button>
+        )}
+        {onToggleFavorite && (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={StarIcon}
+            onClick={() => onToggleFavorite(item)}
+          >
+            {item.isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
           </Button>
         )}
         <Button

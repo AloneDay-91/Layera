@@ -323,6 +323,27 @@ export function FileBrowser() {
     toasts.add({ title: "Lien copié", description: "Le lien de partage a été copié dans le presse-papiers." });
   }
 
+  async function handleToggleFavorite(item: MockItem) {
+    const nextFavorite = !item.isFavorite;
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, isFavorite: nextFavorite } : i)));
+    try {
+      const res = await fetch("/api/favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, type: item.type }),
+      });
+      if (!res.ok) throw new Error("Failed to toggle favorite");
+      toasts.add({
+        title: nextFavorite ? "Ajouté aux favoris" : "Retiré des favoris",
+        description: `"${item.name}" ${nextFavorite ? "a été ajouté à" : "a été retiré de"} vos favoris.`,
+      });
+    } catch (err) {
+      console.error("Toggle favorite error:", err);
+      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, isFavorite: item.isFavorite } : i)));
+      toasts.add({ title: "Erreur", description: "Impossible de mettre à jour les favoris." });
+    }
+  }
+
   function handleDetailAction(action: string) {
     toasts.add({
       title: "Action sur le fichier",
@@ -445,6 +466,7 @@ export function FileBrowser() {
             }}
             onShareItem={handleShareItem}
             onDeleteItem={handleDeleteItem}
+            onToggleFavorite={handleToggleFavorite}
             onMoveItem={handleMoveItem}
           />
         ) : (
@@ -453,6 +475,7 @@ export function FileBrowser() {
             selectedItemId={selectedItemId}
             onOpenFolder={handleOpenFolder}
             onSelectItem={setSelectedItemId}
+            onToggleFavorite={handleToggleFavorite}
             onMoveItem={handleMoveItem}
           />
         )}
@@ -464,6 +487,7 @@ export function FileBrowser() {
           onClose={() => setSelectedItemId(null)}
           onAction={handleDetailAction}
           onShare={handleShareItem}
+          onToggleFavorite={handleToggleFavorite}
         />
       )}
 

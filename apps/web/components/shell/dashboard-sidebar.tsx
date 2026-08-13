@@ -24,7 +24,6 @@ const ORGANIZER_SUB_ITEMS = [
 
 const COMING_SOON_ITEMS = [
   { href: "/dashboard/shared", label: "Partagés avec moi", icon: ShareIcon },
-  { href: "/dashboard/favorites", label: "Favoris", icon: StarIcon },
   { href: "/dashboard/activity", label: "Activité", icon: ActivityIcon },
   { href: "/dashboard/admin", label: "Administration", icon: ShieldCheckIcon },
 ];
@@ -47,6 +46,9 @@ export function DashboardSidebar() {
             </Sidebar.MenuButton>
             <Sidebar.MenuButton icon={ClockIcon} href="/dashboard/recent" active={pathname === "/dashboard/recent"}>
               Récents
+            </Sidebar.MenuButton>
+            <Sidebar.MenuButton icon={StarIcon} href="/dashboard/favorites" active={pathname === "/dashboard/favorites"}>
+              Favoris
             </Sidebar.MenuButton>
           </Sidebar.Menu>
         </Sidebar.Group>

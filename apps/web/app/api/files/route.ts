@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { db, workspace, folder, file, trashItem, provisionPersonalWorkspace, provisionOrganizationWorkspace, eq, and, isNull, ilike } from "@filecloud/db";
+import { db, workspace, folder, file, trashItem, favorite, provisionPersonalWorkspace, provisionOrganizationWorkspace, eq, and, isNull, ilike } from "@filecloud/db";
 
 export async function GET(request: Request) {
   try {
@@ -117,6 +117,13 @@ export async function GET(request: Request) {
         .where(and(eq(file.workspaceId, wsRecord.id), fileCondition));
     }
 
+    // 5. Récupérer les favoris de l'utilisateur pour cet espace
+    const favoriteRows = await db
+      .select({ itemId: favorite.itemId })
+      .from(favorite)
+      .where(and(eq(favorite.workspaceId, wsRecord.id), eq(favorite.userId, session.user.id)));
+    const favoriteIds = new Set(favoriteRows.map((f) => f.itemId));
+
     // 5. Transformer au format d'affichage FileBrowser
     const formattedFolders = dbFolders
       .filter((f) => f.name !== "root")
@@ -129,6 +136,7 @@ export async function GET(request: Request) {
         size: null,
         updatedAt: f.updatedAt.toISOString(),
         owner: session.user.name,
+        isFavorite: favoriteIds.has(f.id),
       }));
 
     const formattedFiles = dbFiles.map((f) => ({
@@ -140,6 +148,7 @@ export async function GET(request: Request) {
       size: f.size,
       updatedAt: f.updatedAt.toISOString(),
       owner: session.user.name,
+      isFavorite: favoriteIds.has(f.id),
     }));
 
     // 5. Calculer le fil d'Ariane (breadcrumbs)
@@ -374,6 +383,7 @@ export async function DELETE(request: Request) {
         await db.delete(file).where(eq(file.id, id));
       }
       await db.delete(trashItem).where(eq(trashItem.itemId, id));
+      await db.delete(favorite).where(eq(favorite.itemId, id));
     } else {
       // Soft delete: ajouter à la corbeille (trashItem)
       const activeOrgId = session.session.activeOrganizationId;
