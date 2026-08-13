@@ -48,8 +48,12 @@ export async function GET() {
     const folderIds = favoriteRows.filter((f) => f.itemType === "folder").map((f) => f.itemId);
 
     const [favFiles, favFolders, allFolders] = await Promise.all([
-      fileIds.length > 0 ? db.select().from(file).where(inArray(file.id, fileIds)) : Promise.resolve([]),
-      folderIds.length > 0 ? db.select().from(folder).where(inArray(folder.id, folderIds)) : Promise.resolve([]),
+      fileIds.length > 0
+        ? db.select().from(file).where(and(inArray(file.id, fileIds), eq(file.workspaceId, wsRecord.id)))
+        : Promise.resolve([]),
+      folderIds.length > 0
+        ? db.select().from(folder).where(and(inArray(folder.id, folderIds), eq(folder.workspaceId, wsRecord.id)))
+        : Promise.resolve([]),
       db.select().from(folder).where(eq(folder.workspaceId, wsRecord.id)),
     ]);
 
@@ -112,6 +116,15 @@ export async function POST(request: Request) {
     const wsRecord = await getActiveWorkspace(session);
     if (!wsRecord) {
       return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
+    }
+
+    const belongsToWorkspace =
+      type === "file"
+        ? await db.select({ id: file.id }).from(file).where(and(eq(file.id, id), eq(file.workspaceId, wsRecord.id))).limit(1)
+        : await db.select({ id: folder.id }).from(folder).where(and(eq(folder.id, id), eq(folder.workspaceId, wsRecord.id))).limit(1);
+
+    if (!belongsToWorkspace[0]) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
     const existing = await db
