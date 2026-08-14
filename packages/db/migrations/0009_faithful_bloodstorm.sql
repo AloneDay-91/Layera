@@ -1,0 +1,1 @@
+ALTER TABLE "share_link" ALTER COLUMN "workspace_id" SET NOT NULL;

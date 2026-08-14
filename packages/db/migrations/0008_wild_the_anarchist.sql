@@ -1,0 +1,2 @@
+ALTER TABLE "share_link" ADD COLUMN "workspace_id" uuid;--> statement-breakpoint
+ALTER TABLE "share_link" ADD CONSTRAINT "share_link_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE cascade ON UPDATE no action;

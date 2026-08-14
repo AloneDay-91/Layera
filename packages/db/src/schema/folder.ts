@@ -11,6 +11,7 @@ export const folder = pgTable(
       .references(() => workspace.id, { onDelete: "cascade" }),
     parentId: uuid("parent_id").references((): AnyPgColumn => folder.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    color: text("color"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

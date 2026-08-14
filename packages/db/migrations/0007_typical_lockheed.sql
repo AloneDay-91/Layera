@@ -1,0 +1,1 @@
+ALTER TABLE "folder" ADD COLUMN "color" text;
