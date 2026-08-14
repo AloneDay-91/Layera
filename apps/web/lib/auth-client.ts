@@ -1,7 +1,23 @@
 import { createAuthClient } from "better-auth/react";
-import { adminClient, emailOTPClient, organizationClient } from "better-auth/client/plugins";
+import {
+  adminClient,
+  emailOTPClient,
+  multiSessionClient,
+  organizationClient,
+  twoFactorClient,
+} from "better-auth/client/plugins";
 
 export const authClient = createAuthClient({
   baseURL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL ?? "http://localhost:3000",
-  plugins: [adminClient(), emailOTPClient(), organizationClient()],
+  plugins: [
+    adminClient(),
+    emailOTPClient(),
+    organizationClient(),
+    multiSessionClient(),
+    twoFactorClient({
+      onTwoFactorRedirect() {
+        window.location.href = "/login/two-factor";
+      },
+    }),
+  ],
 });

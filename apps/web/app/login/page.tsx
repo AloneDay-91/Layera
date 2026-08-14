@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
-import { Button, Input, LayerCard, Link, Tabs, Text, useKumoToastManager } from "@cloudflare/kumo";
+import { Button, Input, LayerCard, Link, Loader, Tabs, Text, useKumoToastManager } from "@cloudflare/kumo";
 import {
   GithubLogoIcon,
   GoogleLogoIcon,
@@ -35,10 +35,15 @@ export default function LoginPage() {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    const { error: signInError } = await authClient.signIn.email({ email, password });
+    const { data, error: signInError } = await authClient.signIn.email({ email, password });
     setSubmitting(false);
     if (signInError) {
       setError(signInError.message ?? "Échec de la connexion");
+      return;
+    }
+    if (data && "twoFactorRedirect" in data && data.twoFactorRedirect) {
+      // La redirection vers /login/two-factor est gérée par onTwoFactorRedirect
+      // dans le client Better Auth ; on n'ouvre pas de session ici.
       return;
     }
     toasts.add({ title: "Connexion réussie", description: "Bienvenue sur FileCloud." });
@@ -100,7 +105,7 @@ export default function LoginPage() {
         <div className="mb-6 flex flex-col gap-1">
           <div className="flex items-center gap-2 mb-1">
             <AppLogo size={36} />
-            <Text as="h1" variant="heading1">
+            <Text as="h1" variant="heading1" DANGEROUS_className="font-logo">
               FileCloud
             </Text>
           </div>
@@ -140,24 +145,27 @@ export default function LoginPage() {
         {/* Choix de la méthode d'authentification */}
         <div className="mb-4">
           <Tabs
-            variant="segmented"
+            listClassName="justify-center w-full "
+            variant="underline"
             size="sm"
             tabs={[
               {
                 value: "password",
                 label: (
-                  <span className="flex items-center gap-1.5">
+                  <span className="flex items-center justify-center gap-1.5 w-full">
                     <KeyIcon size={14} /> Mot de passe
                   </span>
                 ),
+                className: "w-full flex items-center justify-center text-center"
               },
               {
                 value: "otp",
                 label: (
-                  <span className="flex items-center gap-1.5">
+                  <span className="flex items-center justify-center gap-1.5 w-full">
                     <EnvelopeSimpleIcon size={14} /> Code OTP Email
                   </span>
                 ),
+                className: "w-full flex items-center justify-center text-center"
               },
             ]}
             value={authMethod}
@@ -202,7 +210,13 @@ export default function LoginPage() {
               icon={ArrowRightIcon}
               className="mt-2 w-full justify-center"
             >
-              {submitting ? "Connexion en cours…" : "Se connecter"}
+              {submitting ? (
+                <span className="flex items-center gap-1.5">
+                  <Loader size="sm" /> Connexion en cours…
+                </span>
+              ) : (
+                "Se connecter"
+              )}
             </Button>
           </form>
         )}
@@ -231,7 +245,13 @@ export default function LoginPage() {
                   icon={EnvelopeSimpleIcon}
                   className="mt-2 w-full justify-center"
                 >
-                  {sendingOtp ? "Envoi du code…" : "Recevoir un code par email"}
+                  {sendingOtp ? (
+                    <span className="flex items-center gap-1.5">
+                      <Loader size="sm" /> Envoi du code…
+                    </span>
+                  ) : (
+                    "Recevoir un code par email"
+                  )}
                 </Button>
               </form>
             ) : (
@@ -268,7 +288,13 @@ export default function LoginPage() {
                     icon={ArrowRightIcon}
                     className="w-2/3 justify-center"
                   >
-                    {submitting ? "Vérification…" : "Valider le code"}
+                    {submitting ? (
+                      <span className="flex items-center gap-1.5">
+                        <Loader size="sm" /> Vérification…
+                      </span>
+                    ) : (
+                      "Valider le code"
+                    )}
                   </Button>
                 </div>
               </form>

@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { admin, emailOTP, organization } from "better-auth/plugins";
+import { admin, emailOTP, multiSession, organization, twoFactor } from "better-auth/plugins";
 import { db, provisionPersonalWorkspace, provisionOrganizationWorkspace, eq } from "@filecloud/db";
 import * as schema from "@filecloud/db";
 
@@ -42,6 +42,26 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: false,
   },
+  user: {
+    deleteUser: {
+      enabled: true,
+    },
+  },
+  rateLimit: {
+    enabled: true,
+    storage: "database",
+    window: 60,
+    max: 100,
+    customRules: {
+      "/sign-in/email": { window: 10, max: 5 },
+      "/sign-in/email-otp": { window: 10, max: 5 },
+      "/sign-up/email": { window: 60, max: 5 },
+      "/email-otp/send-verification-otp": { window: 60, max: 3 },
+      "/two-factor/verify-totp": { window: 10, max: 5 },
+      "/two-factor/verify-otp": { window: 10, max: 5 },
+      "/two-factor/verify-backup-code": { window: 10, max: 5 },
+    },
+  },
   socialProviders: {
     github: {
       clientId: process.env.GITHUB_CLIENT_ID ?? "mock-github-client-id",
@@ -54,6 +74,12 @@ export const auth = betterAuth({
   },
   plugins: [
     admin(),
+    twoFactor({
+      issuer: "FileCloud",
+    }),
+    multiSession({
+      maximumSessions: 5,
+    }),
     emailOTP({
       async sendVerificationOTP({ email, otp, type }) {
         // Log OTP code for local development / S3 notification integration
