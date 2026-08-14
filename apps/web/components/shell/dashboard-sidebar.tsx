@@ -12,6 +12,7 @@ import {
   ShieldCheckIcon,
   ShareIcon,
   StarIcon,
+  TagIcon,
 } from "@phosphor-icons/react";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 
@@ -81,6 +82,13 @@ export function DashboardSidebar() {
                 </Sidebar.CollapsibleContent>
               </Sidebar.Collapsible>
             </Sidebar.MenuItem>
+            <Sidebar.MenuButton
+              icon={TagIcon}
+              href="/dashboard/tags"
+              active={pathname === "/dashboard/tags"}
+            >
+              Tags
+            </Sidebar.MenuButton>
             <Sidebar.MenuButton
               icon={HardDriveIcon}
               href="/dashboard/storage"

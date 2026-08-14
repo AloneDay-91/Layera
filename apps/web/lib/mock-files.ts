@@ -1,5 +1,11 @@
 export type MockItemType = "file" | "folder";
 
+export type ItemTag = {
+  id: string;
+  name: string;
+  color: string;
+};
+
 export type MockItem = {
   id: string;
   parentId: string | null;
@@ -10,6 +16,7 @@ export type MockItem = {
   updatedAt: string;
   owner: string;
   isFavorite?: boolean;
+  tags?: ItemTag[];
 };
 
 export const MOCK_ITEMS: MockItem[] = [
@@ -167,7 +174,7 @@ export function getBreadcrumbPath(items: MockItem[], folderId: string | null): M
 
 export function formatFileSize(bytes: number | null): string {
   if (bytes === null) return "—";
-  const units = ["B", "KB", "MB", "GB"];
+  const units = ["B", "Kb", "Mb", "Gb"];
   let value = bytes;
   let unitIndex = 0;
   while (value >= 1024 && unitIndex < units.length - 1) {

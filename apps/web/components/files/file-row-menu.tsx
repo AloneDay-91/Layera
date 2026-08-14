@@ -1,7 +1,7 @@
 "use client";
 
 import { DropdownMenu, Button } from "@cloudflare/kumo";
-import { DotsThreeIcon, PencilSimpleIcon, ShareIcon, StarIcon, TrashIcon } from "@phosphor-icons/react";
+import { DotsThreeIcon, PencilSimpleIcon, ShareIcon, StarIcon, TagIcon, TrashIcon } from "@phosphor-icons/react";
 import type { MockItem } from "@/lib/mock-files";
 
 type FileRowMenuProps = {
@@ -10,9 +10,10 @@ type FileRowMenuProps = {
   onShare?: (item: MockItem) => void;
   onDelete?: (item: MockItem) => void;
   onToggleFavorite?: (item: MockItem) => void;
+  onManageTags?: (item: MockItem) => void;
 };
 
-export function FileRowMenu({ item, onRename, onShare, onDelete, onToggleFavorite }: FileRowMenuProps) {
+export function FileRowMenu({ item, onRename, onShare, onDelete, onToggleFavorite, onManageTags }: FileRowMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger>
@@ -38,6 +39,11 @@ export function FileRowMenu({ item, onRename, onShare, onDelete, onToggleFavorit
         {onRename && (
           <DropdownMenu.Item icon={PencilSimpleIcon} onClick={() => onRename(item)}>
             Renommer
+          </DropdownMenu.Item>
+        )}
+        {onManageTags && (
+          <DropdownMenu.Item icon={TagIcon} onClick={() => onManageTags(item)}>
+            Tags
           </DropdownMenu.Item>
         )}
         <DropdownMenu.Separator />
