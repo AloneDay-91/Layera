@@ -371,6 +371,68 @@
     "trash": "Corbeille",
     "itemCount": "{count, plural, one {# élément} other {# éléments}}"
   },
+  "activityPage": {
+    "title": "Journaux d'activité",
+    "description": "Historique des actions, créations, suppressions et partages."
+  },
+  "sharedPage": {
+    "breadcrumb": "Partagés avec moi",
+    "comingSoonTitle": "Partage bientôt disponible",
+    "comingSoonDescription": "Le partage de fichiers et de dossiers arrive dans une prochaine mise à jour."
+  },
+  "workspaceSwitcher": {
+    "personalWorkspaceOf": "Espace de {name}",
+    "personalWorkspace": "Espace personnel",
+    "workspacesLabel": "Espaces de travail",
+    "newWorkspace": "Nouveau workspace / équipe",
+    "createDialogTitle": "Créer un workspace",
+    "close": "Fermer",
+    "workspaceNameLabel": "Nom de l'espace",
+    "workspaceNamePlaceholder": "ex: Équipe Marketing",
+    "cancel": "Annuler",
+    "creating": "Création…",
+    "createWorkspace": "Créer le workspace",
+    "toasts": {
+      "switchErrorTitle": "Erreur de changement d'espace",
+      "switchErrorFallback": "Impossible de changer d'espace.",
+      "activeWorkspaceChangedTitle": "Espace actif modifié",
+      "activeWorkspaceChangedDescription": "Vous êtes maintenant sur \"{name}\".",
+      "createErrorTitle": "Erreur de création",
+      "createErrorFallback": "Impossible de créer le workspace.",
+      "workspaceCreatedTitle": "Workspace créé",
+      "workspaceCreatedDescription": "L'espace \"{name}\" a été configuré avec succès."
+    }
+  },
+  "accountSwitcher": {
+    "menuAria": "Menu du compte, {name}",
+    "removeAccountAria": "Retirer {name}",
+    "accountsLabel": "Comptes",
+    "addAccount": "Ajouter un compte",
+    "accountLabel": "Compte",
+    "myProfile": "Mon profil",
+    "appSettings": "Réglages applicatifs",
+    "preferencesLabel": "Préférences",
+    "themeAndAppearance": "Thème & Apparence",
+    "themeLight": "Clair",
+    "themeDark": "Sombre",
+    "themeSystem": "Système",
+    "resourcesLabel": "Ressources",
+    "apiDocumentation": "Documentation API",
+    "keyboardShortcuts": "Raccourcis clavier",
+    "signOut": "Se déconnecter",
+    "defaultUserName": "Développeur",
+    "personalWorkspace": "Espace Personnel",
+    "toasts": {
+      "genericError": "Erreur",
+      "unknownError": "Erreur inconnue",
+      "switchAccountErrorDescription": "Impossible de changer de compte.",
+      "removeAccountErrorDescription": "Impossible de retirer ce compte.",
+      "comingSoonTitle": "Bientôt disponible",
+      "comingSoonDescription": "La fonctionnalité \"{feature}\" arrive très vite.",
+      "documentation": "Documentation",
+      "keyboardShortcutsFeature": "Raccourcis Clavier"
+    }
+  },
   "settings": {
     "language": "Langue",
     "languageDescription": "Choisissez la langue utilisée dans l'interface.",

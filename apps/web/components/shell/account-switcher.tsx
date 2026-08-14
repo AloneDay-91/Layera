@@ -58,6 +58,8 @@ export function AccountSwitcher() {
   const { mode, setMode } = useTheme();
   const { locale, setLocale } = useAppLocale();
   const tSettings = useTranslations("settings");
+  const t = useTranslations("accountSwitcher");
+  const tToasts = useTranslations("accountSwitcher.toasts");
 
   const [deviceSessions, setDeviceSessions] = useState<DeviceSession[]>([]);
   const [switchingToken, setSwitchingToken] = useState<string | null>(null);
@@ -76,11 +78,11 @@ export function AccountSwitcher() {
     setSwitchingToken(sessionToken);
     try {
       const { error } = await authClient.multiSession.setActive({ sessionToken });
-      if (error) throw new Error(error.message ?? "Erreur inconnue");
+      if (error) throw new Error(error.message ?? tToasts("unknownError"));
       router.refresh();
     } catch (err) {
       console.error("Switch account error:", err);
-      toasts.add({ title: "Erreur", description: "Impossible de changer de compte." });
+      toasts.add({ title: tToasts("genericError"), description: tToasts("switchAccountErrorDescription") });
     } finally {
       setSwitchingToken(null);
     }
@@ -90,7 +92,7 @@ export function AccountSwitcher() {
     setRevokingToken(sessionToken);
     try {
       const { error } = await authClient.multiSession.revoke({ sessionToken });
-      if (error) throw new Error(error.message ?? "Erreur inconnue");
+      if (error) throw new Error(error.message ?? tToasts("unknownError"));
       if (sessionToken === session?.session?.token) {
         // Le compte actif a été retiré : Better Auth a promu une autre session
         // (ou aucune) côté serveur — on recharge pour resynchroniser le cookie.
@@ -100,7 +102,7 @@ export function AccountSwitcher() {
       loadDeviceSessions();
     } catch (err) {
       console.error("Remove account error:", err);
-      toasts.add({ title: "Erreur", description: "Impossible de retirer ce compte." });
+      toasts.add({ title: tToasts("genericError"), description: tToasts("removeAccountErrorDescription") });
     } finally {
       setRevokingToken(null);
     }
@@ -113,22 +115,22 @@ export function AccountSwitcher() {
 
   function notifyNotImplemented(feature: string) {
     toasts.add({
-      title: "Bientôt disponible",
-      description: `La fonctionnalité "${feature}" arrive très vite.`,
+      title: tToasts("comingSoonTitle"),
+      description: tToasts("comingSoonDescription", { feature }),
     });
   }
 
-  const userName = session?.user?.name ?? "Développeur";
+  const userName = session?.user?.name ?? t("defaultUserName");
   const userEmail = session?.user?.email ?? "utilisateur@filecloud.io";
   const userImage = session?.user?.image ?? null;
-  const activeWorkspaceLabel = activeOrg ? activeOrg.name : "Espace Personnel";
+  const activeWorkspaceLabel = activeOrg ? activeOrg.name : t("personalWorkspace");
 
   const themeIcon = mode === "dark" ? MoonIcon : mode === "system" ? DesktopIcon : SunIcon;
 
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger>
-        <Button variant="ghost" shape="circle" title={userName} aria-label={`Menu du compte, ${userName}`}>
+        <Button variant="ghost" shape="circle" title={userName} aria-label={t("menuAria", { name: userName })}>
           <span className="flex items-center gap-2">
             <AccountAvatar name={userName} image={userImage} />
           </span>
@@ -156,7 +158,7 @@ export function AccountSwitcher() {
 
         {/* Section Comptes (multi-session) */}
         <DropdownMenu.Group>
-          <DropdownMenu.Label>Comptes</DropdownMenu.Label>
+          <DropdownMenu.Label>{t("accountsLabel")}</DropdownMenu.Label>
           {deviceSessions
             .filter((ds) => ds.user.id !== session?.user?.id)
             .map((ds) => (
@@ -176,7 +178,7 @@ export function AccountSwitcher() {
                       e.stopPropagation();
                       handleRemoveAccount(ds.session.token);
                     }}
-                    aria-label={`Retirer ${ds.user.name}`}
+                    aria-label={t("removeAccountAria", { name: ds.user.name })}
                     className="border-0 bg-transparent p-1 text-kumo-subtle hover:text-kumo-danger"
                   >
                     {revokingToken === ds.session.token ? <Loader size="sm" /> : <XIcon size={14} />}
@@ -185,7 +187,7 @@ export function AccountSwitcher() {
               </DropdownMenu.Item>
             ))}
           <DropdownMenu.LinkItem href="/login" icon={PlusIcon}>
-            Ajouter un compte
+            {t("addAccount")}
           </DropdownMenu.LinkItem>
         </DropdownMenu.Group>
 
@@ -193,12 +195,12 @@ export function AccountSwitcher() {
 
         {/* Section Compte & Paramètres */}
         <DropdownMenu.Group>
-          <DropdownMenu.Label>Compte</DropdownMenu.Label>
+          <DropdownMenu.Label>{t("accountLabel")}</DropdownMenu.Label>
           <DropdownMenu.LinkItem href="/dashboard/profile" icon={UserIcon}>
-            Mon profil
+            {t("myProfile")}
           </DropdownMenu.LinkItem>
           <DropdownMenu.LinkItem href="/dashboard/settings" icon={GearIcon}>
-            Réglages applicatifs
+            {t("appSettings")}
           </DropdownMenu.LinkItem>
         </DropdownMenu.Group>
 
@@ -206,22 +208,22 @@ export function AccountSwitcher() {
 
         {/* Section Préférences (Sous-menu Kumo) */}
         <DropdownMenu.Group>
-          <DropdownMenu.Label>Préférences</DropdownMenu.Label>
+          <DropdownMenu.Label>{t("preferencesLabel")}</DropdownMenu.Label>
           <DropdownMenu.Sub>
             <DropdownMenu.SubTrigger icon={themeIcon}>
-              Thème & Apparence
+              {t("themeAndAppearance")}
             </DropdownMenu.SubTrigger>
             <DropdownMenu.SubContent>
               <DropdownMenu.Item icon={SunIcon} onClick={() => setMode("light")}>
-                <span className="flex-1">Clair</span>
+                <span className="flex-1">{t("themeLight")}</span>
                 {mode === "light" && <CheckIcon size={14} className="ml-2 text-kumo-info" />}
               </DropdownMenu.Item>
               <DropdownMenu.Item icon={MoonIcon} onClick={() => setMode("dark")}>
-                <span className="flex-1">Sombre</span>
+                <span className="flex-1">{t("themeDark")}</span>
                 {mode === "dark" && <CheckIcon size={14} className="ml-2 text-kumo-info" />}
               </DropdownMenu.Item>
               <DropdownMenu.Item icon={DesktopIcon} onClick={() => setMode("system")}>
-                <span className="flex-1">Système</span>
+                <span className="flex-1">{t("themeSystem")}</span>
                 {mode === "system" && <CheckIcon size={14} className="ml-2 text-kumo-info" />}
               </DropdownMenu.Item>
             </DropdownMenu.SubContent>
@@ -243,18 +245,18 @@ export function AccountSwitcher() {
 
         {/* Section Aide & Documentation */}
         <DropdownMenu.Group>
-          <DropdownMenu.Label>Ressources</DropdownMenu.Label>
+          <DropdownMenu.Label>{t("resourcesLabel")}</DropdownMenu.Label>
           <DropdownMenu.Item
             icon={BookOpenIcon}
-            onClick={() => notifyNotImplemented("Documentation")}
+            onClick={() => notifyNotImplemented(tToasts("documentation"))}
           >
-            Documentation API
+            {t("apiDocumentation")}
           </DropdownMenu.Item>
           <DropdownMenu.Item
             icon={CommandIcon}
-            onClick={() => notifyNotImplemented("Raccourcis Clavier")}
+            onClick={() => notifyNotImplemented(tToasts("keyboardShortcutsFeature"))}
           >
-            Raccourcis clavier
+            {t("keyboardShortcuts")}
             <DropdownMenu.Shortcut>⌘K</DropdownMenu.Shortcut>
           </DropdownMenu.Item>
         </DropdownMenu.Group>
@@ -263,7 +265,7 @@ export function AccountSwitcher() {
 
         {/* Action Déconnexion */}
         <DropdownMenu.Item variant="danger" icon={SignOutIcon} onClick={handleSignOut}>
-          Se déconnecter
+          {t("signOut")}
         </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu>

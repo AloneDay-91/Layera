@@ -371,6 +371,68 @@
     "trash": "Trash",
     "itemCount": "{count, plural, one {# item} other {# items}}"
   },
+  "activityPage": {
+    "title": "Activity logs",
+    "description": "History of actions, creations, deletions, and shares."
+  },
+  "sharedPage": {
+    "breadcrumb": "Shared with me",
+    "comingSoonTitle": "Sharing coming soon",
+    "comingSoonDescription": "File and folder sharing arrives in an upcoming update."
+  },
+  "workspaceSwitcher": {
+    "personalWorkspaceOf": "{name}'s workspace",
+    "personalWorkspace": "Personal workspace",
+    "workspacesLabel": "Workspaces",
+    "newWorkspace": "New workspace / team",
+    "createDialogTitle": "Create a workspace",
+    "close": "Close",
+    "workspaceNameLabel": "Workspace name",
+    "workspaceNamePlaceholder": "e.g. Marketing Team",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "createWorkspace": "Create workspace",
+    "toasts": {
+      "switchErrorTitle": "Error switching workspace",
+      "switchErrorFallback": "Could not switch workspace.",
+      "activeWorkspaceChangedTitle": "Active workspace changed",
+      "activeWorkspaceChangedDescription": "You are now on \"{name}\".",
+      "createErrorTitle": "Error creating workspace",
+      "createErrorFallback": "Could not create the workspace.",
+      "workspaceCreatedTitle": "Workspace created",
+      "workspaceCreatedDescription": "\"{name}\" was set up successfully."
+    }
+  },
+  "accountSwitcher": {
+    "menuAria": "Account menu, {name}",
+    "removeAccountAria": "Remove {name}",
+    "accountsLabel": "Accounts",
+    "addAccount": "Add account",
+    "accountLabel": "Account",
+    "myProfile": "My profile",
+    "appSettings": "App settings",
+    "preferencesLabel": "Preferences",
+    "themeAndAppearance": "Theme & appearance",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "resourcesLabel": "Resources",
+    "apiDocumentation": "API documentation",
+    "keyboardShortcuts": "Keyboard shortcuts",
+    "signOut": "Sign out",
+    "defaultUserName": "Developer",
+    "personalWorkspace": "Personal workspace",
+    "toasts": {
+      "genericError": "Error",
+      "unknownError": "Unknown error",
+      "switchAccountErrorDescription": "Could not switch account.",
+      "removeAccountErrorDescription": "Could not remove this account.",
+      "comingSoonTitle": "Coming soon",
+      "comingSoonDescription": "\"{feature}\" is coming very soon.",
+      "documentation": "Documentation",
+      "keyboardShortcutsFeature": "Keyboard Shortcuts"
+    }
+  },
   "settings": {
     "language": "Language",
     "languageDescription": "Choose the language used across the interface.",

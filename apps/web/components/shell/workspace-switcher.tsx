@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button, Dialog, DropdownMenu, Input, Loader, useKumoToastManager } from "@cloudflare/kumo";
 import { FoldersIcon, UsersThreeIcon, PlusIcon, CheckIcon, CaretUpDownIcon, XIcon } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
@@ -11,14 +12,16 @@ export function WorkspaceSwitcher() {
   const { data: session } = authClient.useSession();
   const { data: activeOrg } = authClient.useActiveOrganization();
   const { data: orgs } = authClient.useListOrganizations();
+  const t = useTranslations("workspaceSwitcher");
+  const tToasts = useTranslations("workspaceSwitcher.toasts");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newOrgName, setNewOrgName] = useState("");
   const [creating, setCreating] = useState(false);
 
   const personalWorkspaceName = session?.user?.name
-    ? `Espace de ${session.user.name}`
-    : "Espace personnel";
+    ? t("personalWorkspaceOf", { name: session.user.name })
+    : t("personalWorkspace");
 
   // Nom du workspace affiché actuellement
   const activeWorkspaceName = activeOrg?.name ?? personalWorkspaceName;
@@ -29,14 +32,14 @@ export function WorkspaceSwitcher() {
     });
     if (error) {
       toasts.add({
-        title: "Erreur de changement d'espace",
-        description: error.message ?? "Impossible de changer d'espace.",
+        title: tToasts("switchErrorTitle"),
+        description: error.message ?? tToasts("switchErrorFallback"),
       });
       return;
     }
     toasts.add({
-      title: "Espace actif modifié",
-      description: `Vous êtes maintenant sur "${orgName}".`,
+      title: tToasts("activeWorkspaceChangedTitle"),
+      description: tToasts("activeWorkspaceChangedDescription", { name: orgName }),
     });
   }
 
@@ -59,8 +62,8 @@ export function WorkspaceSwitcher() {
 
     if (error) {
       toasts.add({
-        title: "Erreur de création",
-        description: error.message ?? "Impossible de créer le workspace.",
+        title: tToasts("createErrorTitle"),
+        description: error.message ?? tToasts("createErrorFallback"),
       });
       return;
     }
@@ -70,8 +73,8 @@ export function WorkspaceSwitcher() {
     }
 
     toasts.add({
-      title: "Workspace créé",
-      description: `L'espace "${newOrgName}" a été configuré avec succès.`,
+      title: tToasts("workspaceCreatedTitle"),
+      description: tToasts("workspaceCreatedDescription", { name: newOrgName }),
     });
     setNewOrgName("");
     setIsModalOpen(false);
@@ -93,7 +96,7 @@ export function WorkspaceSwitcher() {
           </DropdownMenu.Trigger>
           <DropdownMenu.Content>
             <DropdownMenu.Group>
-              <DropdownMenu.Label>Espaces de travail</DropdownMenu.Label>
+              <DropdownMenu.Label>{t("workspacesLabel")}</DropdownMenu.Label>
 
               {/* Option Espace personnel */}
               <DropdownMenu.Item
@@ -122,7 +125,7 @@ export function WorkspaceSwitcher() {
 
             <DropdownMenu.Separator />
             <DropdownMenu.Item icon={PlusIcon} onClick={() => setIsModalOpen(true)}>
-              Nouveau workspace / équipe
+              {t("newWorkspace")}
             </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu>
@@ -132,9 +135,9 @@ export function WorkspaceSwitcher() {
       <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
         <Dialog className="p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold">Créer un workspace</Dialog.Title>
+            <Dialog.Title className="text-lg font-semibold">{t("createDialogTitle")}</Dialog.Title>
             <Dialog.Close
-              aria-label="Fermer"
+              aria-label={t("close")}
               render={(props) => (
                 <Button
                   {...props}
@@ -142,7 +145,7 @@ export function WorkspaceSwitcher() {
                   shape="square"
                   size="sm"
                   icon={XIcon}
-                  aria-label="Fermer"
+                  aria-label={t("close")}
                 />
               )}
             />
@@ -151,8 +154,8 @@ export function WorkspaceSwitcher() {
           <form onSubmit={handleCreateOrg} className="flex flex-col gap-4">
             <Input
               size="sm"
-              label="Nom de l'espace"
-              placeholder="ex: Équipe Marketing"
+              label={t("workspaceNameLabel")}
+              placeholder={t("workspaceNamePlaceholder")}
               value={newOrgName}
               onChange={(e) => setNewOrgName(e.target.value)}
               required
@@ -166,15 +169,15 @@ export function WorkspaceSwitcher() {
                 type="button"
                 onClick={() => setIsModalOpen(false)}
               >
-                Annuler
+                {t("cancel")}
               </Button>
               <Button variant="primary" size="sm" type="submit" disabled={creating}>
                 {creating ? (
                   <span className="flex items-center gap-1.5">
-                    <Loader size="sm" /> Création…
+                    <Loader size="sm" /> {t("creating")}
                   </span>
                 ) : (
-                  "Créer le workspace"
+                  t("createWorkspace")
                 )}
               </Button>
             </div>
