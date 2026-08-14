@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { Button, Dialog, Text } from "@cloudflare/kumo";
 import { XIcon, ShareIcon, DownloadIcon, StarIcon, TagIcon } from "@phosphor-icons/react";
 import type { MockItem } from "@/lib/mock-files";
@@ -26,19 +27,24 @@ export function FileDetailsPanel({
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const previewable = isPreviewable(item);
+  const t = useTranslations("fileDetails");
+  const tFileType = useTranslations("filePreview");
+  const tRowMenu = useTranslations("fileRowMenu");
+  const tBrowser = useTranslations("fileBrowser");
+  const locale = useLocale();
 
   return (
     <aside className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto border-l border-kumo-line bg-kumo-base p-4 text-kumo-default">
       <div className="flex items-center justify-between">
         <Text as="h2" bold>
-          Détails
+          {t("title")}
         </Text>
         <Button
           variant="secondary"
           shape="square"
           size="sm"
           icon={XIcon}
-          aria-label="Fermer le panneau"
+          aria-label={t("closePanel")}
           onClick={onClose}
         />
       </div>
@@ -48,7 +54,7 @@ export function FileDetailsPanel({
           <button
             type="button"
             onClick={() => setPreviewOpen(true)}
-            aria-label={`Prévisualiser ${item.name}`}
+            aria-label={t("previewAlt", { name: item.name })}
             className="border-0 bg-transparent p-0"
           >
             <FilePreviewIcon item={item} size={96} />
@@ -64,27 +70,27 @@ export function FileDetailsPanel({
 
       <dl className="flex flex-col gap-2 text-sm">
         <div className="flex justify-between">
-          <Text as="dt" variant="secondary">Type</Text>
-          <dd className="font-medium text-kumo-default">{getFileTypeLabel(item)}</dd>
+          <Text as="dt" variant="secondary">{t("type")}</Text>
+          <dd className="font-medium text-kumo-default">{getFileTypeLabel(item, tFileType)}</dd>
         </div>
         <div className="flex justify-between">
-          <Text as="dt" variant="secondary">Taille</Text>
+          <Text as="dt" variant="secondary">{t("size")}</Text>
           <dd className="font-medium text-kumo-default">{formatFileSize(item.size)}</dd>
         </div>
         <div className="flex justify-between">
-          <Text as="dt" variant="secondary">Propriétaire</Text>
+          <Text as="dt" variant="secondary">{t("owner")}</Text>
           <dd className="font-medium text-kumo-default">{item.owner}</dd>
         </div>
         <div className="flex justify-between">
-          <Text as="dt" variant="secondary">Modifié</Text>
-          <dd className="font-medium text-kumo-default">{new Date(item.updatedAt).toLocaleDateString("fr-FR")}</dd>
+          <Text as="dt" variant="secondary">{t("modified")}</Text>
+          <dd className="font-medium text-kumo-default">{new Date(item.updatedAt).toLocaleDateString(locale)}</dd>
         </div>
       </dl>
 
       <div className="flex flex-wrap gap-2">
         {previewable && (
           <Button variant="secondary" size="sm" onClick={() => setPreviewOpen(true)}>
-            Aperçu
+            {t("preview")}
           </Button>
         )}
         {onToggleFavorite && (
@@ -94,23 +100,23 @@ export function FileDetailsPanel({
             icon={StarIcon}
             onClick={() => onToggleFavorite(item)}
           >
-            {item.isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+            {item.isFavorite ? tRowMenu("removeFavorite") : tRowMenu("addFavorite")}
           </Button>
         )}
         <Button
           variant="secondary"
           size="sm"
           icon={ShareIcon}
-          onClick={() => (onShare ? onShare(item) : onAction("Partager"))}
+          onClick={() => (onShare ? onShare(item) : onAction(t("share")))}
         >
-          Partager
+          {t("share")}
         </Button>
-        <Button variant="secondary" size="sm" icon={DownloadIcon} onClick={() => onAction("Télécharger")}>
-          Télécharger
+        <Button variant="secondary" size="sm" icon={DownloadIcon} onClick={() => onAction(t("download"))}>
+          {t("download")}
         </Button>
         {onManageTags && (
           <Button variant="secondary" size="sm" icon={TagIcon} onClick={() => onManageTags(item)}>
-            Tags
+            {t("tags")}
           </Button>
         )}
       </div>
@@ -121,9 +127,9 @@ export function FileDetailsPanel({
             <div className="mb-4 flex items-center justify-between gap-4">
               <Dialog.Title className="text-lg font-semibold break-all">{item.name}</Dialog.Title>
               <Dialog.Close
-                aria-label="Fermer"
+                aria-label={tBrowser("close")}
                 render={(props) => (
-                  <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Fermer" />
+                  <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={tBrowser("close")} />
                 )}
               />
             </div>

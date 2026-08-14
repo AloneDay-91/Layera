@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Breadcrumbs } from "@cloudflare/kumo";
 
 export type BreadcrumbSegment = {
@@ -19,6 +20,7 @@ type FileBreadcrumbsProps = {
 
 export function FileBreadcrumbs({ path, onNavigate, onMoveItem }: FileBreadcrumbsProps) {
   const [hoveredTargetId, setHoveredTargetId] = useState<string | "root" | null>(null);
+  const t = useTranslations("fileBreadcrumbs");
 
   function handleDropOnSegment(e: React.DragEvent, targetFolderId: string | null) {
     e.preventDefault();
@@ -54,7 +56,7 @@ export function FileBreadcrumbs({ path, onNavigate, onMoveItem }: FileBreadcrumb
             : "text-sm text-kumo-subtle hover:text-kumo-default hover:underline"
         }
       >
-        Mes fichiers
+        {t("myFiles")}
       </button>
 
       {path.map((folder, index) => {

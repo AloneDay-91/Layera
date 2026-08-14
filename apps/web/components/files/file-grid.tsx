@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Grid, GridItem, LayerCard, Text } from "@cloudflare/kumo";
 import { StarIcon } from "@phosphor-icons/react";
 import type { MockItem } from "@/lib/mock-files";
@@ -26,6 +27,7 @@ export function FileGrid({
   onMoveItem,
 }: FileGridProps) {
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  const t = useTranslations("fileTable");
 
   function handleActivate(item: MockItem) {
     if (item.type === "folder") {
@@ -87,7 +89,11 @@ export function FileGrid({
                     e.stopPropagation();
                     onToggleFavorite(item);
                   }}
-                  aria-label={item.isFavorite ? `Retirer "${item.name}" des favoris` : `Ajouter "${item.name}" aux favoris`}
+                  aria-label={
+                    item.isFavorite
+                      ? t("removeFavorite", { name: item.name })
+                      : t("addFavorite", { name: item.name })
+                  }
                   aria-pressed={item.isFavorite}
                   className="absolute right-2 top-2 z-10 border-0 bg-transparent p-1"
                 >

@@ -141,6 +141,164 @@
     },
     "deleteTagConfirm": "Supprimer définitivement le tag \"{name}\" de cet espace ?"
   },
+  "fileBreadcrumbs": {
+    "myFiles": "Mes fichiers"
+  },
+  "fileDetails": {
+    "title": "Détails",
+    "previewAlt": "Prévisualiser {name}",
+    "closePanel": "Fermer le panneau",
+    "type": "Type",
+    "size": "Taille",
+    "owner": "Propriétaire",
+    "modified": "Modifié",
+    "preview": "Aperçu",
+    "share": "Partager",
+    "download": "Télécharger",
+    "tags": "Tags"
+  },
+  "filePreview": {
+    "cannotLoad": "Impossible de charger l'aperçu de ce fichier.",
+    "loadingPreview": "Chargement de l'aperçu…",
+    "videoNotSupported": "Votre navigateur ne prend pas en charge la lecture vidéo.",
+    "audioNotSupported": "Votre navigateur ne prend pas en charge la lecture audio.",
+    "noPreviewAvailable": "Aucun aperçu disponible pour ce type de fichier.",
+    "types": {
+      "folder": "Dossier",
+      "file": "Fichier",
+      "pdf": "PDF",
+      "image": "Image {subtype}",
+      "imageGeneric": "Image",
+      "video": "Vidéo {subtype}",
+      "videoGeneric": "Vidéo",
+      "audio": "Audio {subtype}",
+      "audioGeneric": "Audio",
+      "markdown": "Markdown",
+      "text": "Texte",
+      "fileExt": "Fichier {ext}",
+      "fileGeneric": "Fichier"
+    }
+  },
+  "manageTagsDialog": {
+    "title": "Tags de \"{name}\"",
+    "close": "Fermer",
+    "noTags": "Aucun tag dans cet espace pour le moment.",
+    "deleteTagAria": "Supprimer le tag \"{name}\" de l'espace",
+    "newTagLabel": "Nouveau tag",
+    "newTagPlaceholder": "ex: Urgent",
+    "creating": "Création…",
+    "createTag": "Créer le tag"
+  },
+  "folderColorDialog": {
+    "title": "Couleur de \"{name}\"",
+    "close": "Fermer"
+  },
+  "folderColors": {
+    "default": "Défaut",
+    "red": "Rouge",
+    "orange": "Orange",
+    "green": "Vert",
+    "teal": "Sarcelle",
+    "blue": "Bleu",
+    "purple": "Violet",
+    "neutral": "Neutre"
+  },
+  "tagColors": {
+    "neutral": "Neutre",
+    "red": "Rouge",
+    "orange": "Orange",
+    "green": "Vert",
+    "teal": "Sarcelle",
+    "blue": "Bleu",
+    "purple": "Violet",
+    "info": "Info"
+  },
+  "uploadDropzone": {
+    "emptyTitle": "Ce dossier est vide",
+    "emptyDescription": "Glissez des fichiers ici pour les ajouter, ou utilisez le bouton ci-dessous.",
+    "browse": "Parcourir les fichiers"
+  },
+  "tagsPage": {
+    "title": "Tags",
+    "description": "Créez, renommez et supprimez les tags disponibles dans cet espace de travail.",
+    "newTag": "Nouveau tag",
+    "tagColumn": "Tag",
+    "itemsColumn": "Éléments",
+    "actionsColumn": "Actions",
+    "itemCount": "{count, plural, one {# élément} other {# éléments}}",
+    "editTagAria": "Modifier le tag \"{name}\"",
+    "deleteTagAria": "Supprimer le tag \"{name}\"",
+    "emptyTitle": "Aucun tag pour le moment",
+    "emptyDescription": "Créez votre premier tag pour commencer à organiser vos fichiers et dossiers.",
+    "createTag": "Créer un tag",
+    "close": "Fermer",
+    "createDialogTitle": "Nouveau tag",
+    "tagNameLabel": "Nom du tag",
+    "tagNamePlaceholder": "ex: Urgent",
+    "colorLabel": "Couleur",
+    "cancel": "Annuler",
+    "creating": "Création…",
+    "createTagButton": "Créer le tag",
+    "editDialogTitle": "Modifier \"{name}\"",
+    "saving": "Enregistrement…",
+    "save": "Enregistrer",
+    "deleteButtonText": "Supprimer le tag",
+    "toasts": {
+      "genericError": "Erreur",
+      "tagCreatedTitle": "Tag créé",
+      "tagCreatedDescription": "Le tag \"{name}\" a été créé.",
+      "tagCreateErrorDescription": "Impossible de créer le tag.",
+      "tagUpdatedTitle": "Tag mis à jour",
+      "tagUpdatedDescription": "Le tag a été renommé en \"{name}\".",
+      "tagUpdateErrorDescription": "Impossible de mettre à jour le tag.",
+      "tagDeletedTitle": "Tag supprimé",
+      "tagDeletedDescription": "\"{name}\" a été supprimé de l'espace.",
+      "tagDeleteErrorDescription": "Impossible de supprimer le tag."
+    }
+  },
+  "trashPage": {
+    "title": "Corbeille",
+    "description": "Les éléments placés dans la corbeille sont conservés pendant 30 jours avant leur purge définitive.",
+    "emptyTrash": "Vider la corbeille",
+    "emptyStateTitle": "La corbeille est vide",
+    "emptyStateDescription": "Aucun fichier ni dossier n'a été supprimé récemment.",
+    "nameColumn": "Nom",
+    "typeColumn": "Type",
+    "deletedColumn": "Date de suppression",
+    "expiresColumn": "Expiration (30j)",
+    "actionsColumn": "Actions",
+    "folder": "Dossier",
+    "file": "Fichier",
+    "restore": "Restaurer",
+    "delete": "Supprimer",
+    "emptyConfirm": "Voulez-vous vraiment vider définitivement toute la corbeille ?",
+    "toasts": {
+      "itemRestoredTitle": "Élément restauré",
+      "itemRestoredDescription": "\"{name}\" a été restauré dans vos fichiers.",
+      "permanentDeleteTitle": "Suppression définitive",
+      "permanentDeleteDescription": "\"{name}\" a été supprimé définitivement.",
+      "trashEmptiedTitle": "Corbeille vidée",
+      "trashEmptiedDescription": "Tous les éléments de la corbeille ont été supprimés."
+    }
+  },
+  "favoritesPage": {
+    "title": "Favoris",
+    "description": "Les fichiers et dossiers que vous avez marqués comme favoris.",
+    "emptyTitle": "Aucun favori",
+    "emptyDescription": "Marquez des fichiers ou dossiers comme favoris pour les retrouver ici.",
+    "nameColumn": "Nom",
+    "locationColumn": "Emplacement",
+    "modifiedColumn": "Modifié",
+    "sizeColumn": "Taille",
+    "toasts": {
+      "removedTitle": "Retiré des favoris",
+      "removedDescription": "\"{name}\" a été retiré de vos favoris.",
+      "genericError": "Erreur",
+      "removeErrorDescription": "Impossible de retirer cet élément des favoris.",
+      "itemDeletedTitle": "Élément supprimé",
+      "itemDeletedDescription": "\"{name}\" a été déplacé dans la corbeille."
+    }
+  },
   "settings": {
     "language": "Langue",
     "languageDescription": "Choisissez la langue utilisée dans l'interface.",

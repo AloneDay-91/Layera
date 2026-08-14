@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { Badge, Breadcrumbs, Button, LayerCard, Loader, SkeletonLine, Table, Text, useKumoToastManager } from "@cloudflare/kumo";
 import { TrashIcon, ArrowCounterClockwiseIcon, XCircleIcon } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
@@ -26,6 +27,10 @@ export default function TrashPage() {
   const [items, setItems] = useState<TrashedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
+  const t = useTranslations("trashPage");
+  const tToasts = useTranslations("trashPage.toasts");
+  const tBreadcrumbs = useTranslations("fileBreadcrumbs");
+  const locale = useLocale();
 
   async function fetchTrash() {
     setLoading(true);
@@ -56,8 +61,8 @@ export default function TrashPage() {
       });
       if (res.ok) {
         toasts.add({
-          title: "Élément restauré",
-          description: `"${item.name}" a été restauré dans vos fichiers.`,
+          title: tToasts("itemRestoredTitle"),
+          description: tToasts("itemRestoredDescription", { name: item.name }),
         });
         fetchTrash();
       }
@@ -76,8 +81,8 @@ export default function TrashPage() {
       });
       if (res.ok) {
         toasts.add({
-          title: "Suppression définitive",
-          description: `"${item.name}" a été supprimé définitivement.`,
+          title: tToasts("permanentDeleteTitle"),
+          description: tToasts("permanentDeleteDescription", { name: item.name }),
         });
         fetchTrash();
         notifyStorageUpdated();
@@ -90,15 +95,15 @@ export default function TrashPage() {
   }
 
   async function handleEmptyTrash() {
-    if (!confirm("Voulez-vous vraiment vider définitivement toute la corbeille ?")) return;
+    if (!confirm(t("emptyConfirm"))) return;
 
     setLoading(true);
     try {
       const res = await fetch("/api/trash?empty=true", { method: "DELETE" });
       if (res.ok) {
         toasts.add({
-          title: "Corbeille vidée",
-          description: "Tous les éléments de la corbeille ont été supprimés.",
+          title: tToasts("trashEmptiedTitle"),
+          description: tToasts("trashEmptiedDescription"),
         });
         fetchTrash();
         notifyStorageUpdated();
@@ -116,13 +121,13 @@ export default function TrashPage() {
         className="-mx-6 -mt-6"
         breadcrumbs={
           <Breadcrumbs>
-            <Breadcrumbs.Link href="/dashboard">Mes fichiers</Breadcrumbs.Link>
+            <Breadcrumbs.Link href="/dashboard">{tBreadcrumbs("myFiles")}</Breadcrumbs.Link>
             <Breadcrumbs.Separator />
-            <Breadcrumbs.Current>Corbeille</Breadcrumbs.Current>
+            <Breadcrumbs.Current>{t("title")}</Breadcrumbs.Current>
           </Breadcrumbs>
         }
-        title="Corbeille"
-        description="Les éléments placés dans la corbeille sont conservés pendant 30 jours avant leur purge définitive."
+        title={t("title")}
+        description={t("description")}
       >
         {items.length > 0 && (
           <Button
@@ -131,7 +136,7 @@ export default function TrashPage() {
             icon={XCircleIcon}
             onClick={handleEmptyTrash}
           >
-            Vider la corbeille
+            {t("emptyTrash")}
           </Button>
         )}
       </PageHeader>
@@ -157,10 +162,10 @@ export default function TrashPage() {
         <LayerCard className="flex flex-col items-center justify-center p-12 text-center">
           <TrashIcon size={48} className="text-kumo-subtle mb-3" />
           <Text as="p" variant="heading3" DANGEROUS_className="mb-1">
-            La corbeille est vide
+            {t("emptyStateTitle")}
           </Text>
           <Text variant="secondary">
-            Aucun fichier ni dossier n&apos;a été supprimé récemment.
+            {t("emptyStateDescription")}
           </Text>
         </LayerCard>
       ) : (
@@ -168,11 +173,11 @@ export default function TrashPage() {
           <Table>
             <Table.Header>
               <Table.Row>
-                <Table.Head>Nom</Table.Head>
-                <Table.Head>Type</Table.Head>
-                <Table.Head>Date de suppression</Table.Head>
-                <Table.Head>Expiration (30j)</Table.Head>
-                <Table.Head className="text-right">Actions</Table.Head>
+                <Table.Head>{t("nameColumn")}</Table.Head>
+                <Table.Head>{t("typeColumn")}</Table.Head>
+                <Table.Head>{t("deletedColumn")}</Table.Head>
+                <Table.Head>{t("expiresColumn")}</Table.Head>
+                <Table.Head className="text-right">{t("actionsColumn")}</Table.Head>
               </Table.Row>
             </Table.Header>
             <Table.Body>
@@ -182,10 +187,10 @@ export default function TrashPage() {
                     <Text as="span" bold>{item.name}</Text>
                   </Table.Cell>
                   <Table.Cell>
-                    <Badge variant="neutral">{item.type === "folder" ? "Dossier" : "Fichier"}</Badge>
+                    <Badge variant="neutral">{item.type === "folder" ? t("folder") : t("file")}</Badge>
                   </Table.Cell>
-                  <Table.Cell>{new Date(item.deletedAt).toLocaleDateString("fr-FR")}</Table.Cell>
-                  <Table.Cell>{new Date(item.purgeAt).toLocaleDateString("fr-FR")}</Table.Cell>
+                  <Table.Cell>{new Date(item.deletedAt).toLocaleDateString(locale)}</Table.Cell>
+                  <Table.Cell>{new Date(item.purgeAt).toLocaleDateString(locale)}</Table.Cell>
                   <Table.Cell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button
@@ -195,7 +200,7 @@ export default function TrashPage() {
                         icon={actionId === item.id ? undefined : ArrowCounterClockwiseIcon}
                         onClick={() => handleRestore(item)}
                       >
-                        {actionId === item.id ? <Loader size="sm" /> : "Restaurer"}
+                        {actionId === item.id ? <Loader size="sm" /> : t("restore")}
                       </Button>
                       <Button
                         variant="destructive"
@@ -204,7 +209,7 @@ export default function TrashPage() {
                         icon={XCircleIcon}
                         onClick={() => handlePermanentDelete(item)}
                       >
-                        Supprimer
+                        {t("delete")}
                       </Button>
                     </div>
                   </Table.Cell>

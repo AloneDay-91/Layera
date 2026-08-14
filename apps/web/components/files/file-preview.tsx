@@ -80,21 +80,23 @@ function getIconForItem(item: MockItem): Icon {
   return FileIcon;
 }
 
-export function getFileTypeLabel(item: MockItem): string {
-  if (item.type === "folder") return "Dossier";
-  if (!item.mimeType) return "Fichier";
+type FileTypeTranslator = (key: string, values?: Record<string, string>) => string;
+
+export function getFileTypeLabel(item: MockItem, t: FileTypeTranslator): string {
+  if (item.type === "folder") return t("types.folder");
+  if (!item.mimeType) return t("types.file");
 
   const subtype = item.mimeType.split("/")[1]?.toUpperCase();
 
-  if (isPreviewablePdf(item)) return "PDF";
-  if (isPreviewableImage(item)) return subtype ? `Image ${subtype}` : "Image";
-  if (isPreviewableVideo(item)) return subtype ? `Vidéo ${subtype}` : "Vidéo";
-  if (isPreviewableAudio(item)) return subtype ? `Audio ${subtype}` : "Audio";
-  if (isPreviewableMarkdown(item)) return "Markdown";
-  if (isPreviewableText(item)) return "Texte";
+  if (isPreviewablePdf(item)) return t("types.pdf");
+  if (isPreviewableImage(item)) return subtype ? t("types.image", { subtype }) : t("types.imageGeneric");
+  if (isPreviewableVideo(item)) return subtype ? t("types.video", { subtype }) : t("types.videoGeneric");
+  if (isPreviewableAudio(item)) return subtype ? t("types.audio", { subtype }) : t("types.audioGeneric");
+  if (isPreviewableMarkdown(item)) return t("types.markdown");
+  if (isPreviewableText(item)) return t("types.text");
 
   const ext = item.name.split(".").pop();
-  return ext && ext !== item.name ? `Fichier ${ext.toUpperCase()}` : "Fichier";
+  return ext && ext !== item.name ? t("types.fileExt", { ext: ext.toUpperCase() }) : t("types.fileGeneric");
 }
 
 function getIconColorForItem(item: MockItem): string {

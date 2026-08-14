@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Loader, Text, cn } from "@cloudflare/kumo";
 import { CodeHighlighted } from "@cloudflare/kumo/code";
 import { marked } from "marked";
@@ -19,6 +20,7 @@ import {
 function TextPreview({ item, markdown }: { item: MockItem; markdown: boolean }) {
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState(false);
+  const t = useTranslations("filePreview");
 
   useEffect(() => {
     let cancelled = false;
@@ -41,13 +43,13 @@ function TextPreview({ item, markdown }: { item: MockItem; markdown: boolean }) 
   }, [item.id]);
 
   if (error) {
-    return <Text variant="secondary">Impossible de charger l&apos;aperçu de ce fichier.</Text>;
+    return <Text variant="secondary">{t("cannotLoad")}</Text>;
   }
 
   if (content === null) {
     return (
       <div className="flex items-center gap-2 py-8 justify-center">
-        <Loader size="sm" /> Chargement de l&apos;aperçu…
+        <Loader size="sm" /> {t("loadingPreview")}
       </div>
     );
   }
@@ -120,6 +122,7 @@ function PdfPreview({ src, title }: { src: string; title: string }) {
 
 function VideoPreview({ src }: { src: string }) {
   const [loaded, setLoaded] = useState(false);
+  const t = useTranslations("filePreview");
 
   useEffect(() => {
     setLoaded(false);
@@ -138,13 +141,14 @@ function VideoPreview({ src }: { src: string }) {
         onLoadedData={() => setLoaded(true)}
         className={cn("max-h-[70vh] w-full rounded", !loaded && "hidden")}
       >
-        Votre navigateur ne prend pas en charge la lecture vidéo.
+        {t("videoNotSupported")}
       </video>
     </div>
   );
 }
 
 export function FilePreviewContent({ item }: { item: MockItem }) {
+  const t = useTranslations("filePreview");
   const contentUrl = `/api/files/content?id=${item.id}`;
 
   if (isPreviewableImage(item)) {
@@ -162,7 +166,7 @@ export function FilePreviewContent({ item }: { item: MockItem }) {
   if (isPreviewableAudio(item)) {
     return (
       <audio controls src={contentUrl} className="w-full">
-        Votre navigateur ne prend pas en charge la lecture audio.
+        {t("audioNotSupported")}
       </audio>
     );
   }
@@ -171,5 +175,5 @@ export function FilePreviewContent({ item }: { item: MockItem }) {
     return <TextPreview item={item} markdown={isPreviewableMarkdown(item)} />;
   }
 
-  return <Text variant="secondary">Aucun aperçu disponible pour ce type de fichier.</Text>;
+  return <Text variant="secondary">{t("noPreviewAvailable")}</Text>;
 }

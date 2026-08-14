@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { useTranslations } from "next-intl";
 import { Button, Empty } from "@cloudflare/kumo";
 import { UploadSimpleIcon } from "@phosphor-icons/react";
 
@@ -10,6 +11,7 @@ type UploadDropzoneProps = {
 
 export function UploadDropzone({ onFilesSelected }: UploadDropzoneProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const t = useTranslations("uploadDropzone");
 
   return (
     <div className="rounded-lg border-2 border-dashed border-kumo-line p-4">
@@ -28,11 +30,11 @@ export function UploadDropzone({ onFilesSelected }: UploadDropzoneProps) {
       <Empty
         size="sm"
         icon={<UploadSimpleIcon size={40} />}
-        title="Ce dossier est vide"
-        description="Glissez des fichiers ici pour les ajouter, ou utilisez le bouton ci-dessous."
+        title={t("emptyTitle")}
+        description={t("emptyDescription")}
         contents={
           <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
-            Parcourir les fichiers
+            {t("browse")}
           </Button>
         }
       />

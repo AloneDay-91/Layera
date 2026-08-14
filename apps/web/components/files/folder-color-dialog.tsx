@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Button, Dialog, Text, cn } from "@cloudflare/kumo";
 import { CheckIcon, FolderSimpleIcon, XIcon } from "@phosphor-icons/react";
 import type { MockItem } from "@/lib/mock-files";
@@ -13,18 +14,20 @@ type FolderColorDialogProps = {
 
 export function FolderColorDialog({ item, onClose, onSelectColor }: FolderColorDialogProps) {
   const currentColor = item?.color ?? "default";
+  const t = useTranslations("folderColorDialog");
+  const tColors = useTranslations("folderColors");
 
   return (
     <Dialog.Root open={item !== null} onOpenChange={(open) => !open && onClose()}>
       <Dialog className="p-6">
         <div className="mb-4 flex items-center justify-between gap-4">
           <Dialog.Title className="text-lg font-semibold">
-            Couleur de &quot;{item?.name}&quot;
+            {t("title", { name: item?.name ?? "" })}
           </Dialog.Title>
           <Dialog.Close
-            aria-label="Fermer"
+            aria-label={t("close")}
             render={(props) => (
-              <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Fermer" />
+              <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={t("close")} />
             )}
           />
         </div>
@@ -35,7 +38,7 @@ export function FolderColorDialog({ item, onClose, onSelectColor }: FolderColorD
               key={opt.value}
               type="button"
               onClick={() => item && onSelectColor(item, opt.value)}
-              aria-label={opt.label}
+              aria-label={tColors(opt.value)}
               aria-pressed={currentColor === opt.value}
               className={cn(
                 "flex flex-col items-center gap-1 rounded-lg border-0 bg-transparent p-2 hover:bg-kumo-tint",
@@ -52,7 +55,7 @@ export function FolderColorDialog({ item, onClose, onSelectColor }: FolderColorD
                   />
                 )}
               </span>
-              <Text as="span" size="sm">{opt.label}</Text>
+              <Text as="span" size="sm">{tColors(opt.value)}</Text>
             </button>
           ))}
         </div>

@@ -141,6 +141,164 @@
     },
     "deleteTagConfirm": "Permanently delete the tag \"{name}\" from this workspace?"
   },
+  "fileBreadcrumbs": {
+    "myFiles": "My files"
+  },
+  "fileDetails": {
+    "title": "Details",
+    "previewAlt": "Preview {name}",
+    "closePanel": "Close panel",
+    "type": "Type",
+    "size": "Size",
+    "owner": "Owner",
+    "modified": "Modified",
+    "preview": "Preview",
+    "share": "Share",
+    "download": "Download",
+    "tags": "Tags"
+  },
+  "filePreview": {
+    "cannotLoad": "Could not load this file's preview.",
+    "loadingPreview": "Loading preview…",
+    "videoNotSupported": "Your browser doesn't support video playback.",
+    "audioNotSupported": "Your browser doesn't support audio playback.",
+    "noPreviewAvailable": "No preview available for this file type.",
+    "types": {
+      "folder": "Folder",
+      "file": "File",
+      "pdf": "PDF",
+      "image": "Image {subtype}",
+      "imageGeneric": "Image",
+      "video": "Video {subtype}",
+      "videoGeneric": "Video",
+      "audio": "Audio {subtype}",
+      "audioGeneric": "Audio",
+      "markdown": "Markdown",
+      "text": "Text",
+      "fileExt": "File {ext}",
+      "fileGeneric": "File"
+    }
+  },
+  "manageTagsDialog": {
+    "title": "Tags for \"{name}\"",
+    "close": "Close",
+    "noTags": "No tags in this workspace yet.",
+    "deleteTagAria": "Delete tag \"{name}\" from this workspace",
+    "newTagLabel": "New tag",
+    "newTagPlaceholder": "e.g. Urgent",
+    "creating": "Creating…",
+    "createTag": "Create tag"
+  },
+  "folderColorDialog": {
+    "title": "Color of \"{name}\"",
+    "close": "Close"
+  },
+  "folderColors": {
+    "default": "Default",
+    "red": "Red",
+    "orange": "Orange",
+    "green": "Green",
+    "teal": "Teal",
+    "blue": "Blue",
+    "purple": "Purple",
+    "neutral": "Neutral"
+  },
+  "tagColors": {
+    "neutral": "Neutral",
+    "red": "Red",
+    "orange": "Orange",
+    "green": "Green",
+    "teal": "Teal",
+    "blue": "Blue",
+    "purple": "Purple",
+    "info": "Info"
+  },
+  "uploadDropzone": {
+    "emptyTitle": "This folder is empty",
+    "emptyDescription": "Drag files here to add them, or use the button below.",
+    "browse": "Browse files"
+  },
+  "tagsPage": {
+    "title": "Tags",
+    "description": "Create, rename, and delete the tags available in this workspace.",
+    "newTag": "New tag",
+    "tagColumn": "Tag",
+    "itemsColumn": "Items",
+    "actionsColumn": "Actions",
+    "itemCount": "{count, plural, one {# item} other {# items}}",
+    "editTagAria": "Edit tag \"{name}\"",
+    "deleteTagAria": "Delete tag \"{name}\"",
+    "emptyTitle": "No tags yet",
+    "emptyDescription": "Create your first tag to start organizing your files and folders.",
+    "createTag": "Create a tag",
+    "close": "Close",
+    "createDialogTitle": "New tag",
+    "tagNameLabel": "Tag name",
+    "tagNamePlaceholder": "e.g. Urgent",
+    "colorLabel": "Color",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "createTagButton": "Create tag",
+    "editDialogTitle": "Edit \"{name}\"",
+    "saving": "Saving…",
+    "save": "Save",
+    "deleteButtonText": "Delete tag",
+    "toasts": {
+      "genericError": "Error",
+      "tagCreatedTitle": "Tag created",
+      "tagCreatedDescription": "The tag \"{name}\" was created.",
+      "tagCreateErrorDescription": "Could not create the tag.",
+      "tagUpdatedTitle": "Tag updated",
+      "tagUpdatedDescription": "The tag was renamed to \"{name}\".",
+      "tagUpdateErrorDescription": "Could not update the tag.",
+      "tagDeletedTitle": "Tag deleted",
+      "tagDeletedDescription": "\"{name}\" was deleted from the workspace.",
+      "tagDeleteErrorDescription": "Could not delete the tag."
+    }
+  },
+  "trashPage": {
+    "title": "Trash",
+    "description": "Items placed in the trash are kept for 30 days before being permanently purged.",
+    "emptyTrash": "Empty trash",
+    "emptyStateTitle": "The trash is empty",
+    "emptyStateDescription": "No files or folders have been deleted recently.",
+    "nameColumn": "Name",
+    "typeColumn": "Type",
+    "deletedColumn": "Deleted on",
+    "expiresColumn": "Expires (30d)",
+    "actionsColumn": "Actions",
+    "folder": "Folder",
+    "file": "File",
+    "restore": "Restore",
+    "delete": "Delete",
+    "emptyConfirm": "Are you sure you want to permanently empty the entire trash?",
+    "toasts": {
+      "itemRestoredTitle": "Item restored",
+      "itemRestoredDescription": "\"{name}\" was restored to your files.",
+      "permanentDeleteTitle": "Permanently deleted",
+      "permanentDeleteDescription": "\"{name}\" was permanently deleted.",
+      "trashEmptiedTitle": "Trash emptied",
+      "trashEmptiedDescription": "All items in the trash have been deleted."
+    }
+  },
+  "favoritesPage": {
+    "title": "Favorites",
+    "description": "Files and folders you've marked as favorites.",
+    "emptyTitle": "No favorites",
+    "emptyDescription": "Mark files or folders as favorites to find them here.",
+    "nameColumn": "Name",
+    "locationColumn": "Location",
+    "modifiedColumn": "Modified",
+    "sizeColumn": "Size",
+    "toasts": {
+      "removedTitle": "Removed from favorites",
+      "removedDescription": "\"{name}\" was removed from your favorites.",
+      "genericError": "Error",
+      "removeErrorDescription": "Could not remove this item from favorites.",
+      "itemDeletedTitle": "Item deleted",
+      "itemDeletedDescription": "\"{name}\" was moved to the trash."
+    }
+  },
   "settings": {
     "language": "Language",
     "languageDescription": "Choose the language used across the interface.",

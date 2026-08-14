@@ -96,6 +96,7 @@ export function FileTable({
   onClearTagFilter,
 }: FileTableProps) {
   const t = useTranslations("fileTable");
+  const tFileType = useTranslations("filePreview");
   const locale = useLocale();
   const showSelection = Boolean(onToggleSelectItem);
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
@@ -260,7 +261,7 @@ export function FileTable({
                       <TagBadgeList tags={item.tags} max={3} />
                     </div>
                   </Table.Cell>
-                  <Table.Cell className="text-kumo-subtle">{getFileTypeLabel(item)}</Table.Cell>
+                  <Table.Cell className="text-kumo-subtle">{getFileTypeLabel(item, tFileType)}</Table.Cell>
                   <Table.Cell>{item.owner}</Table.Cell>
                   <Table.Cell>{new Date(item.updatedAt).toLocaleDateString(locale)}</Table.Cell>
                   <Table.Cell className="text-right">{formatFileSize(item.size)}</Table.Cell>

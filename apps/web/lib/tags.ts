@@ -1,12 +1,12 @@
 export const TAG_COLOR_OPTIONS = [
-  { value: "neutral", label: "Neutre" },
-  { value: "red", label: "Rouge" },
-  { value: "orange", label: "Orange" },
-  { value: "green", label: "Vert" },
-  { value: "teal", label: "Sarcelle" },
-  { value: "blue", label: "Bleu" },
-  { value: "purple", label: "Violet" },
-  { value: "info", label: "Info" },
+  { value: "neutral" },
+  { value: "red" },
+  { value: "orange" },
+  { value: "green" },
+  { value: "teal" },
+  { value: "blue" },
+  { value: "purple" },
+  { value: "info" },
 ] as const;
 
 export type TagColorValue = (typeof TAG_COLOR_OPTIONS)[number]["value"];

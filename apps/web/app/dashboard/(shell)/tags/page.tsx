@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   Badge,
   Button,
@@ -43,6 +44,10 @@ export default function TagsPage() {
   const [deleteTag, setDeleteTag] = useState<WorkspaceTag | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const t = useTranslations("tagsPage");
+  const tToasts = useTranslations("tagsPage.toasts");
+  const tColors = useTranslations("tagColors");
+
   async function fetchTags() {
     setLoading(true);
     try {
@@ -73,18 +78,18 @@ export default function TagsPage() {
         body: JSON.stringify({ name: newName.trim(), color: newColor }),
       });
       if (res.ok) {
-        toasts.add({ title: "Tag créé", description: `Le tag "${newName.trim()}" a été créé.` });
+        toasts.add({ title: tToasts("tagCreatedTitle"), description: tToasts("tagCreatedDescription", { name: newName.trim() }) });
         setNewName("");
         setNewColor("neutral");
         setIsCreateOpen(false);
         fetchTags();
       } else {
         const data = await res.json().catch(() => null);
-        toasts.add({ title: "Erreur", description: data?.error ?? "Impossible de créer le tag." });
+        toasts.add({ title: tToasts("genericError"), description: data?.error ?? tToasts("tagCreateErrorDescription") });
       }
     } catch (err) {
       console.error("Create tag error:", err);
-      toasts.add({ title: "Erreur", description: "Impossible de créer le tag." });
+      toasts.add({ title: tToasts("genericError"), description: tToasts("tagCreateErrorDescription") });
     } finally {
       setCreating(false);
     }
@@ -107,16 +112,16 @@ export default function TagsPage() {
         body: JSON.stringify({ id: editTag.id, name: editName.trim(), color: editColor }),
       });
       if (res.ok) {
-        toasts.add({ title: "Tag mis à jour", description: `Le tag a été renommé en "${editName.trim()}".` });
+        toasts.add({ title: tToasts("tagUpdatedTitle"), description: tToasts("tagUpdatedDescription", { name: editName.trim() }) });
         setEditTag(null);
         fetchTags();
       } else {
         const data = await res.json().catch(() => null);
-        toasts.add({ title: "Erreur", description: data?.error ?? "Impossible de mettre à jour le tag." });
+        toasts.add({ title: tToasts("genericError"), description: data?.error ?? tToasts("tagUpdateErrorDescription") });
       }
     } catch (err) {
       console.error("Edit tag error:", err);
-      toasts.add({ title: "Erreur", description: "Impossible de mettre à jour le tag." });
+      toasts.add({ title: tToasts("genericError"), description: tToasts("tagUpdateErrorDescription") });
     } finally {
       setSaving(false);
     }
@@ -128,15 +133,15 @@ export default function TagsPage() {
     try {
       const res = await fetch(`/api/tags?id=${deleteTag.id}`, { method: "DELETE" });
       if (res.ok) {
-        toasts.add({ title: "Tag supprimé", description: `"${deleteTag.name}" a été supprimé de l'espace.` });
+        toasts.add({ title: tToasts("tagDeletedTitle"), description: tToasts("tagDeletedDescription", { name: deleteTag.name }) });
         setDeleteTag(null);
         fetchTags();
       } else {
-        toasts.add({ title: "Erreur", description: "Impossible de supprimer le tag." });
+        toasts.add({ title: tToasts("genericError"), description: tToasts("tagDeleteErrorDescription") });
       }
     } catch (err) {
       console.error("Delete tag error:", err);
-      toasts.add({ title: "Erreur", description: "Impossible de supprimer le tag." });
+      toasts.add({ title: tToasts("genericError"), description: tToasts("tagDeleteErrorDescription") });
     } finally {
       setDeleting(false);
     }
@@ -145,11 +150,11 @@ export default function TagsPage() {
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
-        title="Tags"
-        description="Créez, renommez et supprimez les tags disponibles dans cet espace de travail."
+        title={t("title")}
+        description={t("description")}
       >
         <Button variant="primary" size="sm" icon={PlusIcon} onClick={() => setIsCreateOpen(true)}>
-          Nouveau tag
+          {t("newTag")}
         </Button>
       </PageHeader>
 
@@ -170,11 +175,11 @@ export default function TagsPage() {
             <Empty
               size="sm"
               icon={<TagIcon size={40} />}
-              title="Aucun tag pour le moment"
-              description="Créez votre premier tag pour commencer à organiser vos fichiers et dossiers."
+              title={t("emptyTitle")}
+              description={t("emptyDescription")}
               contents={
                 <Button variant="secondary" size="sm" icon={PlusIcon} onClick={() => setIsCreateOpen(true)}>
-                  Créer un tag
+                  {t("createTag")}
                 </Button>
               }
             />
@@ -184,21 +189,19 @@ export default function TagsPage() {
             <Table>
               <Table.Header>
                 <Table.Row>
-                  <Table.Head>Tag</Table.Head>
-                  <Table.Head>Éléments</Table.Head>
-                  <Table.Head className="text-right">Actions</Table.Head>
+                  <Table.Head>{t("tagColumn")}</Table.Head>
+                  <Table.Head>{t("itemsColumn")}</Table.Head>
+                  <Table.Head className="text-right">{t("actionsColumn")}</Table.Head>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {tags.map((t) => (
-                  <Table.Row key={t.id}>
+                {tags.map((tag) => (
+                  <Table.Row key={tag.id}>
                     <Table.Cell>
-                      <Badge variant={t.color as BadgeVariant}>{t.name}</Badge>
+                      <Badge variant={tag.color as BadgeVariant}>{tag.name}</Badge>
                     </Table.Cell>
                     <Table.Cell>
-                      <Text variant="secondary">
-                        {t.itemCount ?? 0} élément{(t.itemCount ?? 0) === 1 ? "" : "s"}
-                      </Text>
+                      <Text variant="secondary">{t("itemCount", { count: tag.itemCount ?? 0 })}</Text>
                     </Table.Cell>
                     <Table.Cell className="text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -207,16 +210,16 @@ export default function TagsPage() {
                           shape="square"
                           size="sm"
                           icon={PencilSimpleIcon}
-                          aria-label={`Modifier le tag "${t.name}"`}
-                          onClick={() => openEditDialog(t)}
+                          aria-label={t("editTagAria", { name: tag.name })}
+                          onClick={() => openEditDialog(tag)}
                         />
                         <Button
                           variant="ghost"
                           shape="square"
                           size="sm"
                           icon={TrashIcon}
-                          aria-label={`Supprimer le tag "${t.name}"`}
-                          onClick={() => setDeleteTag(t)}
+                          aria-label={t("deleteTagAria", { name: tag.name })}
+                          onClick={() => setDeleteTag(tag)}
                         />
                       </div>
                     </Table.Cell>
@@ -232,55 +235,55 @@ export default function TagsPage() {
       <Dialog.Root open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <Dialog className="p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold">Nouveau tag</Dialog.Title>
+            <Dialog.Title className="text-lg font-semibold">{t("createDialogTitle")}</Dialog.Title>
             <Dialog.Close
-              aria-label="Fermer"
+              aria-label={t("close")}
               render={(props) => (
-                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Fermer" />
+                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={t("close")} />
               )}
             />
           </div>
           <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
             <Input
               size="sm"
-              label="Nom du tag"
-              placeholder="ex: Urgent"
+              label={t("tagNameLabel")}
+              placeholder={t("tagNamePlaceholder")}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               required
               autoFocus
             />
             <div className="flex flex-col gap-1.5">
-              <Text variant="secondary">Couleur</Text>
+              <Text variant="secondary">{t("colorLabel")}</Text>
               <div className="flex flex-wrap gap-1.5">
                 {TAG_COLOR_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
                     onClick={() => setNewColor(opt.value)}
-                    aria-label={opt.label}
+                    aria-label={tColors(opt.value)}
                     aria-pressed={newColor === opt.value}
                     className={cn(
                       "rounded-full border-0 bg-transparent p-0.5",
                       newColor === opt.value && "ring-2 ring-kumo-info",
                     )}
                   >
-                    <Badge variant={opt.value}>{opt.label}</Badge>
+                    <Badge variant={opt.value}>{tColors(opt.value)}</Badge>
                   </button>
                 ))}
               </div>
             </div>
             <div className="mt-2 flex justify-end gap-2">
               <Button variant="secondary" size="sm" type="button" onClick={() => setIsCreateOpen(false)}>
-                Annuler
+                {t("cancel")}
               </Button>
               <Button variant="primary" size="sm" type="submit" disabled={creating || !newName.trim()}>
                 {creating ? (
                   <span className="flex items-center gap-1.5">
-                    <Loader size="sm" /> Création…
+                    <Loader size="sm" /> {t("creating")}
                   </span>
                 ) : (
-                  "Créer le tag"
+                  t("createTagButton")
                 )}
               </Button>
             </div>
@@ -292,54 +295,54 @@ export default function TagsPage() {
       <Dialog.Root open={editTag !== null} onOpenChange={(open) => !open && setEditTag(null)}>
         <Dialog className="p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold">Modifier &quot;{editTag?.name}&quot;</Dialog.Title>
+            <Dialog.Title className="text-lg font-semibold">{t("editDialogTitle", { name: editTag?.name ?? "" })}</Dialog.Title>
             <Dialog.Close
-              aria-label="Fermer"
+              aria-label={t("close")}
               render={(props) => (
-                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Fermer" />
+                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={t("close")} />
               )}
             />
           </div>
           <form onSubmit={handleEditSubmit} className="flex flex-col gap-4">
             <Input
               size="sm"
-              label="Nom du tag"
+              label={t("tagNameLabel")}
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
               required
               autoFocus
             />
             <div className="flex flex-col gap-1.5">
-              <Text variant="secondary">Couleur</Text>
+              <Text variant="secondary">{t("colorLabel")}</Text>
               <div className="flex flex-wrap gap-1.5">
                 {TAG_COLOR_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
                     onClick={() => setEditColor(opt.value)}
-                    aria-label={opt.label}
+                    aria-label={tColors(opt.value)}
                     aria-pressed={editColor === opt.value}
                     className={cn(
                       "rounded-full border-0 bg-transparent p-0.5",
                       editColor === opt.value && "ring-2 ring-kumo-info",
                     )}
                   >
-                    <Badge variant={opt.value}>{opt.label}</Badge>
+                    <Badge variant={opt.value}>{tColors(opt.value)}</Badge>
                   </button>
                 ))}
               </div>
             </div>
             <div className="mt-2 flex justify-end gap-2">
               <Button variant="secondary" size="sm" type="button" onClick={() => setEditTag(null)}>
-                Annuler
+                {t("cancel")}
               </Button>
               <Button variant="primary" size="sm" type="submit" disabled={saving || !editName.trim()}>
                 {saving ? (
                   <span className="flex items-center gap-1.5">
-                    <Loader size="sm" /> Enregistrement…
+                    <Loader size="sm" /> {t("saving")}
                   </span>
                 ) : (
-                  "Enregistrer"
+                  t("save")
                 )}
               </Button>
             </div>
@@ -355,7 +358,7 @@ export default function TagsPage() {
         resourceName={deleteTag?.name ?? ""}
         onDelete={handleDeleteConfirm}
         isDeleting={deleting}
-        deleteButtonText="Supprimer le tag"
+        deleteButtonText={t("deleteButtonText")}
       />
     </div>
   );
