@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { Badge, Breadcrumbs, Button, Input, LayerCard, Loader, Table, Text, useKumoToastManager } from "@cloudflare/kumo";
 import {
   UsersThreeIcon,
@@ -29,6 +30,9 @@ export default function SettingsPage() {
   const { data: session } = authClient.useSession();
   const { data: activeOrg } = authClient.useActiveOrganization();
   const toasts = useKumoToastManager();
+  const t = useTranslations("settingsPage");
+  const tToasts = useTranslations("settingsPage.toasts");
+  const tBreadcrumbs = useTranslations("fileBreadcrumbs");
 
   const [activeTab, setActiveTab] = useState<"workspaces" | "storage">("workspaces");
   const [members, setMembers] = useState<MemberUI[]>([]);
@@ -74,7 +78,7 @@ export default function SettingsPage() {
     setMembers(
       memberList.map((m) => ({
         id: m.id,
-        name: m.user?.name ?? m.user?.email?.split("@")[0] ?? "Utilisateur",
+        name: m.user?.name ?? m.user?.email?.split("@")[0] ?? t("defaultUser"),
         email: m.user?.email ?? "",
         role: m.role ?? "member",
       })),
@@ -109,8 +113,8 @@ export default function SettingsPage() {
 
     if (error) {
       toasts.add({
-        title: "Erreur de création",
-        description: error.message ?? "Impossible de créer le groupe de workspace.",
+        title: tToasts("createOrgErrorTitle"),
+        description: error.message ?? tToasts("createOrgErrorFallback"),
       });
       return;
     }
@@ -120,8 +124,8 @@ export default function SettingsPage() {
     }
 
     toasts.add({
-      title: "Groupe de Workspace créé",
-      description: `L'espace "${newOrgName}" est désormais votre workspace actif.`,
+      title: tToasts("orgCreatedTitle"),
+      description: tToasts("orgCreatedDescription", { name: newOrgName }),
     });
     setNewOrgName("");
   }
@@ -138,14 +142,14 @@ export default function SettingsPage() {
       });
       if (error) {
         toasts.add({
-          title: "Erreur d'invitation",
-          description: error.message ?? "Impossible d'envoyer l'invitation.",
+          title: tToasts("inviteErrorTitle"),
+          description: error.message ?? tToasts("inviteErrorFallback"),
         });
         return;
       }
       toasts.add({
-        title: "Invitation envoyée",
-        description: `Un e-mail d'invitation a été transmis à ${newMemberEmail}.`,
+        title: tToasts("invitationSentTitle"),
+        description: tToasts("invitationSentDescription", { email: newMemberEmail }),
       });
       setNewMemberEmail("");
       loadWorkspaceData();
@@ -157,20 +161,20 @@ export default function SettingsPage() {
   async function handleRemoveMember(memberId: string, email: string) {
     const { error } = await authClient.organization.removeMember({ memberIdOrEmail: memberId });
     if (error) {
-      toasts.add({ title: "Erreur", description: error.message ?? "Impossible de retirer ce membre." });
+      toasts.add({ title: tToasts("genericError"), description: error.message ?? tToasts("removeMemberErrorFallback") });
       return;
     }
-    toasts.add({ title: "Membre retiré", description: `Accès révoqué pour ${email}.` });
+    toasts.add({ title: tToasts("memberRemovedTitle"), description: tToasts("memberRemovedDescription", { email }) });
     loadWorkspaceData();
   }
 
   async function handleCancelInvitation(invitationId: string, email: string) {
     const { error } = await authClient.organization.cancelInvitation({ invitationId });
     if (error) {
-      toasts.add({ title: "Erreur", description: error.message ?? "Impossible d'annuler l'invitation." });
+      toasts.add({ title: tToasts("genericError"), description: error.message ?? tToasts("cancelInvitationErrorFallback") });
       return;
     }
-    toasts.add({ title: "Invitation annulée", description: email });
+    toasts.add({ title: tToasts("invitationCancelledTitle"), description: email });
     loadWorkspaceData();
   }
 
@@ -179,8 +183,8 @@ export default function SettingsPage() {
     if (!newTeamName.trim()) return;
 
     toasts.add({
-      title: "Sous-équipe créée",
-      description: `L'équipe "${newTeamName}" a été rattachée à ${activeOrg?.name ?? "votre workspace"}.`,
+      title: tToasts("subteamCreatedTitle"),
+      description: tToasts("subteamCreatedDescription", { name: newTeamName, workspace: activeOrg?.name ?? tToasts("yourWorkspace") }),
     });
     setNewTeamName("");
   }
@@ -191,16 +195,16 @@ export default function SettingsPage() {
         className="-mx-6 -mt-6"
         breadcrumbs={
           <Breadcrumbs>
-            <Breadcrumbs.Link href="/dashboard">Mes fichiers</Breadcrumbs.Link>
+            <Breadcrumbs.Link href="/dashboard">{tBreadcrumbs("myFiles")}</Breadcrumbs.Link>
             <Breadcrumbs.Separator />
-            <Breadcrumbs.Current>Réglages</Breadcrumbs.Current>
+            <Breadcrumbs.Current>{t("title")}</Breadcrumbs.Current>
           </Breadcrumbs>
         }
-        title="Réglages"
-        description="Gérez vos espaces de travail et la configuration du stockage."
+        title={t("title")}
+        description={t("description")}
         tabs={[
-          { value: "workspaces", label: "Groupes & Équipes" },
-          { value: "storage", label: "Stockage & S3" },
+          { value: "workspaces", label: t("tabWorkspaces") },
+          { value: "storage", label: t("tabStorage") },
         ]}
         activeTab={activeTab}
         onValueChange={(val) => setActiveTab(val as "workspaces" | "storage")}
@@ -215,17 +219,17 @@ export default function SettingsPage() {
           <LayerCard className="flex flex-col gap-4 p-6">
             <div>
               <Text as="h2" variant="heading2">
-                Créer un Groupe de Workspace (Organization)
+                {t("createOrgTitle")}
               </Text>
               <Text variant="secondary">
-                Déployez une organisation Better Auth pour réunir vos équipes et vos sous-projets.
+                {t("createOrgDescription")}
               </Text>
             </div>
 
             <form onSubmit={handleCreateOrganization} className="flex gap-3">
               <Input
                 size="sm"
-                placeholder="Nom du nouveau workspace (ex: Équipe Data)..."
+                placeholder={t("newWorkspaceNamePlaceholder")}
                 value={newOrgName}
                 onChange={(e) => setNewOrgName(e.target.value)}
                 className="flex-1"
@@ -233,10 +237,10 @@ export default function SettingsPage() {
               <Button variant="primary" size="sm" type="submit" disabled={submittingOrg} icon={PlusIcon}>
                 {submittingOrg ? (
                   <span className="flex items-center gap-1.5">
-                    <Loader size="sm" /> Création…
+                    <Loader size="sm" /> {t("creating")}
                   </span>
                 ) : (
-                  "Créer le groupe"
+                  t("createGroup")
                 )}
               </Button>
             </form>
@@ -246,23 +250,23 @@ export default function SettingsPage() {
           <LayerCard className="flex flex-col gap-4 p-6">
             <div>
               <Text as="h2" variant="heading2">
-                Sous-équipes du Workspace ({activeOrg?.name ?? "Espace Personnel"})
+                {t("subteamsTitle", { name: activeOrg?.name ?? t("personalWorkspace") })}
               </Text>
               <Text variant="secondary">
-                Organisez vos départements (Dev, Design, Marketing) au sein de votre organisation.
+                {t("subteamsDescription")}
               </Text>
             </div>
 
             <form onSubmit={handleCreateTeam} className="flex gap-3">
               <Input
                 size="sm"
-                placeholder="Nom de la sous-équipe (ex: Frontend Eng)..."
+                placeholder={t("newSubteamPlaceholder")}
                 value={newTeamName}
                 onChange={(e) => setNewTeamName(e.target.value)}
                 className="flex-1"
               />
               <Button variant="secondary" size="sm" type="submit" icon={PlusIcon}>
-                Ajouter une sous-équipe
+                {t("addSubteam")}
               </Button>
             </form>
           </LayerCard>
@@ -272,12 +276,10 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <Text as="h2" variant="heading2">
-                  Membres du Workspace ({activeOrg?.name ?? "Espace Personnel"})
+                  {t("membersTitle", { name: activeOrg?.name ?? t("personalWorkspace") })}
                 </Text>
                 <Text variant="secondary">
-                  {activeOrg
-                    ? "Invitez des collaborateurs par email et gérez leurs rôles d'accès."
-                    : "Les espaces personnels n'ont pas de membres — créez un groupe pour inviter des collaborateurs."}
+                  {activeOrg ? t("membersDescriptionWithOrg") : t("membersDescriptionNoOrg")}
                 </Text>
               </div>
             </div>
@@ -287,7 +289,7 @@ export default function SettingsPage() {
                 <Input
                   size="sm"
                   type="email"
-                  placeholder="collaborateur@exemple.com"
+                  placeholder={t("collaboratorEmailPlaceholder")}
                   value={newMemberEmail}
                   onChange={(e) => setNewMemberEmail(e.target.value)}
                   className="flex-1"
@@ -295,10 +297,10 @@ export default function SettingsPage() {
                 <Button variant="secondary" size="sm" type="submit" disabled={invitingMember} icon={UsersThreeIcon}>
                   {invitingMember ? (
                     <span className="flex items-center gap-1.5">
-                      <Loader size="sm" /> Envoi…
+                      <Loader size="sm" /> {t("sending")}
                     </span>
                   ) : (
-                    "Inviter par email"
+                    t("inviteByEmail")
                   )}
                 </Button>
               </form>
@@ -307,9 +309,9 @@ export default function SettingsPage() {
             <Table>
               <Table.Header>
                 <Table.Row>
-                  <Table.Head>Membre</Table.Head>
-                  <Table.Head>Rôle</Table.Head>
-                  {canManageMembers && <Table.Head className="text-right">Action</Table.Head>}
+                  <Table.Head>{t("memberColumn")}</Table.Head>
+                  <Table.Head>{t("roleColumn")}</Table.Head>
+                  {canManageMembers && <Table.Head className="text-right">{t("actionColumn")}</Table.Head>}
                 </Table.Row>
               </Table.Header>
               <Table.Body>
@@ -323,7 +325,7 @@ export default function SettingsPage() {
                     </Table.Cell>
                     <Table.Cell>
                       <Badge variant={member.role === "owner" || member.role === "admin" ? "primary" : "neutral"}>
-                        {member.role === "owner" ? "Propriétaire" : member.role === "admin" ? "Admin" : "Membre"}
+                        {member.role === "owner" ? t("roleOwner") : member.role === "admin" ? t("roleAdmin") : t("roleMember")}
                       </Badge>
                     </Table.Cell>
                     {canManageMembers && (
@@ -334,7 +336,7 @@ export default function SettingsPage() {
                             shape="square"
                             size="sm"
                             icon={TrashIcon}
-                            title="Retirer le membre"
+                            title={t("removeMember")}
                             onClick={() => handleRemoveMember(member.id, member.email)}
                           />
                         )}
@@ -350,15 +352,15 @@ export default function SettingsPage() {
           {activeOrg && canManageMembers && invitations.length > 0 && (
             <LayerCard className="flex flex-col gap-4 p-6">
               <div>
-                <Text as="h2" variant="heading2">Invitations en attente</Text>
-                <Text variant="secondary">Ces personnes n&apos;ont pas encore rejoint le workspace.</Text>
+                <Text as="h2" variant="heading2">{t("pendingInvitationsTitle")}</Text>
+                <Text variant="secondary">{t("pendingInvitationsDescription")}</Text>
               </div>
               <Table>
                 <Table.Header>
                   <Table.Row>
-                    <Table.Head>Email</Table.Head>
-                    <Table.Head>Rôle proposé</Table.Head>
-                    <Table.Head className="text-right">Action</Table.Head>
+                    <Table.Head>{t("emailColumn")}</Table.Head>
+                    <Table.Head>{t("proposedRoleColumn")}</Table.Head>
+                    <Table.Head className="text-right">{t("actionColumn")}</Table.Head>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -366,7 +368,7 @@ export default function SettingsPage() {
                     <Table.Row key={inv.id}>
                       <Table.Cell>{inv.email}</Table.Cell>
                       <Table.Cell>
-                        <Badge variant="neutral">{inv.role === "admin" ? "Admin" : "Membre"}</Badge>
+                        <Badge variant="neutral">{inv.role === "admin" ? t("roleAdmin") : t("roleMember")}</Badge>
                       </Table.Cell>
                       <Table.Cell className="text-right">
                         <Button
@@ -374,7 +376,7 @@ export default function SettingsPage() {
                           shape="square"
                           size="sm"
                           icon={XCircleIcon}
-                          title="Annuler l'invitation"
+                          title={t("cancelInvitation")}
                           onClick={() => handleCancelInvitation(inv.id, inv.email)}
                         />
                       </Table.Cell>
@@ -392,35 +394,35 @@ export default function SettingsPage() {
         <LayerCard className="flex flex-col gap-6 p-6">
           <div>
             <Text as="h2" variant="heading2">
-              Configuration du Stockage Cloud & S3
+              {t("storageConfigTitle")}
             </Text>
             <Text variant="secondary">
-              Raccordez votre bucket MinIO ou AWS S3 compatible.
+              {t("storageConfigDescription")}
             </Text>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               size="sm"
-              label="Endpoint S3"
+              label={t("s3Endpoint")}
               value={s3Endpoint}
               onChange={(e) => setS3Endpoint(e.target.value)}
             />
             <Input
               size="sm"
-              label="Nom du Bucket"
+              label={t("bucketName")}
               value={s3Bucket}
               onChange={(e) => setS3Bucket(e.target.value)}
             />
             <Input
               size="sm"
-              label="Région S3"
+              label={t("s3Region")}
               value={s3Region}
               onChange={(e) => setS3Region(e.target.value)}
             />
             <Input
               size="sm"
-              label="Access Key ID"
+              label={t("accessKeyId")}
               value={s3AccessKey}
               onChange={(e) => setS3AccessKey(e.target.value)}
             />
@@ -430,9 +432,9 @@ export default function SettingsPage() {
             variant="primary"
             size="sm"
             className="w-fit"
-            onClick={() => toasts.add({ title: "Configuration S3", description: "Test de connexion S3 réussi !" })}
+            onClick={() => toasts.add({ title: tToasts("s3ConfigTitle"), description: tToasts("s3ConnectionSuccess") })}
           >
-            Tester la connexion S3
+            {t("testS3Connection")}
           </Button>
         </LayerCard>
       )}
