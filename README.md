@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="apps/web/public/logo.png" alt="Layera" width="120" />
+<img src="apps/web/public/logo.svg" alt="Layera" width="120" />
 
 # Layera
 
