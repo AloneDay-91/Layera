@@ -5,6 +5,7 @@ import { Badge, Breadcrumbs, Button, LayerCard, Loader, SkeletonLine, Table, Tex
 import { TrashIcon, ArrowCounterClockwiseIcon, XCircleIcon } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/kumo/page-header";
 import { ClientOnly } from "@/components/shell/client-only";
+import { notifyStorageUpdated } from "@/lib/storage-events";
 
 type TrashedItem = {
   id: string;
@@ -77,6 +78,7 @@ export default function TrashPage() {
           description: `"${item.name}" a été supprimé définitivement.`,
         });
         fetchTrash();
+        notifyStorageUpdated();
       }
     } catch (err) {
       console.error("Permanent delete error:", err);
@@ -97,6 +99,7 @@ export default function TrashPage() {
           description: "Tous les éléments de la corbeille ont été supprimés.",
         });
         fetchTrash();
+        notifyStorageUpdated();
       }
     } catch (err) {
       console.error("Empty trash error:", err);

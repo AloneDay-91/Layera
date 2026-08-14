@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Input, Meter, Sidebar, Text } from "@cloudflare/kumo";
 import { AccountSwitcher } from "./account-switcher";
 import { formatFileSize } from "@/lib/mock-files";
+import { onStorageUpdated } from "@/lib/storage-events";
 
 type StorageSummary = { usedBytes: number; quotaBytes: number };
 
@@ -16,6 +17,7 @@ const PAGE_LABELS: Record<string, string> = {
   "/dashboard/favorites": "Favoris",
   "/dashboard/links": "Liens de partage",
   "/dashboard/trash": "Corbeille",
+  "/dashboard/tags": "Tags",
   "/dashboard/storage": "Analyse du stockage",
   "/dashboard/activity": "Journaux d'activité",
   "/dashboard/admin": "Administration",
@@ -31,10 +33,14 @@ export function DashboardHeader() {
   const [storage, setStorage] = useState<StorageSummary | null>(null);
 
   useEffect(() => {
-    fetch("/api/storage/stats")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => data && setStorage({ usedBytes: data.usedBytes, quotaBytes: data.quotaBytes }))
-      .catch(() => {});
+    function fetchStorage() {
+      fetch("/api/storage/stats")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => data && setStorage({ usedBytes: data.usedBytes, quotaBytes: data.quotaBytes }))
+        .catch(() => {});
+    }
+    fetchStorage();
+    return onStorageUpdated(fetchStorage);
   }, []);
 
   const pageLabel = PAGE_LABELS[pathname] ?? "FileCloud";
