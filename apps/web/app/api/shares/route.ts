@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db, workspace, folder, file, shareLink, eq, and, isNull } from "@filecloud/db";
 import { randomBytes } from "crypto";
 import { hashSharePassword } from "@/lib/share-password";
+import { checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 
 export async function GET() {
   try {
@@ -66,6 +67,12 @@ export async function POST(request: Request) {
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { allowed, retryAfter } = await checkRateLimit(`share-create:${session.user.id}`, {
+      windowSeconds: 60,
+      max: 20,
+    });
+    if (!allowed) return rateLimitedResponse(retryAfter!);
 
     const { itemId, itemType, expiresAt, password } = await request.json();
 

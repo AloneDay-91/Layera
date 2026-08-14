@@ -2,9 +2,16 @@ import { NextResponse } from "next/server";
 import { db, shareLink, eq } from "@filecloud/db";
 import { verifySharePassword } from "@/lib/share-password";
 import { shareUnlockCookieName, signShareUnlock } from "@/lib/share-unlock";
+import { checkRateLimit, getClientIp, rateLimitedResponse } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   try {
+    const { allowed, retryAfter } = await checkRateLimit(`share-unlock:${getClientIp(request)}`, {
+      windowSeconds: 60,
+      max: 5,
+    });
+    if (!allowed) return rateLimitedResponse(retryAfter!);
+
     const { token, password } = await request.json();
 
     if (!token || typeof password !== "string") {

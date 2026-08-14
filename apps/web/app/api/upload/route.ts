@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db, workspace, folder, file, provisionPersonalWorkspace, provisionOrganizationWorkspace, eq, and, isNull } from "@filecloud/db";
 import { minioClient, S3_BUCKET } from "@filecloud/storage";
+import { checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   try {
@@ -13,6 +14,12 @@ export async function POST(request: Request) {
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const { allowed, retryAfter } = await checkRateLimit(`upload:${session.user.id}`, {
+      windowSeconds: 60,
+      max: 30,
+    });
+    if (!allowed) return rateLimitedResponse(retryAfter!);
 
     const formData = await request.formData();
     const uploadedFile = formData.get("file") as File | null;

@@ -3,9 +3,16 @@ import { cookies } from "next/headers";
 import { db, shareLink, file, eq } from "@filecloud/db";
 import { minioClient, S3_BUCKET } from "@filecloud/storage";
 import { shareUnlockCookieName, verifyShareUnlock } from "@/lib/share-unlock";
+import { checkRateLimit, getClientIp, rateLimitedResponse } from "@/lib/rate-limit";
 
 export async function GET(request: Request) {
   try {
+    const { allowed, retryAfter } = await checkRateLimit(`share-download:${getClientIp(request)}`, {
+      windowSeconds: 60,
+      max: 30,
+    });
+    if (!allowed) return rateLimitedResponse(retryAfter!);
+
     const { searchParams } = new URL(request.url);
     const token = searchParams.get("token");
 
