@@ -1,8 +1,8 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Dialog, Input, Loader, SkeletonLine, Tabs, useKumoToastManager } from "@cloudflare/kumo";
+import { Button, Dialog, Input, Loader, Pagination, SkeletonLine, Tabs, Text, useKumoToastManager } from "@cloudflare/kumo";
 import {
   GridFourIcon,
   ListBulletsIcon,
@@ -12,21 +12,46 @@ import {
   CopyIcon,
   CheckCircleIcon,
   XCircleIcon,
+  TrashIcon,
 } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { ClientOnly } from "@/components/shell/client-only";
 import { MockItem } from "@/lib/mock-files";
+import { notifyStorageUpdated } from "@/lib/storage-events";
+import type { TagColorValue, WorkspaceTag } from "@/lib/tags";
 import { FileBreadcrumbs } from "./file-breadcrumbs";
-import { FileTable } from "./file-table";
+import { FileTable, type TypeFilterValue } from "./file-table";
 import { FileGrid } from "./file-grid";
 import { FileDetailsPanel } from "./file-details-panel";
 import { UploadDropzone } from "./upload-dropzone";
+import { ManageTagsDialog } from "./manage-tags-dialog";
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const DEFAULT_PAGE_SIZE = 25;
 
 type ViewMode = "table" | "grid";
 
 export function FileBrowser() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const searchQuery = searchParams.get("search");
+
+  const pageParam = parseInt(searchParams.get("page") ?? "1", 10);
+  const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
+  const pageSizeParam = parseInt(searchParams.get("pageSize") ?? "", 10);
+  const pageSize = PAGE_SIZE_OPTIONS.includes(pageSizeParam) ? pageSizeParam : DEFAULT_PAGE_SIZE;
+
+  function updateQueryParams(updates: Record<string, string | null>) {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === null) params.delete(key);
+      else params.set(key, value);
+    }
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
   const { data: activeOrg } = authClient.useActiveOrganization();
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -55,6 +80,20 @@ export function FileBrowser() {
   const [uploadQueue, setUploadQueue] = useState<
     Array<{ name: string; status: "uploading" | "success" | "error" }>
   >([]);
+
+  // État modale de gestion des tags
+  const [workspaceTags, setWorkspaceTags] = useState<WorkspaceTag[]>([]);
+  const [loadingTags, setLoadingTags] = useState(true);
+  const [manageTagsItem, setManageTagsItem] = useState<MockItem | null>(null);
+
+  // État de sélection multiple et suppression groupée
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  // État des filtres
+  const [typeFilter, setTypeFilter] = useState<TypeFilterValue>("all");
+  const [tagFilterIds, setTagFilterIds] = useState<Set<string>>(new Set());
 
   // État de la dropzone plein cadre (glisser-déposer de fichiers depuis le système)
   const [isDraggingFileOver, setIsDraggingFileOver] = useState(false);
@@ -124,19 +163,152 @@ export function FileBrowser() {
     fetchFiles(currentFolderId, searchQuery);
   }, [currentFolderId, searchQuery, activeOrg?.id]);
 
+  async function fetchTags() {
+    setLoadingTags(true);
+    try {
+      const res = await fetch("/api/tags");
+      if (res.ok) {
+        const data = await res.json();
+        setWorkspaceTags(data.tags ?? []);
+      }
+    } catch (err) {
+      console.error("Erreur de chargement des tags :", err);
+    } finally {
+      setLoadingTags(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchTags();
+  }, [activeOrg?.id]);
+
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedItemId) ?? null,
     [items, selectedItemId],
   );
 
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      if (typeFilter === "folder" && item.type !== "folder") return false;
+      if (typeFilter === "file" && item.type !== "file") return false;
+      if (tagFilterIds.size > 0) {
+        const itemTagIds = new Set((item.tags ?? []).map((t) => t.id));
+        const hasMatch = [...tagFilterIds].some((id) => itemTagIds.has(id));
+        if (!hasMatch) return false;
+      }
+      return true;
+    });
+  }, [items, typeFilter, tagFilterIds]);
+
+  const pageCount = Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredItems.slice(start, start + pageSize);
+  }, [filteredItems, currentPage, pageSize]);
+
+  // Ramène à la page 1 dès que le dossier, la recherche ou les filtres changent
+  // (ignore le tout premier rendu pour ne pas écraser un ?page= présent dans l'URL initiale)
+  const isFirstFilterRender = useRef(true);
+  useEffect(() => {
+    if (isFirstFilterRender.current) {
+      isFirstFilterRender.current = false;
+      return;
+    }
+    updateQueryParams({ page: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentFolderId, searchQuery, typeFilter, tagFilterIds]);
+
+  // Corrige l'URL si la page demandée dépasse le nombre de pages disponibles
+  // (seulement une fois les données chargées, pour ne pas écraser un ?page= valide pendant le chargement)
+  useEffect(() => {
+    if (!loading && page > pageCount) {
+      updateQueryParams({ page: pageCount > 1 ? String(pageCount) : null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, page, pageCount]);
+
+  const allVisibleSelected = paginatedItems.length > 0 && paginatedItems.every((i) => selectedIds.has(i.id));
+  const someVisibleSelected = paginatedItems.some((i) => selectedIds.has(i.id));
+
   function handleOpenFolder(folderId: string) {
     setCurrentFolderId(folderId);
     setSelectedItemId(null);
+    setSelectedIds(new Set());
   }
 
   function handleNavigate(folderId: string | null) {
     setCurrentFolderId(folderId);
     setSelectedItemId(null);
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => {
+      if (allVisibleSelected) {
+        const next = new Set(prev);
+        paginatedItems.forEach((i) => next.delete(i.id));
+        return next;
+      }
+      const next = new Set(prev);
+      paginatedItems.forEach((i) => next.add(i.id));
+      return next;
+    });
+  }
+
+  function toggleSelectItem(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleTagFilter(tagId: string) {
+    setTagFilterIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(tagId)) next.delete(tagId);
+      else next.add(tagId);
+      return next;
+    });
+  }
+
+  async function handleBulkDeleteConfirm() {
+    const targets = items.filter((i) => selectedIds.has(i.id));
+    if (targets.length === 0) return;
+
+    setBulkDeleting(true);
+    try {
+      const results = await Promise.all(
+        targets.map((item) =>
+          fetch(`/api/files?id=${item.id}&type=${item.type}`, { method: "DELETE" }).then((res) => res.ok),
+        ),
+      );
+      const failedCount = results.filter((ok) => !ok).length;
+
+      if (failedCount === 0) {
+        toasts.add({
+          title: "Éléments supprimés",
+          description: `${targets.length} élément${targets.length > 1 ? "s" : ""} supprimé${targets.length > 1 ? "s" : ""}.`,
+        });
+      } else {
+        toasts.add({
+          title: "Suppression partielle",
+          description: `${targets.length - failedCount}/${targets.length} éléments supprimés. Certains ont échoué.`,
+        });
+      }
+
+      setSelectedIds(new Set());
+      setBulkDeleteOpen(false);
+      fetchFiles(currentFolderId, searchQuery);
+      notifyStorageUpdated();
+    } catch (err) {
+      console.error("Bulk delete error:", err);
+      toasts.add({ title: "Erreur", description: "Impossible de supprimer les éléments sélectionnés." });
+    } finally {
+      setBulkDeleting(false);
+    }
   }
 
   async function handleCreateFolder(e: React.FormEvent) {
@@ -286,6 +458,7 @@ export function FileBrowser() {
 
     if (successCount > 0) {
       fetchFiles(currentFolderId, searchQuery);
+      notifyStorageUpdated();
     }
   }
 
@@ -351,19 +524,83 @@ export function FileBrowser() {
     });
   }
 
+  async function handleToggleTag(tag: WorkspaceTag) {
+    const item = manageTagsItem;
+    if (!item) return;
+    const isAssigned = (item.tags ?? []).some((t) => t.id === tag.id);
+    const nextTags = isAssigned
+      ? (item.tags ?? []).filter((t) => t.id !== tag.id)
+      : [...(item.tags ?? []), tag];
+
+    setManageTagsItem({ ...item, tags: nextTags });
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, tags: nextTags } : i)));
+
+    try {
+      const res = isAssigned
+        ? await fetch(`/api/tags/assign?tagId=${tag.id}&itemId=${item.id}`, { method: "DELETE" })
+        : await fetch("/api/tags/assign", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tagId: tag.id, itemId: item.id, itemType: item.type }),
+          });
+      if (!res.ok) throw new Error("Failed to toggle tag");
+    } catch (err) {
+      console.error("Toggle tag error:", err);
+      setManageTagsItem(item);
+      setItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
+      toasts.add({ title: "Erreur", description: "Impossible de mettre à jour les tags." });
+    }
+  }
+
+  async function handleCreateTag(name: string, color: TagColorValue) {
+    try {
+      const res = await fetch("/api/tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, color }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setWorkspaceTags((prev) => [...prev, data.tag].sort((a, b) => a.name.localeCompare(b.name)));
+      } else {
+        const data = await res.json().catch(() => null);
+        toasts.add({ title: "Erreur", description: data?.error ?? "Impossible de créer le tag." });
+      }
+    } catch (err) {
+      console.error("Create tag error:", err);
+      toasts.add({ title: "Erreur", description: "Impossible de créer le tag." });
+    }
+  }
+
+  async function handleDeleteTag(tag: WorkspaceTag) {
+    if (!confirm(`Supprimer définitivement le tag "${tag.name}" de cet espace ?`)) return;
+    try {
+      const res = await fetch(`/api/tags?id=${tag.id}`, { method: "DELETE" });
+      if (res.ok) {
+        setWorkspaceTags((prev) => prev.filter((t) => t.id !== tag.id));
+        setItems((prev) => prev.map((i) => ({ ...i, tags: (i.tags ?? []).filter((t) => t.id !== tag.id) })));
+        setManageTagsItem((prev) => (prev ? { ...prev, tags: (prev.tags ?? []).filter((t) => t.id !== tag.id) } : prev));
+        toasts.add({ title: "Tag supprimé", description: `"${tag.name}" a été supprimé de l'espace.` });
+      }
+    } catch (err) {
+      console.error("Delete tag error:", err);
+      toasts.add({ title: "Erreur", description: "Impossible de supprimer le tag." });
+    }
+  }
+
   return (
-    <div className="flex flex-1 gap-6">
+    <div className="flex h-full min-h-0 gap-6">
       <div
-        className="relative flex flex-1 flex-col gap-4"
+        className="relative flex min-h-0 flex-1 flex-col gap-4"
         onDragEnter={handleBrowserDragEnter}
         onDragOver={handleBrowserDragOver}
         onDragLeave={handleBrowserDragLeave}
         onDrop={handleBrowserDrop}
       >
         {isDraggingFileOver && (
-          <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-kumo-brand bg-kumo-tint/90">
-            <UploadSimpleIcon size={40} className="text-kumo-brand" />
-            <span className="text-sm font-medium text-kumo-brand">Déposez vos fichiers ici pour les téléverser</span>
+          <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-kumo-info bg-kumo-tint/90">
+            <UploadSimpleIcon size={40} className="text-kumo-info" />
+            <span className="text-sm font-medium text-kumo-info">Déposez vos fichiers ici pour les téléverser</span>
           </div>
         )}
         <div className="flex items-center justify-between">
@@ -428,6 +665,28 @@ export function FileBrowser() {
           </div>
         </div>
 
+        {selectedIds.size > 0 && (
+          <div className="flex items-center justify-between gap-2 rounded-lg bg-kumo-tint px-3 py-2">
+            <Text variant="secondary">
+              {selectedIds.size} élément{selectedIds.size > 1 ? "s" : ""} sélectionné{selectedIds.size > 1 ? "s" : ""}
+            </Text>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+                Tout désélectionner
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                icon={TrashIcon}
+                onClick={() => setBulkDeleteOpen(true)}
+              >
+                Supprimer
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
         {loading ? (
           <ClientOnly
             fallback={
@@ -454,9 +713,23 @@ export function FileBrowser() {
           </ClientOnly>
         ) : items.length === 0 ? (
           <UploadDropzone onFilesSelected={handleUploadFiles} />
+        ) : filteredItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-kumo-line bg-kumo-base p-10">
+            <Text variant="secondary">Aucun élément ne correspond à ces filtres.</Text>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setTypeFilter("all");
+                setTagFilterIds(new Set());
+              }}
+            >
+              Réinitialiser les filtres
+            </Button>
+          </div>
         ) : viewMode === "table" ? (
           <FileTable
-            items={items}
+            items={paginatedItems}
             selectedItemId={selectedItemId}
             onOpenFolder={handleOpenFolder}
             onSelectItem={setSelectedItemId}
@@ -467,17 +740,51 @@ export function FileBrowser() {
             onShareItem={handleShareItem}
             onDeleteItem={handleDeleteItem}
             onToggleFavorite={handleToggleFavorite}
+            onManageTags={setManageTagsItem}
             onMoveItem={handleMoveItem}
+            selectedIds={selectedIds}
+            onToggleSelectItem={toggleSelectItem}
+            allSelected={allVisibleSelected}
+            someSelected={someVisibleSelected}
+            onToggleSelectAll={toggleSelectAll}
+            typeFilter={typeFilter}
+            onTypeFilterChange={setTypeFilter}
+            workspaceTags={workspaceTags}
+            tagFilterIds={tagFilterIds}
+            onToggleTagFilter={toggleTagFilter}
+            onClearTagFilter={() => setTagFilterIds(new Set())}
           />
         ) : (
           <FileGrid
-            items={items}
+            items={paginatedItems}
             selectedItemId={selectedItemId}
             onOpenFolder={handleOpenFolder}
             onSelectItem={setSelectedItemId}
             onToggleFavorite={handleToggleFavorite}
             onMoveItem={handleMoveItem}
           />
+        )}
+        </div>
+
+        {!loading && filteredItems.length > 0 && (
+          <Pagination
+            page={currentPage}
+            setPage={(nextPage) => updateQueryParams({ page: nextPage > 1 ? String(nextPage) : null })}
+            perPage={pageSize}
+            totalCount={filteredItems.length}
+            className="flex flex-wrap items-center justify-between gap-3"
+          >
+            <Pagination.Info />
+            <div className="flex items-center gap-3">
+              <Pagination.PageSize
+                value={pageSize}
+                onChange={(size) => updateQueryParams({ pageSize: size === DEFAULT_PAGE_SIZE ? null : String(size), page: null })}
+                options={PAGE_SIZE_OPTIONS}
+                label="Par page :"
+              />
+              <Pagination.Controls pageSelector="input" />
+            </div>
+          </Pagination>
         )}
       </div>
 
@@ -488,8 +795,19 @@ export function FileBrowser() {
           onAction={handleDetailAction}
           onShare={handleShareItem}
           onToggleFavorite={handleToggleFavorite}
+          onManageTags={setManageTagsItem}
         />
       )}
+
+      <ManageTagsDialog
+        item={manageTagsItem}
+        workspaceTags={workspaceTags}
+        loading={loadingTags}
+        onClose={() => setManageTagsItem(null)}
+        onToggleTag={handleToggleTag}
+        onCreateTag={handleCreateTag}
+        onDeleteTag={handleDeleteTag}
+      />
 
       {/* Modale de création de dossier */}
       <Dialog.Root open={isFolderModalOpen} onOpenChange={setIsFolderModalOpen}>
@@ -645,6 +963,42 @@ export function FileBrowser() {
               </Button>
             </div>
           )}
+        </Dialog>
+      </Dialog.Root>
+
+      {/* Modale de confirmation de suppression groupée */}
+      <Dialog.Root open={bulkDeleteOpen} onOpenChange={(open) => !bulkDeleting && setBulkDeleteOpen(open)}>
+        <Dialog className="p-6">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <Dialog.Title className="text-lg font-semibold">
+              Supprimer {selectedIds.size} élément{selectedIds.size > 1 ? "s" : ""} ?
+            </Dialog.Title>
+            <Dialog.Close
+              aria-label="Fermer"
+              render={(props) => (
+                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Fermer" disabled={bulkDeleting} />
+              )}
+            />
+          </div>
+
+          <Text variant="secondary">
+            Cette action déplacera les éléments sélectionnés vers la corbeille. Vous pourrez les restaurer tant qu&apos;elle n&apos;a pas été vidée.
+          </Text>
+
+          <div className="mt-4 flex justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setBulkDeleteOpen(false)} disabled={bulkDeleting}>
+              Annuler
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleBulkDeleteConfirm} disabled={bulkDeleting}>
+              {bulkDeleting ? (
+                <span className="flex items-center gap-1.5">
+                  <Loader size="sm" /> Suppression…
+                </span>
+              ) : (
+                "Supprimer"
+              )}
+            </Button>
+          </div>
         </Dialog>
       </Dialog.Root>
     </div>

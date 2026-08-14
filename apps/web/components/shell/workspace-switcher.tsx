@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Dialog, DropdownMenu, Input, useKumoToastManager } from "@cloudflare/kumo";
+import { Button, Dialog, DropdownMenu, Input, Loader, useKumoToastManager } from "@cloudflare/kumo";
 import { FoldersIcon, UsersThreeIcon, PlusIcon, CheckIcon, CaretUpDownIcon, XIcon } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { AppLogo } from "./app-logo";
@@ -101,7 +101,7 @@ export function WorkspaceSwitcher() {
                 onClick={() => handleSelectOrg(null, personalWorkspaceName)}
               >
                 <span className="flex-1 truncate">{personalWorkspaceName}</span>
-                {!activeOrg && <CheckIcon size={14} className="ml-2 text-kumo-brand" />}
+                {!activeOrg && <CheckIcon size={14} className="ml-2 text-kumo-info" />}
               </DropdownMenu.Item>
 
               {/* Liste des Organisations Better Auth */}
@@ -114,7 +114,7 @@ export function WorkspaceSwitcher() {
                     onClick={() => handleSelectOrg(org.id, org.name)}
                   >
                     <span className="flex-1 truncate">{org.name}</span>
-                    {isSelected && <CheckIcon size={14} className="ml-2 text-kumo-brand" />}
+                    {isSelected && <CheckIcon size={14} className="ml-2 text-kumo-info" />}
                   </DropdownMenu.Item>
                 );
               })}
@@ -169,7 +169,13 @@ export function WorkspaceSwitcher() {
                 Annuler
               </Button>
               <Button variant="primary" size="sm" type="submit" disabled={creating}>
-                {creating ? "Création…" : "Créer le workspace"}
+                {creating ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader size="sm" /> Création…
+                  </span>
+                ) : (
+                  "Créer le workspace"
+                )}
               </Button>
             </div>
           </form>

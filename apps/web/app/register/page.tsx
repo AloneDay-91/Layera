@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
-import { Button, Input, LayerCard, Link, Text, useKumoToastManager } from "@cloudflare/kumo";
+import { Button, Input, LayerCard, Link, Loader, Text, useKumoToastManager } from "@cloudflare/kumo";
 import {
   GithubLogoIcon,
   GoogleLogoIcon,
@@ -158,7 +158,13 @@ export default function RegisterPage() {
             icon={UserPlusIcon}
             className="mt-2 w-full justify-center"
           >
-            {submitting ? "Création…" : "Créer le compte"}
+            {submitting ? (
+              <span className="flex items-center gap-1.5">
+                <Loader size="sm" /> Création…
+              </span>
+            ) : (
+              "Créer le compte"
+            )}
           </Button>
         </form>
 

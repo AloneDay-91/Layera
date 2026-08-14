@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { Button, Dialog, Text } from "@cloudflare/kumo";
-import { XIcon, ShareIcon, DownloadIcon, StarIcon } from "@phosphor-icons/react";
+import { XIcon, ShareIcon, DownloadIcon, StarIcon, TagIcon } from "@phosphor-icons/react";
 import type { MockItem } from "@/lib/mock-files";
 import { formatFileSize } from "@/lib/mock-files";
-import { FilePreviewIcon, isPreviewableImage } from "./file-preview";
+import { FilePreviewIcon, getFileTypeLabel, isPreviewable } from "./file-preview";
+import { FilePreviewContent } from "./file-preview-content";
+import { TagBadgeList } from "./tag-badge-list";
 
 export function FileDetailsPanel({
   item,
@@ -13,18 +15,20 @@ export function FileDetailsPanel({
   onAction,
   onShare,
   onToggleFavorite,
+  onManageTags,
 }: {
   item: MockItem;
   onClose: () => void;
   onAction: (action: string) => void;
   onShare?: (item: MockItem) => void;
   onToggleFavorite?: (item: MockItem) => void;
+  onManageTags?: (item: MockItem) => void;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
-  const previewable = isPreviewableImage(item);
+  const previewable = isPreviewable(item);
 
   return (
-    <aside className="flex w-72 flex-shrink-0 flex-col gap-4 border-l border-kumo-line bg-kumo-base p-4 text-kumo-default">
+    <aside className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto border-l border-kumo-line bg-kumo-base p-4 text-kumo-default">
       <div className="flex items-center justify-between">
         <Text as="h2" bold>
           Détails
@@ -55,12 +59,13 @@ export function FileDetailsPanel({
         <Text as="p" bold DANGEROUS_className="break-all text-center">
           {item.name}
         </Text>
+        <TagBadgeList tags={item.tags} />
       </div>
 
       <dl className="flex flex-col gap-2 text-sm">
         <div className="flex justify-between">
           <Text as="dt" variant="secondary">Type</Text>
-          <dd className="font-medium text-kumo-default">{item.type === "folder" ? "Dossier" : item.mimeType ?? "Fichier"}</dd>
+          <dd className="font-medium text-kumo-default">{getFileTypeLabel(item)}</dd>
         </div>
         <div className="flex justify-between">
           <Text as="dt" variant="secondary">Taille</Text>
@@ -103,6 +108,11 @@ export function FileDetailsPanel({
         <Button variant="secondary" size="sm" icon={DownloadIcon} onClick={() => onAction("Télécharger")}>
           Télécharger
         </Button>
+        {onManageTags && (
+          <Button variant="secondary" size="sm" icon={TagIcon} onClick={() => onManageTags(item)}>
+            Tags
+          </Button>
+        )}
       </div>
 
       {previewable && (
@@ -117,12 +127,7 @@ export function FileDetailsPanel({
                 )}
               />
             </div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`/api/files/content?id=${item.id}`}
-              alt={item.name}
-              className="max-h-[70vh] w-full rounded object-contain"
-            />
+            <FilePreviewContent item={item} />
           </Dialog>
         </Dialog.Root>
       )}

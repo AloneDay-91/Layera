@@ -6,6 +6,7 @@ import { StarIcon } from "@phosphor-icons/react";
 import type { MockItem } from "@/lib/mock-files";
 import { formatFileSize } from "@/lib/mock-files";
 import { FilePreviewIcon } from "./file-preview";
+import { TagBadgeList } from "./tag-badge-list";
 
 type FileGridProps = {
   items: MockItem[];
@@ -57,7 +58,7 @@ export function FileGrid({
   }
 
   return (
-    <Grid variant="4up" gap="sm">
+    <Grid variant="6up" gap="sm" className="p-1">
       {items.map((item) => {
         const isFolder = item.type === "folder";
         const isDragOver = dragOverFolderId === item.id;
@@ -93,7 +94,7 @@ export function FileGrid({
                   <StarIcon
                     size={16}
                     weight={item.isFavorite ? "fill" : "regular"}
-                    className={item.isFavorite ? "text-kumo-warning" : "text-kumo-subtle"}
+                    className={item.isFavorite ? "text-kumo-info" : "text-kumo-subtle"}
                   />
                 </button>
               )}
@@ -102,15 +103,16 @@ export function FileGrid({
                 onClick={() => handleActivate(item)}
                 className={
                   isDragOver
-                    ? "flex w-full flex-col items-center gap-2 rounded-lg p-4 bg-kumo-tint border-2 border-dashed border-kumo-brand"
+                    ? "flex w-full flex-col items-center gap-2 rounded-lg p-4 bg-kumo-tint border-2 border-dashed border-kumo-info"
                     : selectedItemId === item.id
-                      ? "flex w-full flex-col items-center gap-2 rounded-lg p-4 ring-2 ring-kumo-brand"
+                      ? "flex w-full flex-col items-center gap-2 rounded-lg p-4 ring-2 ring-kumo-info"
                       : "flex w-full flex-col items-center gap-2 rounded-lg p-4 hover:bg-kumo-tint"
                 }
               >
                 <FilePreviewIcon item={item} size={32} />
                 <Text as="span" truncate DANGEROUS_className="w-full text-center">{item.name}</Text>
                 <Text as="span" variant="secondary">{formatFileSize(item.size)}</Text>
+                <TagBadgeList tags={item.tags} max={2} />
               </LayerCard>
             </div>
           </GridItem>
