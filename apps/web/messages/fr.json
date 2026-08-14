@@ -471,6 +471,40 @@
       "oauthRedirectDescription": "Connexion avec {provider} en cours…"
     }
   },
+  "twoFactorPage": {
+    "title": "Vérification en deux étapes",
+    "instructionsBackup": "Entrez l'un de vos codes de secours.",
+    "instructionsTotp": "Entrez le code à 6 chiffres généré par votre application d'authentification.",
+    "backupCodeLabel": "Code de secours",
+    "verificationCodeLabel": "Code de vérification",
+    "verifying": "Vérification…",
+    "validate": "Valider",
+    "useAuthenticatorApp": "Utiliser mon application d'authentification",
+    "useBackupCode": "Utiliser un code de secours",
+    "errors": {
+      "invalidCode": "Code invalide."
+    }
+  },
+  "registerPage": {
+    "tagline": "Configure ton espace de travail personnel",
+    "nameLabel": "Nom",
+    "namePlaceholder": "Ton nom",
+    "confirmPasswordLabel": "Confirmer le mot de passe",
+    "creating": "Création…",
+    "createAccount": "Créer le compte",
+    "alreadyHaveAccount": "Déjà un compte ?",
+    "signIn": "Se connecter",
+    "errors": {
+      "passwordsDontMatch": "Les mots de passe ne correspondent pas",
+      "signUpFailed": "Échec de la création du compte"
+    },
+    "toasts": {
+      "accountCreatedTitle": "Compte créé avec succès",
+      "accountCreatedDescription": "Votre espace de travail personnel a été configuré.",
+      "oauthSignUpTitle": "Inscription via OAuth",
+      "oauthSignUpDescription": "Connexion avec {provider}…"
+    }
+  },
   "settings": {
     "language": "Langue",
     "languageDescription": "Choisissez la langue utilisée dans l'interface.",

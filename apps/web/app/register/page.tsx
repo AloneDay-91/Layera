@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { authClient } from "@/lib/auth-client";
 import { Button, Input, LayerCard, Link, Loader, Text, useKumoToastManager } from "@cloudflare/kumo";
 import {
@@ -22,12 +23,15 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const t = useTranslations("registerPage");
+  const tLogin = useTranslations("loginPage");
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
     if (password !== confirmPassword) {
-      setError("Les mots de passe ne correspondent pas");
+      setError(t("errors.passwordsDontMatch"));
       return;
     }
 
@@ -36,21 +40,21 @@ export default function RegisterPage() {
     setSubmitting(false);
 
     if (signUpError) {
-      setError(signUpError.message ?? "Échec de la création du compte");
+      setError(signUpError.message ?? t("errors.signUpFailed"));
       return;
     }
 
     toasts.add({
-      title: "Compte créé avec succès",
-      description: "Votre espace de travail personnel a été configuré.",
+      title: t("toasts.accountCreatedTitle"),
+      description: t("toasts.accountCreatedDescription"),
     });
     router.push("/dashboard");
   }
 
   async function handleSocialSignUp(provider: "github" | "google") {
     toasts.add({
-      title: "Inscription via OAuth",
-      description: `Connexion avec ${provider === "github" ? "GitHub" : "Google"}…`,
+      title: t("toasts.oauthSignUpTitle"),
+      description: t("toasts.oauthSignUpDescription", { provider: provider === "github" ? "GitHub" : "Google" }),
     });
     await authClient.signIn.social({
       provider,
@@ -69,7 +73,7 @@ export default function RegisterPage() {
               Layera
             </Text>
           </div>
-          <Text variant="secondary">Configure ton espace de travail personnel</Text>
+          <Text variant="secondary">{t("tagline")}</Text>
         </div>
 
         {/* Inscription Sociale */}
@@ -81,7 +85,7 @@ export default function RegisterPage() {
             onClick={() => handleSocialSignUp("github")}
             className="w-full justify-center"
           >
-            Continuer avec GitHub
+            {tLogin("continueWithGithub")}
           </Button>
           <Button
             variant="secondary"
@@ -90,7 +94,7 @@ export default function RegisterPage() {
             onClick={() => handleSocialSignUp("google")}
             className="w-full justify-center"
           >
-            Continuer avec Google
+            {tLogin("continueWithGoogle")}
           </Button>
         </div>
 
@@ -98,7 +102,7 @@ export default function RegisterPage() {
         <div className="relative my-6 flex items-center justify-center">
           <div className="w-full border-t border-kumo-line" />
           <Text as="span" variant="secondary" DANGEROUS_className="absolute bg-kumo-base px-3">
-            Ou email
+            {tLogin("orEmail")}
           </Text>
         </div>
 
@@ -106,29 +110,29 @@ export default function RegisterPage() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <Input
             size="sm"
-            label="Nom"
+            label={t("nameLabel")}
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
             autoComplete="name"
-            placeholder="Ton nom"
+            placeholder={t("namePlaceholder")}
           />
 
           <Input
             size="sm"
             type="email"
-            label="Email"
+            label={tLogin("emailLabel")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
-            placeholder="toi@exemple.com"
+            placeholder={tLogin("emailPlaceholder")}
           />
 
           <Input
             size="sm"
             type="password"
-            label="Mot de passe"
+            label={tLogin("passwordLabel")}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             minLength={8}
@@ -140,7 +144,7 @@ export default function RegisterPage() {
           <Input
             size="sm"
             type="password"
-            label="Confirmer le mot de passe"
+            label={t("confirmPasswordLabel")}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             minLength={8}
@@ -160,10 +164,10 @@ export default function RegisterPage() {
           >
             {submitting ? (
               <span className="flex items-center gap-1.5">
-                <Loader size="sm" /> Création…
+                <Loader size="sm" /> {t("creating")}
               </span>
             ) : (
-              "Créer le compte"
+              t("createAccount")
             )}
           </Button>
         </form>
@@ -171,8 +175,8 @@ export default function RegisterPage() {
         {/* Footer Redirection Login */}
         <div className="mt-6 text-center">
           <Text variant="secondary">
-            Déjà un compte ?{" "}
-            <Link href="/login">Se connecter</Link>
+            {t("alreadyHaveAccount")}{" "}
+            <Link href="/login">{t("signIn")}</Link>
           </Text>
         </div>
       </LayerCard>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { authClient } from "@/lib/auth-client";
 import { Button, Input, LayerCard, Link, Loader, Text, useKumoToastManager } from "@cloudflare/kumo";
 import { ArrowRightIcon, ShieldCheckIcon } from "@phosphor-icons/react";
@@ -16,6 +17,9 @@ export default function TwoFactorLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const t = useTranslations("twoFactorPage");
+  const tLogin = useTranslations("loginPage");
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
@@ -27,10 +31,10 @@ export default function TwoFactorLoginPage() {
 
     setSubmitting(false);
     if (verifyError) {
-      setError(verifyError.message ?? "Code invalide.");
+      setError(verifyError.message ?? t("errors.invalidCode"));
       return;
     }
-    toasts.add({ title: "Connexion réussie", description: "Bienvenue sur Layera." });
+    toasts.add({ title: tLogin("toasts.signInSuccessTitle"), description: tLogin("toasts.signInSuccessDescription") });
     router.push("/dashboard");
   }
 
@@ -46,20 +50,18 @@ export default function TwoFactorLoginPage() {
           </div>
           <div className="flex items-center gap-1.5 text-kumo-info">
             <ShieldCheckIcon size={16} />
-            <Text variant="secondary">Vérification en deux étapes</Text>
+            <Text variant="secondary">{t("title")}</Text>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <Text variant="secondary">
-            {useBackupCode
-              ? "Entrez l'un de vos codes de secours."
-              : "Entrez le code à 6 chiffres généré par votre application d'authentification."}
+            {useBackupCode ? t("instructionsBackup") : t("instructionsTotp")}
           </Text>
           <Input
             size="sm"
             type="text"
-            label={useBackupCode ? "Code de secours" : "Code de vérification"}
+            label={useBackupCode ? t("backupCodeLabel") : t("verificationCodeLabel")}
             value={code}
             onChange={(e) => setCode(e.target.value)}
             required
@@ -78,10 +80,10 @@ export default function TwoFactorLoginPage() {
           >
             {submitting ? (
               <span className="flex items-center gap-1.5">
-                <Loader size="sm" /> Vérification…
+                <Loader size="sm" /> {t("verifying")}
               </span>
             ) : (
-              "Valider"
+              t("validate")
             )}
           </Button>
         </form>
@@ -96,7 +98,7 @@ export default function TwoFactorLoginPage() {
               setError(null);
             }}
           >
-            {useBackupCode ? "Utiliser mon application d'authentification" : "Utiliser un code de secours"}
+            {useBackupCode ? t("useAuthenticatorApp") : t("useBackupCode")}
           </Link>
         </div>
       </LayerCard>
