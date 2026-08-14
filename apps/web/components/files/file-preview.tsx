@@ -15,6 +15,7 @@ import {
 } from "@phosphor-icons/react";
 import type { MockItem } from "@/lib/mock-files";
 import { getLangFromFilename } from "@/lib/code-lang";
+import { getFolderColorClass } from "@/lib/folder-colors";
 
 const CODE_EXTENSIONS = new Set([
   "js", "mjs", "cjs", "ts", "mts", "cts", "jsx", "tsx", "json", "jsonc", "html", "htm",
@@ -93,7 +94,7 @@ export function getFileTypeLabel(item: MockItem): string {
 }
 
 function getIconColorForItem(item: MockItem): string {
-  if (item.type === "folder") return "text-kumo-info";
+  if (item.type === "folder") return getFolderColorClass(item.color);
   if (isPreviewablePdf(item)) return "text-kumo-danger";
   if (isPreviewableImage(item)) return "text-kumo-info";
   if (isPreviewableMarkdown(item)) return "text-kumo-success";

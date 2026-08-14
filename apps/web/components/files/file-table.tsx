@@ -23,6 +23,7 @@ type FileTableProps = {
   onDeleteItem?: (item: MockItem) => void;
   onToggleFavorite?: (item: MockItem) => void;
   onManageTags?: (item: MockItem) => void;
+  onChangeColor?: (item: MockItem) => void;
   onMoveItem?: (draggedItem: { id: string; type: "file" | "folder"; name: string }, targetFolderId: string) => void;
   selectedIds?: Set<string>;
   onToggleSelectItem?: (id: string) => void;
@@ -75,6 +76,7 @@ export function FileTable({
   onDeleteItem,
   onToggleFavorite,
   onManageTags,
+  onChangeColor,
   onMoveItem,
   selectedIds,
   onToggleSelectItem,
@@ -259,6 +261,7 @@ export function FileTable({
                       onDelete={onDeleteItem}
                       onToggleFavorite={onToggleFavorite}
                       onManageTags={onManageTags}
+                      onChangeColor={onChangeColor}
                     />
                   </Table.Cell>
                 </Table.Row>

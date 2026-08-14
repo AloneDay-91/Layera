@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db, workspace, folder, file, trashItem, favorite, tag, itemTag, provisionPersonalWorkspace, provisionOrganizationWorkspace, eq, and, isNull, ilike, inArray } from "@filecloud/db";
+import { FOLDER_COLOR_OPTIONS } from "@/lib/folder-colors";
+
+const FOLDER_COLOR_VALUES = new Set<string>(FOLDER_COLOR_OPTIONS.map((opt) => opt.value));
 
 export async function GET(request: Request) {
   try {
@@ -154,6 +157,7 @@ export async function GET(request: Request) {
         owner: session.user.name,
         isFavorite: favoriteIds.has(f.id),
         tags: tagsByItemId.get(f.id) ?? [],
+        color: f.color,
       }));
 
     const formattedFiles = dbFiles.map((f) => ({
@@ -299,10 +303,14 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id, type, name, targetFolderId } = await request.json();
+    const { id, type, name, targetFolderId, color } = await request.json();
 
     if (!id || !type) {
       return NextResponse.json({ error: "Missing id or type" }, { status: 400 });
+    }
+
+    if (color !== undefined && !FOLDER_COLOR_VALUES.has(color)) {
+      return NextResponse.json({ error: "Invalid color" }, { status: 400 });
     }
 
     let resolvedTargetFolderId = targetFolderId;
@@ -338,10 +346,11 @@ export async function PATCH(request: Request) {
     }
 
     if (type === "folder") {
-      const updateData: { name?: string; parentId?: string; updatedAt: Date } = {
+      const updateData: { name?: string; parentId?: string; color?: string | null; updatedAt: Date } = {
         updatedAt: new Date(),
       };
       if (name !== undefined) updateData.name = name;
+      if (color !== undefined) updateData.color = color === "default" ? null : color;
       if (resolvedTargetFolderId !== undefined && resolvedTargetFolderId !== null) {
         updateData.parentId = resolvedTargetFolderId;
       }

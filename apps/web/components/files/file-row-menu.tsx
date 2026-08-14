@@ -1,7 +1,7 @@
 "use client";
 
 import { DropdownMenu, Button } from "@cloudflare/kumo";
-import { DotsThreeIcon, PencilSimpleIcon, ShareIcon, StarIcon, TagIcon, TrashIcon } from "@phosphor-icons/react";
+import { DotsThreeIcon, PaintBucketIcon, PencilSimpleIcon, ShareIcon, StarIcon, TagIcon, TrashIcon } from "@phosphor-icons/react";
 import type { MockItem } from "@/lib/mock-files";
 
 type FileRowMenuProps = {
@@ -11,9 +11,10 @@ type FileRowMenuProps = {
   onDelete?: (item: MockItem) => void;
   onToggleFavorite?: (item: MockItem) => void;
   onManageTags?: (item: MockItem) => void;
+  onChangeColor?: (item: MockItem) => void;
 };
 
-export function FileRowMenu({ item, onRename, onShare, onDelete, onToggleFavorite, onManageTags }: FileRowMenuProps) {
+export function FileRowMenu({ item, onRename, onShare, onDelete, onToggleFavorite, onManageTags, onChangeColor }: FileRowMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger>
@@ -44,6 +45,11 @@ export function FileRowMenu({ item, onRename, onShare, onDelete, onToggleFavorit
         {onManageTags && (
           <DropdownMenu.Item icon={TagIcon} onClick={() => onManageTags(item)}>
             Tags
+          </DropdownMenu.Item>
+        )}
+        {item.type === "folder" && onChangeColor && (
+          <DropdownMenu.Item icon={PaintBucketIcon} onClick={() => onChangeColor(item)}>
+            Changer la couleur
           </DropdownMenu.Item>
         )}
         <DropdownMenu.Separator />

@@ -19,12 +19,14 @@ import { ClientOnly } from "@/components/shell/client-only";
 import { MockItem } from "@/lib/mock-files";
 import { notifyStorageUpdated } from "@/lib/storage-events";
 import type { TagColorValue, WorkspaceTag } from "@/lib/tags";
+import type { FolderColorValue } from "@/lib/folder-colors";
 import { FileBreadcrumbs } from "./file-breadcrumbs";
 import { FileTable, type TypeFilterValue } from "./file-table";
 import { FileGrid } from "./file-grid";
 import { FileDetailsPanel } from "./file-details-panel";
 import { UploadDropzone } from "./upload-dropzone";
 import { ManageTagsDialog } from "./manage-tags-dialog";
+import { FolderColorDialog } from "./folder-color-dialog";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
@@ -85,6 +87,9 @@ export function FileBrowser() {
   const [workspaceTags, setWorkspaceTags] = useState<WorkspaceTag[]>([]);
   const [loadingTags, setLoadingTags] = useState(true);
   const [manageTagsItem, setManageTagsItem] = useState<MockItem | null>(null);
+
+  // État modale de couleur de dossier
+  const [colorItem, setColorItem] = useState<MockItem | null>(null);
 
   // État de sélection multiple et suppression groupée
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -524,6 +529,26 @@ export function FileBrowser() {
     });
   }
 
+  async function handleChangeFolderColor(item: MockItem, color: FolderColorValue) {
+    const previousColor = item.color;
+    const nextColor = color === "default" ? null : color;
+    setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, color: nextColor } : i)));
+    setColorItem(null);
+
+    try {
+      const res = await fetch("/api/files", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, type: item.type, color }),
+      });
+      if (!res.ok) throw new Error("Failed to update folder color");
+    } catch (err) {
+      console.error("Change folder color error:", err);
+      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, color: previousColor } : i)));
+      toasts.add({ title: "Erreur", description: "Impossible de changer la couleur du dossier." });
+    }
+  }
+
   async function handleToggleTag(tag: WorkspaceTag) {
     const item = manageTagsItem;
     if (!item) return;
@@ -741,6 +766,7 @@ export function FileBrowser() {
             onDeleteItem={handleDeleteItem}
             onToggleFavorite={handleToggleFavorite}
             onManageTags={setManageTagsItem}
+            onChangeColor={setColorItem}
             onMoveItem={handleMoveItem}
             selectedIds={selectedIds}
             onToggleSelectItem={toggleSelectItem}
@@ -807,6 +833,12 @@ export function FileBrowser() {
         onToggleTag={handleToggleTag}
         onCreateTag={handleCreateTag}
         onDeleteTag={handleDeleteTag}
+      />
+
+      <FolderColorDialog
+        item={colorItem}
+        onClose={() => setColorItem(null)}
+        onSelectColor={handleChangeFolderColor}
       />
 
       {/* Modale de création de dossier */}
