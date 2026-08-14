@@ -3,6 +3,7 @@ node_modules/
 dist/
 .env
 .env.local
+.env.production
 *.log
 .turbo/
 .DS_Store
