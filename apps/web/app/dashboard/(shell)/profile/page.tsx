@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import {
   Badge,
   Breadcrumbs,
@@ -43,8 +44,8 @@ type SessionRow = {
   updatedAt: string;
 };
 
-function describeDevice(userAgent: string | null) {
-  if (!userAgent) return { label: "Appareil inconnu", isMobile: false };
+function describeDevice(userAgent: string | null, unknownLabel: string, browserLabel: string, onOsLabel: (browser: string, os: string) => string) {
+  if (!userAgent) return { label: unknownLabel, isMobile: false };
   const isMobile = /Mobile|Android|iPhone|iPad/i.test(userAgent);
   const browser = /Edg\//.test(userAgent)
     ? "Edge"
@@ -54,7 +55,7 @@ function describeDevice(userAgent: string | null) {
         ? "Firefox"
         : /Safari\//.test(userAgent)
           ? "Safari"
-          : "Navigateur";
+          : browserLabel;
   const os = /Windows/.test(userAgent)
     ? "Windows"
     : /Mac OS X/.test(userAgent)
@@ -66,7 +67,7 @@ function describeDevice(userAgent: string | null) {
           : /Linux/.test(userAgent)
             ? "Linux"
             : "";
-  return { label: os ? `${browser} sur ${os}` : browser, isMobile };
+  return { label: os ? onOsLabel(browser, os) : browser, isMobile };
 }
 
 function extractTotpSecret(totpURI: string) {
@@ -115,6 +116,15 @@ export default function ProfilePage() {
   const [regeneratedCodes, setRegeneratedCodes] = useState<string[]>([]);
   const [regenerating, setRegenerating] = useState(false);
 
+  const t = useTranslations("profilePage");
+  const tErrors = useTranslations("profilePage.errors");
+  const tToasts = useTranslations("profilePage.toasts");
+  const tEnable = useTranslations("profilePage.enableDialog");
+  const tDisable = useTranslations("profilePage.disableDialog");
+  const tRegenerate = useTranslations("profilePage.regenerateDialog");
+  const tBreadcrumbs = useTranslations("fileBreadcrumbs");
+  const locale = useLocale();
+
   useEffect(() => {
     if (session?.user) {
       setName(session.user.name ?? "");
@@ -155,11 +165,11 @@ export default function ProfilePage() {
     setSavingProfile(true);
     try {
       const { error } = await authClient.updateUser({ name: name.trim() });
-      if (error) throw new Error(error.message ?? "Erreur inconnue");
-      toasts.add({ title: "Profil mis à jour", description: "Votre nom a été enregistré." });
+      if (error) throw new Error(error.message ?? tErrors("unknown"));
+      toasts.add({ title: tToasts("profileUpdatedTitle"), description: tToasts("profileUpdatedDescription") });
     } catch (err) {
       console.error("Update profile error:", err);
-      toasts.add({ title: "Erreur", description: "Impossible de mettre à jour le profil." });
+      toasts.add({ title: tToasts("genericError"), description: tToasts("profileUpdateError") });
     } finally {
       setSavingProfile(false);
     }
@@ -171,11 +181,11 @@ export default function ProfilePage() {
     if (!selectedFile) return;
 
     if (!["image/png", "image/jpeg", "image/gif", "image/webp"].includes(selectedFile.type)) {
-      toasts.add({ title: "Erreur", description: "Formats acceptés : PNG, JPEG, GIF, WebP." });
+      toasts.add({ title: tToasts("genericError"), description: tErrors("acceptedFormats") });
       return;
     }
     if (selectedFile.size > 5 * 1024 * 1024) {
-      toasts.add({ title: "Erreur", description: "L'image ne doit pas dépasser 5 Mo." });
+      toasts.add({ title: tToasts("genericError"), description: tErrors("imageTooLarge") });
       return;
     }
 
@@ -186,19 +196,19 @@ export default function ProfilePage() {
       const uploadRes = await fetch("/api/profile/avatar", { method: "POST", body: formData });
       if (!uploadRes.ok) {
         const data = await uploadRes.json().catch(() => null);
-        throw new Error(data?.error ?? "Échec du téléversement");
+        throw new Error(data?.error ?? tErrors("uploadFailed"));
       }
       const { image } = await uploadRes.json();
 
       const { error } = await authClient.updateUser({ image });
-      if (error) throw new Error(error.message ?? "Erreur inconnue");
+      if (error) throw new Error(error.message ?? tErrors("unknown"));
 
-      toasts.add({ title: "Photo de profil mise à jour", description: "Votre nouvelle photo a été enregistrée." });
+      toasts.add({ title: tToasts("avatarUpdatedTitle"), description: tToasts("avatarUpdatedDescription") });
     } catch (err) {
       console.error("Avatar upload error:", err);
       toasts.add({
-        title: "Erreur",
-        description: err instanceof Error ? err.message : "Impossible de téléverser la photo de profil.",
+        title: tToasts("genericError"),
+        description: err instanceof Error ? err.message : tToasts("avatarUploadError"),
       });
     } finally {
       setUploadingAvatar(false);
@@ -209,15 +219,15 @@ export default function ProfilePage() {
     setUploadingAvatar(true);
     try {
       const res = await fetch("/api/profile/avatar", { method: "DELETE" });
-      if (!res.ok) throw new Error("Échec de la suppression");
+      if (!res.ok) throw new Error(tErrors("removeFailed"));
 
       const { error } = await authClient.updateUser({ image: null });
-      if (error) throw new Error(error.message ?? "Erreur inconnue");
+      if (error) throw new Error(error.message ?? tErrors("unknown"));
 
-      toasts.add({ title: "Photo de profil retirée", description: "Votre photo de profil a été supprimée." });
+      toasts.add({ title: tToasts("avatarRemovedTitle"), description: tToasts("avatarRemovedDescription") });
     } catch (err) {
       console.error("Avatar remove error:", err);
-      toasts.add({ title: "Erreur", description: "Impossible de retirer la photo de profil." });
+      toasts.add({ title: tToasts("genericError"), description: tToasts("avatarRemoveError") });
     } finally {
       setUploadingAvatar(false);
     }
@@ -227,7 +237,7 @@ export default function ProfilePage() {
     e.preventDefault();
     if (!currentPassword || !newPassword) return;
     if (newPassword !== confirmPassword) {
-      toasts.add({ title: "Erreur", description: "Les deux mots de passe ne correspondent pas." });
+      toasts.add({ title: tToasts("genericError"), description: tErrors("passwordsDontMatch") });
       return;
     }
     setSavingPassword(true);
@@ -237,8 +247,8 @@ export default function ProfilePage() {
         newPassword,
         revokeOtherSessions: revokeOtherSessionsOnChange,
       });
-      if (error) throw new Error(error.message ?? "Erreur inconnue");
-      toasts.add({ title: "Mot de passe modifié", description: "Votre mot de passe a été mis à jour avec succès." });
+      if (error) throw new Error(error.message ?? tErrors("unknown"));
+      toasts.add({ title: tToasts("passwordChangedTitle"), description: tToasts("passwordChangedDescription") });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -246,8 +256,8 @@ export default function ProfilePage() {
     } catch (err) {
       console.error("Change password error:", err);
       toasts.add({
-        title: "Erreur",
-        description: err instanceof Error ? err.message : "Impossible de modifier le mot de passe.",
+        title: tToasts("genericError"),
+        description: err instanceof Error ? err.message : tToasts("passwordChangeError"),
       });
     } finally {
       setSavingPassword(false);
@@ -258,12 +268,12 @@ export default function ProfilePage() {
     setRevokingToken(token);
     try {
       const { error } = await authClient.revokeSession({ token });
-      if (error) throw new Error(error.message ?? "Erreur inconnue");
-      toasts.add({ title: "Session révoquée", description: "Cet appareil a été déconnecté." });
+      if (error) throw new Error(error.message ?? tErrors("unknown"));
+      toasts.add({ title: tToasts("sessionRevokedTitle"), description: tToasts("sessionRevokedDescription") });
       loadSessions();
     } catch (err) {
       console.error("Revoke session error:", err);
-      toasts.add({ title: "Erreur", description: "Impossible de révoquer cette session." });
+      toasts.add({ title: tToasts("genericError"), description: tToasts("revokeSessionError") });
     } finally {
       setRevokingToken(null);
     }
@@ -273,12 +283,12 @@ export default function ProfilePage() {
     setRevokingOthers(true);
     try {
       const { error } = await authClient.revokeOtherSessions();
-      if (error) throw new Error(error.message ?? "Erreur inconnue");
-      toasts.add({ title: "Appareils déconnectés", description: "Toutes les autres sessions ont été révoquées." });
+      if (error) throw new Error(error.message ?? tErrors("unknown"));
+      toasts.add({ title: tToasts("devicesSignedOutTitle"), description: tToasts("devicesSignedOutDescription") });
       loadSessions();
     } catch (err) {
       console.error("Revoke other sessions error:", err);
-      toasts.add({ title: "Erreur", description: "Impossible de déconnecter les autres appareils." });
+      toasts.add({ title: tToasts("genericError"), description: tToasts("signOutOthersError") });
     } finally {
       setRevokingOthers(false);
     }
@@ -298,15 +308,15 @@ export default function ProfilePage() {
     setEnableSubmitting(true);
     try {
       const { data, error } = await authClient.twoFactor.enable({ password: enablePassword });
-      if (error) throw new Error(error.message ?? "Erreur inconnue");
+      if (error) throw new Error(error.message ?? tErrors("unknown"));
       setTotpURI(data?.totpURI ?? null);
       setNewBackupCodes(data?.backupCodes ?? []);
       setEnableStep("setup");
     } catch (err) {
       console.error("Enable 2FA error:", err);
       toasts.add({
-        title: "Erreur",
-        description: err instanceof Error ? err.message : "Mot de passe incorrect.",
+        title: tToasts("genericError"),
+        description: err instanceof Error ? err.message : tErrors("wrongPassword"),
       });
     } finally {
       setEnableSubmitting(false);
@@ -318,14 +328,14 @@ export default function ProfilePage() {
     setEnableSubmitting(true);
     try {
       const { error } = await authClient.twoFactor.verifyTotp({ code: verifyCode });
-      if (error) throw new Error(error.message ?? "Code invalide");
-      toasts.add({ title: "2FA activée", description: "L'authentification à deux facteurs est maintenant active." });
+      if (error) throw new Error(error.message ?? tErrors("invalidCode"));
+      toasts.add({ title: tToasts("twoFactorEnabledTitle"), description: tToasts("twoFactorEnabledDescription") });
       setEnableDialogOpen(false);
     } catch (err) {
       console.error("Verify TOTP error:", err);
       toasts.add({
-        title: "Erreur",
-        description: err instanceof Error ? err.message : "Code de vérification invalide.",
+        title: tToasts("genericError"),
+        description: err instanceof Error ? err.message : tErrors("invalidVerificationCode"),
       });
     } finally {
       setEnableSubmitting(false);
@@ -342,14 +352,14 @@ export default function ProfilePage() {
     setDisabling(true);
     try {
       const { error } = await authClient.twoFactor.disable({ password: disablePassword });
-      if (error) throw new Error(error.message ?? "Erreur inconnue");
-      toasts.add({ title: "2FA désactivée", description: "L'authentification à deux facteurs a été désactivée." });
+      if (error) throw new Error(error.message ?? tErrors("unknown"));
+      toasts.add({ title: tToasts("twoFactorDisabledTitle"), description: tToasts("twoFactorDisabledDescription") });
       setDisableDialogOpen(false);
     } catch (err) {
       console.error("Disable 2FA error:", err);
       toasts.add({
-        title: "Erreur",
-        description: err instanceof Error ? err.message : "Mot de passe incorrect.",
+        title: tToasts("genericError"),
+        description: err instanceof Error ? err.message : tErrors("wrongPassword"),
       });
     } finally {
       setDisabling(false);
@@ -368,14 +378,14 @@ export default function ProfilePage() {
     setRegenerating(true);
     try {
       const { data, error } = await authClient.twoFactor.generateBackupCodes({ password: regeneratePassword });
-      if (error) throw new Error(error.message ?? "Erreur inconnue");
+      if (error) throw new Error(error.message ?? tErrors("unknown"));
       setRegeneratedCodes(data?.backupCodes ?? []);
       setRegenerateStep("codes");
     } catch (err) {
       console.error("Regenerate backup codes error:", err);
       toasts.add({
-        title: "Erreur",
-        description: err instanceof Error ? err.message : "Mot de passe incorrect.",
+        title: tToasts("genericError"),
+        description: err instanceof Error ? err.message : tErrors("wrongPassword"),
       });
     } finally {
       setRegenerating(false);
@@ -386,17 +396,15 @@ export default function ProfilePage() {
     setDeletingAccount(true);
     try {
       const { error } = await authClient.deleteUser({});
-      if (error) throw new Error(error.message ?? "Erreur inconnue");
-      toasts.add({ title: "Compte supprimé", description: "Votre compte a été supprimé définitivement." });
+      if (error) throw new Error(error.message ?? tErrors("unknown"));
+      toasts.add({ title: tToasts("accountDeletedTitle"), description: tToasts("accountDeletedDescription") });
       router.push("/login");
     } catch (err) {
       console.error("Delete account error:", err);
       toasts.add({
-        title: "Erreur",
+        title: tToasts("genericError"),
         description:
-          err instanceof Error && err.message
-            ? err.message
-            : "Impossible de supprimer le compte. Reconnectez-vous récemment puis réessayez.",
+          err instanceof Error && err.message ? err.message : tErrors("deleteAccountFallback"),
       });
       setDeletingAccount(false);
       setDeleteDialogOpen(false);
@@ -410,12 +418,12 @@ export default function ProfilePage() {
           className="-mx-6 -mt-6"
           breadcrumbs={
             <Breadcrumbs>
-              <Breadcrumbs.Link href="/dashboard">Mes fichiers</Breadcrumbs.Link>
+              <Breadcrumbs.Link href="/dashboard">{tBreadcrumbs("myFiles")}</Breadcrumbs.Link>
               <Breadcrumbs.Separator />
-              <Breadcrumbs.Current>Mon profil</Breadcrumbs.Current>
+              <Breadcrumbs.Current>{t("title")}</Breadcrumbs.Current>
             </Breadcrumbs>
           }
-          title="Mon profil"
+          title={t("title")}
         />
         <div className="flex flex-1 items-center justify-center py-12">
           <Loader size="lg" />
@@ -433,13 +441,13 @@ export default function ProfilePage() {
         className="-mx-6 -mt-6"
         breadcrumbs={
           <Breadcrumbs>
-            <Breadcrumbs.Link href="/dashboard">Mes fichiers</Breadcrumbs.Link>
+            <Breadcrumbs.Link href="/dashboard">{tBreadcrumbs("myFiles")}</Breadcrumbs.Link>
             <Breadcrumbs.Separator />
-            <Breadcrumbs.Current>Mon profil</Breadcrumbs.Current>
+            <Breadcrumbs.Current>{t("title")}</Breadcrumbs.Current>
           </Breadcrumbs>
         }
-        title="Mon profil"
-        description="Gérez vos informations personnelles, votre sécurité et vos sessions actives."
+        title={t("title")}
+        description={t("description")}
       />
 
       <div className="flex flex-1 flex-col gap-6 max-w-3xl pt-6">
@@ -466,7 +474,7 @@ export default function ProfilePage() {
                 type="button"
                 onClick={() => document.getElementById("avatar-upload")?.click()}
                 disabled={uploadingAvatar}
-                aria-label="Changer la photo de profil"
+                aria-label={t("changeAvatarAria")}
                 className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-kumo-base text-kumo-default ring ring-kumo-line"
               >
                 {uploadingAvatar ? <Loader size="sm" /> : <CameraIcon size={14} />}
@@ -477,18 +485,18 @@ export default function ProfilePage() {
                 <Text as="h2" variant="heading3" truncate>
                   {user.name}
                 </Text>
-                {isAdmin && <Badge variant="primary">Administrateur</Badge>}
+                {isAdmin && <Badge variant="primary">{t("administrator")}</Badge>}
               </div>
               <Text variant="secondary" truncate>
                 {user.email}
               </Text>
               <Text as="span" size="sm" variant="secondary">
-                Membre depuis le {new Date(user.createdAt).toLocaleDateString("fr-FR")}
+                {t("memberSince", { date: new Date(user.createdAt).toLocaleDateString(locale) })}
               </Text>
             </div>
             {user.image && (
               <Button variant="secondary" size="sm" onClick={handleRemoveAvatar} disabled={uploadingAvatar}>
-                Retirer la photo
+                {t("removePhoto")}
               </Button>
             )}
           </div>
@@ -497,27 +505,27 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Input
                 size="sm"
-                label="Nom complet"
+                label={t("fullNameLabel")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
               />
               <Input
                 size="sm"
-                label="Adresse email"
+                label={t("emailAddressLabel")}
                 value={user.email}
                 disabled
-                description="Non modifiable pour le moment."
+                description={t("emailNotEditable")}
               />
             </div>
             <div className="flex justify-end">
               <Button variant="primary" size="sm" type="submit" disabled={savingProfile || name.trim() === user.name}>
                 {savingProfile ? (
                   <span className="flex items-center gap-1.5">
-                    <Loader size="sm" /> Enregistrement…
+                    <Loader size="sm" /> {t("saving")}
                   </span>
                 ) : (
-                  "Enregistrer"
+                  t("save")
                 )}
               </Button>
             </div>
@@ -528,16 +536,16 @@ export default function ProfilePage() {
         <LayerCard className="flex flex-col gap-4 px-5 py-4">
           <div>
             <Text as="h2" variant="heading3">
-              Mot de passe
+              {t("passwordTitle")}
             </Text>
-            <Text variant="secondary">Choisissez un mot de passe robuste que vous n&apos;utilisez nulle part ailleurs.</Text>
+            <Text variant="secondary">{t("passwordDescription")}</Text>
           </div>
 
           <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <SensitiveInput
                 size="sm"
-                label="Mot de passe actuel"
+                label={t("currentPasswordLabel")}
                 value={currentPassword}
                 onValueChange={setCurrentPassword}
                 autoComplete="current-password"
@@ -545,7 +553,7 @@ export default function ProfilePage() {
               />
               <SensitiveInput
                 size="sm"
-                label="Nouveau mot de passe"
+                label={t("newPasswordLabel")}
                 value={newPassword}
                 onValueChange={setNewPassword}
                 autoComplete="new-password"
@@ -553,7 +561,7 @@ export default function ProfilePage() {
               />
               <SensitiveInput
                 size="sm"
-                label="Confirmer le nouveau mot de passe"
+                label={t("confirmNewPasswordLabel")}
                 value={confirmPassword}
                 onValueChange={setConfirmPassword}
                 autoComplete="new-password"
@@ -562,7 +570,7 @@ export default function ProfilePage() {
             </div>
 
             <Switch
-              label="Déconnecter tous les autres appareils"
+              label={t("signOutOtherDevices")}
               checked={revokeOtherSessionsOnChange}
               onCheckedChange={setRevokeOtherSessionsOnChange}
             />
@@ -576,10 +584,10 @@ export default function ProfilePage() {
               >
                 {savingPassword ? (
                   <span className="flex items-center gap-1.5">
-                    <Loader size="sm" /> Modification…
+                    <Loader size="sm" /> {t("changing")}
                   </span>
                 ) : (
-                  "Modifier le mot de passe"
+                  t("changePassword")
                 )}
               </Button>
             </div>
@@ -591,9 +599,9 @@ export default function ProfilePage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <Text as="h2" variant="heading3">
-                Sessions actives
+                {t("activeSessionsTitle")}
               </Text>
-              <Text variant="secondary">Les appareils actuellement connectés à votre compte.</Text>
+              <Text variant="secondary">{t("activeSessionsDescription")}</Text>
             </div>
             <Button
               variant="secondary"
@@ -602,27 +610,32 @@ export default function ProfilePage() {
               onClick={handleRevokeOtherSessions}
               disabled={revokingOthers || sortedSessions.length <= 1}
             >
-              Déconnecter les autres
+              {t("signOutOthers")}
             </Button>
           </div>
 
           {loadingSessions ? (
             <div className="flex items-center gap-2 py-4">
-              <Loader size="sm" /> Chargement des sessions…
+              <Loader size="sm" /> {t("loadingSessions")}
             </div>
           ) : (
             <Table>
               <Table.Header>
                 <Table.Row>
-                  <Table.Head>Appareil</Table.Head>
-                  <Table.Head>Adresse IP</Table.Head>
-                  <Table.Head>Dernière activité</Table.Head>
+                  <Table.Head>{t("deviceColumn")}</Table.Head>
+                  <Table.Head>{t("ipAddressColumn")}</Table.Head>
+                  <Table.Head>{t("lastActivityColumn")}</Table.Head>
                   <Table.Head></Table.Head>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
                 {sortedSessions.map((s) => {
-                  const { label, isMobile } = describeDevice(s.userAgent);
+                  const { label, isMobile } = describeDevice(
+                    s.userAgent,
+                    t("unknownDevice"),
+                    t("browserGeneric"),
+                    (browser, os) => t("deviceOnOs", { browser, os }),
+                  );
                   const isCurrent = s.token === currentToken;
                   return (
                     <Table.Row key={s.id}>
@@ -635,14 +648,14 @@ export default function ProfilePage() {
                           {isCurrent && (
                             <Badge variant="success">
                               <span className="flex items-center gap-1">
-                                <CheckCircleIcon size={12} /> Cet appareil
+                                <CheckCircleIcon size={12} /> {t("thisDevice")}
                               </span>
                             </Badge>
                           )}
                         </div>
                       </Table.Cell>
                       <Table.Cell>{s.ipAddress ?? "—"}</Table.Cell>
-                      <Table.Cell>{new Date(s.updatedAt).toLocaleString("fr-FR")}</Table.Cell>
+                      <Table.Cell>{new Date(s.updatedAt).toLocaleString(locale)}</Table.Cell>
                       <Table.Cell>
                         {!isCurrent && (
                           <Button
@@ -651,7 +664,7 @@ export default function ProfilePage() {
                             onClick={() => handleRevokeSession(s.token)}
                             disabled={revokingToken === s.token}
                           >
-                            {revokingToken === s.token ? <Loader size="sm" /> : "Révoquer"}
+                            {revokingToken === s.token ? <Loader size="sm" /> : t("revoke")}
                           </Button>
                         )}
                       </Table.Cell>
@@ -669,17 +682,16 @@ export default function ProfilePage() {
             <div>
               <div className="flex items-center gap-2">
                 <Text as="h2" variant="heading3">
-                  Authentification à deux facteurs
+                  {t("twoFactorTitle")}
                 </Text>
                 {user.twoFactorEnabled ? (
-                  <Badge variant="success">Activée</Badge>
+                  <Badge variant="success">{t("twoFactorEnabledBadge")}</Badge>
                 ) : (
-                  <Badge variant="neutral">Désactivée</Badge>
+                  <Badge variant="neutral">{t("twoFactorDisabledBadge")}</Badge>
                 )}
               </div>
               <Text variant="secondary">
-                Protégez votre compte avec un code généré par une application d&apos;authentification (Google
-                Authenticator, 1Password, Authy…).
+                {t("twoFactorDescription")}
               </Text>
             </div>
           </div>
@@ -687,16 +699,16 @@ export default function ProfilePage() {
           {user.twoFactorEnabled ? (
             <div className="flex gap-2 border-t border-kumo-line pt-4">
               <Button variant="secondary" size="sm" onClick={openRegenerateDialog}>
-                Régénérer les codes de secours
+                {t("regenerateBackupCodes")}
               </Button>
               <Button variant="secondary-destructive" size="sm" onClick={openDisableDialog}>
-                Désactiver la 2FA
+                {t("disable2fa")}
               </Button>
             </div>
           ) : (
             <div className="border-t border-kumo-line pt-4">
               <Button variant="primary" size="sm" icon={ShieldCheckIcon} onClick={openEnableDialog}>
-                Activer la 2FA
+                {t("enable2fa")}
               </Button>
             </div>
           )}
@@ -707,18 +719,18 @@ export default function ProfilePage() {
           <div className="flex items-center gap-2 text-kumo-danger">
             <ShieldWarningIcon size={18} />
             <Text as="h2" variant="heading3" DANGEROUS_className="text-kumo-danger">
-              Zone de danger
+              {t("dangerZoneTitle")}
             </Text>
           </div>
           <div className="flex items-center justify-between gap-4">
             <div>
-              <Text as="p" bold>Supprimer mon compte</Text>
+              <Text as="p" bold>{t("deleteAccountTitle")}</Text>
               <Text variant="secondary">
-                Cette action est définitive. Vos fichiers, dossiers et partages seront supprimés.
+                {t("deleteAccountDescription")}
               </Text>
             </div>
             <Button variant="destructive" size="sm" icon={TrashIcon} onClick={() => setDeleteDialogOpen(true)}>
-              Supprimer mon compte
+              {t("deleteAccountButton")}
             </Button>
           </div>
         </LayerCard>
@@ -727,30 +739,30 @@ export default function ProfilePage() {
       <DeleteResource
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
-        resourceType="Compte"
+        resourceType={t("accountResourceType")}
         resourceName={user.email}
         onDelete={handleDeleteAccount}
         isDeleting={deletingAccount}
-        deleteButtonText="Supprimer mon compte"
+        deleteButtonText={t("deleteAccountButton")}
       />
 
       {/* Activer la 2FA */}
       <Dialog.Root open={enableDialogOpen} onOpenChange={setEnableDialogOpen}>
         <Dialog className="p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold">Activer l&apos;authentification à deux facteurs</Dialog.Title>
+            <Dialog.Title className="text-lg font-semibold">{tEnable("title")}</Dialog.Title>
             <Dialog.Close
-              aria-label="Fermer"
-              render={(props) => <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Fermer" />}
+              aria-label={tEnable("close")}
+              render={(props) => <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={tEnable("close")} />}
             />
           </div>
 
           {enableStep === "password" && (
             <form onSubmit={handleEnableStart} className="flex flex-col gap-4">
-              <Text variant="secondary">Confirmez votre mot de passe pour continuer.</Text>
+              <Text variant="secondary">{tEnable("confirmPassword")}</Text>
               <SensitiveInput
                 size="sm"
-                label="Mot de passe"
+                label={tEnable("passwordLabel")}
                 value={enablePassword}
                 onValueChange={setEnablePassword}
                 autoComplete="current-password"
@@ -761,10 +773,10 @@ export default function ProfilePage() {
                 <Button variant="primary" size="sm" type="submit" disabled={enableSubmitting || !enablePassword}>
                   {enableSubmitting ? (
                     <span className="flex items-center gap-1.5">
-                      <Loader size="sm" /> Vérification…
+                      <Loader size="sm" /> {tEnable("verifying")}
                     </span>
                   ) : (
-                    "Continuer"
+                    tEnable("continue")
                   )}
                 </Button>
               </div>
@@ -774,7 +786,7 @@ export default function ProfilePage() {
           {enableStep === "setup" && totpURI && (
             <div className="flex flex-col gap-4">
               <Text variant="secondary">
-                Scannez ce code avec votre application d&apos;authentification, ou saisissez la clé manuellement.
+                {tEnable("scanInstructions")}
               </Text>
               <div className="flex justify-center rounded-lg bg-white p-4">
                 <QRCodeSVG value={totpURI} size={180} />
@@ -783,10 +795,9 @@ export default function ProfilePage() {
 
               {newBackupCodes.length > 0 && (
                 <div className="flex flex-col gap-2 border-t border-kumo-line pt-4">
-                  <Text as="p" bold>Codes de secours</Text>
+                  <Text as="p" bold>{tEnable("backupCodesTitle")}</Text>
                   <Text variant="secondary">
-                    Conservez ces codes en lieu sûr. Chacun ne peut être utilisé qu&apos;une seule fois pour vous
-                    connecter si vous perdez l&apos;accès à votre application d&apos;authentification.
+                    {tEnable("backupCodesDescription")}
                   </Text>
                   <div className="grid grid-cols-2 gap-2">
                     {newBackupCodes.map((backupCode) => (
@@ -798,7 +809,7 @@ export default function ProfilePage() {
 
               <div className="flex justify-end">
                 <Button variant="primary" size="sm" onClick={() => setEnableStep("verify")}>
-                  J&apos;ai enregistré mes codes, continuer
+                  {tEnable("savedCodesContinue")}
                 </Button>
               </div>
             </div>
@@ -807,12 +818,11 @@ export default function ProfilePage() {
           {enableStep === "verify" && (
             <form onSubmit={handleEnableVerify} className="flex flex-col gap-4">
               <Text variant="secondary">
-                Entrez le code à 6 chiffres affiché par votre application d&apos;authentification pour confirmer
-                l&apos;activation.
+                {tEnable("verifyInstructions")}
               </Text>
               <Input
                 size="sm"
-                label="Code de vérification"
+                label={tEnable("verificationCodeLabel")}
                 value={verifyCode}
                 onChange={(e) => setVerifyCode(e.target.value)}
                 required
@@ -824,10 +834,10 @@ export default function ProfilePage() {
                 <Button variant="primary" size="sm" type="submit" disabled={enableSubmitting || !verifyCode}>
                   {enableSubmitting ? (
                     <span className="flex items-center gap-1.5">
-                      <Loader size="sm" /> Activation…
+                      <Loader size="sm" /> {tEnable("enabling")}
                     </span>
                   ) : (
-                    "Activer la 2FA"
+                    tEnable("enable")
                   )}
                 </Button>
               </div>
@@ -840,19 +850,19 @@ export default function ProfilePage() {
       <Dialog.Root open={disableDialogOpen} onOpenChange={setDisableDialogOpen}>
         <Dialog className="p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold">Désactiver la 2FA</Dialog.Title>
+            <Dialog.Title className="text-lg font-semibold">{tDisable("title")}</Dialog.Title>
             <Dialog.Close
-              aria-label="Fermer"
-              render={(props) => <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Fermer" />}
+              aria-label={tEnable("close")}
+              render={(props) => <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={tEnable("close")} />}
             />
           </div>
           <form onSubmit={handleDisableSubmit} className="flex flex-col gap-4">
             <Text variant="secondary">
-              Votre compte ne sera plus protégé par un second facteur. Confirmez votre mot de passe pour continuer.
+              {tDisable("warning")}
             </Text>
             <SensitiveInput
               size="sm"
-              label="Mot de passe"
+              label={tDisable("passwordLabel")}
               value={disablePassword}
               onValueChange={setDisablePassword}
               autoComplete="current-password"
@@ -863,10 +873,10 @@ export default function ProfilePage() {
               <Button variant="destructive" size="sm" type="submit" disabled={disabling || !disablePassword}>
                 {disabling ? (
                   <span className="flex items-center gap-1.5">
-                    <Loader size="sm" /> Désactivation…
+                    <Loader size="sm" /> {tDisable("disabling")}
                   </span>
                 ) : (
-                  "Désactiver la 2FA"
+                  tDisable("disable")
                 )}
               </Button>
             </div>
@@ -878,21 +888,21 @@ export default function ProfilePage() {
       <Dialog.Root open={regenerateDialogOpen} onOpenChange={setRegenerateDialogOpen}>
         <Dialog className="p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold">Régénérer les codes de secours</Dialog.Title>
+            <Dialog.Title className="text-lg font-semibold">{tRegenerate("title")}</Dialog.Title>
             <Dialog.Close
-              aria-label="Fermer"
-              render={(props) => <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Fermer" />}
+              aria-label={tEnable("close")}
+              render={(props) => <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={tEnable("close")} />}
             />
           </div>
 
           {regenerateStep === "password" && (
             <form onSubmit={handleRegenerateSubmit} className="flex flex-col gap-4">
               <Text variant="secondary">
-                Les anciens codes de secours seront invalidés. Confirmez votre mot de passe pour continuer.
+                {tRegenerate("warning")}
               </Text>
               <SensitiveInput
                 size="sm"
-                label="Mot de passe"
+                label={tRegenerate("passwordLabel")}
                 value={regeneratePassword}
                 onValueChange={setRegeneratePassword}
                 autoComplete="current-password"
@@ -903,10 +913,10 @@ export default function ProfilePage() {
                 <Button variant="primary" size="sm" type="submit" disabled={regenerating || !regeneratePassword}>
                   {regenerating ? (
                     <span className="flex items-center gap-1.5">
-                      <Loader size="sm" /> Génération…
+                      <Loader size="sm" /> {tRegenerate("generating")}
                     </span>
                   ) : (
-                    "Générer de nouveaux codes"
+                    tRegenerate("generate")
                   )}
                 </Button>
               </div>
@@ -915,7 +925,7 @@ export default function ProfilePage() {
 
           {regenerateStep === "codes" && (
             <div className="flex flex-col gap-4">
-              <Text variant="secondary">Conservez ces nouveaux codes en lieu sûr. Les anciens ne fonctionnent plus.</Text>
+              <Text variant="secondary">{tRegenerate("keepSafe")}</Text>
               <div className="grid grid-cols-2 gap-2">
                 {regeneratedCodes.map((backupCode) => (
                   <ClipboardText key={backupCode} text={backupCode} size="sm" />
@@ -923,7 +933,7 @@ export default function ProfilePage() {
               </div>
               <div className="flex justify-end">
                 <Button variant="primary" size="sm" onClick={() => setRegenerateDialogOpen(false)}>
-                  Terminé
+                  {tRegenerate("done")}
                 </Button>
               </div>
             </div>
