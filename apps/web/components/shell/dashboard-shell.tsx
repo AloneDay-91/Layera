@@ -17,7 +17,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         >
           <div className="flex min-w-0 items-center gap-2">
             <div className="size-8.5 md:hidden" />
-            <h1 className="text-lg font-semibold truncate">FileCloud</h1>
+            <h1 className="text-lg font-semibold truncate">Layera</h1>
           </div>
         </header>
         <main className="flex min-w-0 flex-1 flex-col overflow-auto p-6 bg-kumo-base text-kumo-default">

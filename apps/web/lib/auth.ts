@@ -75,7 +75,7 @@ export const auth = betterAuth({
   plugins: [
     admin(),
     twoFactor({
-      issuer: "FileCloud",
+      issuer: "Layera",
     }),
     multiSession({
       maximumSessions: 5,

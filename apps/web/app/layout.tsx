@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FileCloud",
+  title: "Layera",
   description: "Gestionnaire de fichiers self-hosted.",
 };
 

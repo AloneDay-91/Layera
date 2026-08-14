@@ -30,7 +30,7 @@ export default function TwoFactorLoginPage() {
       setError(verifyError.message ?? "Code invalide.");
       return;
     }
-    toasts.add({ title: "Connexion réussie", description: "Bienvenue sur FileCloud." });
+    toasts.add({ title: "Connexion réussie", description: "Bienvenue sur Layera." });
     router.push("/dashboard");
   }
 
@@ -41,7 +41,7 @@ export default function TwoFactorLoginPage() {
           <div className="mb-1 flex items-center gap-2">
             <AppLogo size={36} />
             <Text as="h1" variant="heading1" DANGEROUS_className="font-logo">
-              FileCloud
+              Layera
             </Text>
           </div>
           <div className="flex items-center gap-1.5 text-kumo-info">

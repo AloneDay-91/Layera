@@ -62,11 +62,11 @@ export default function RegisterPage() {
     <main className="flex min-h-screen items-center justify-center p-4">
       <LayerCard className="w-full max-w-sm px-8 py-7">
         {/* En-tête de marque */}
-        <div className="mb-6 flex flex-col gap-1">
-          <div className="flex items-center gap-2 mb-1">
+        <div className="mb-6 flex flex-col gap-1 justify-center items-center">
+          <div className="flex items-center justify-center gap-2 mb-1">
             <AppLogo size={36} />
-            <Text as="h1" variant="heading1">
-              Créer un compte
+            <Text as="h1" variant="heading1" DANGEROUS_className="font-logo">
+              Layera
             </Text>
           </div>
           <Text variant="secondary">Configure ton espace de travail personnel</Text>

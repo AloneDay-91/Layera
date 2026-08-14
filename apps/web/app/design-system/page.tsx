@@ -126,7 +126,7 @@ function DesignSystemContent() {
     <main className="mx-auto flex max-w-5xl flex-col gap-12 p-8">
       <header>
         <Text variant="heading1" as="h1">
-          FileCloud Design System
+          Layera Design System
         </Text>
         <Text variant="secondary">
           Composants Kumo UI v2.9 — imports granulaires

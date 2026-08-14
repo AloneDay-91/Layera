@@ -46,7 +46,7 @@ export default function LoginPage() {
       // dans le client Better Auth ; on n'ouvre pas de session ici.
       return;
     }
-    toasts.add({ title: "Connexion réussie", description: "Bienvenue sur FileCloud." });
+    toasts.add({ title: "Connexion réussie", description: "Bienvenue sur Layera." });
     router.push("/dashboard");
   }
 
@@ -102,11 +102,11 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center p-4">
       <LayerCard className="w-full max-w-sm px-8 py-7">
         {/* En-tête marque */}
-        <div className="mb-6 flex flex-col gap-1">
-          <div className="flex items-center gap-2 mb-1">
+        <div className="mb-6 flex flex-col items-center gap-1">
+          <div className="flex items-center justify-center gap-2 mb-1">
             <AppLogo size={36} />
             <Text as="h1" variant="heading1" DANGEROUS_className="font-logo">
-              FileCloud
+              Layera
             </Text>
           </div>
           <Text variant="secondary">Connecte-toi à tes fichiers et espaces</Text>
