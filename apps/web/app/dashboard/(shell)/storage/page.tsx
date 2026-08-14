@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Breadcrumbs, Grid, GridItem, LayerCard, Meter, SkeletonLine, Text } from "@cloudflare/kumo";
 import {
   HardDriveIcon,
@@ -28,16 +29,18 @@ type StorageStats = {
 };
 
 const CATEGORY_META = [
-  { key: "images" as const, label: "Images", icon: ImageIcon },
-  { key: "documents" as const, label: "Documents", icon: FileTextIcon },
-  { key: "videos" as const, label: "Vidéos", icon: FilmStripIcon },
-  { key: "other" as const, label: "Autres", icon: DotsThreeCircleIcon },
+  { key: "images" as const, labelKey: "categoryImages" as const, icon: ImageIcon },
+  { key: "documents" as const, labelKey: "categoryDocuments" as const, icon: FileTextIcon },
+  { key: "videos" as const, labelKey: "categoryVideos" as const, icon: FilmStripIcon },
+  { key: "other" as const, labelKey: "categoryOther" as const, icon: DotsThreeCircleIcon },
 ];
 
 export default function StoragePage() {
   const { data: activeOrg } = authClient.useActiveOrganization();
   const [stats, setStats] = useState<StorageStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const t = useTranslations("storagePage");
+  const tBreadcrumbs = useTranslations("fileBreadcrumbs");
 
   useEffect(() => {
     async function fetchStats() {
@@ -64,13 +67,13 @@ export default function StoragePage() {
         className="-mx-6 -mt-6"
         breadcrumbs={
           <Breadcrumbs>
-            <Breadcrumbs.Link href="/dashboard">Mes fichiers</Breadcrumbs.Link>
+            <Breadcrumbs.Link href="/dashboard">{tBreadcrumbs("myFiles")}</Breadcrumbs.Link>
             <Breadcrumbs.Separator />
-            <Breadcrumbs.Current>Analyse du stockage</Breadcrumbs.Current>
+            <Breadcrumbs.Current>{t("title")}</Breadcrumbs.Current>
           </Breadcrumbs>
         }
-        title="Analyse du stockage"
-        description="Visualisez l'occupation de votre espace de stockage S3/MinIO."
+        title={t("title")}
+        description={t("description")}
       />
 
       <div className="flex flex-1 flex-col gap-6 pt-6 max-w-3xl">
@@ -85,20 +88,20 @@ export default function StoragePage() {
           <>
             <LayerCard className="flex flex-col gap-4 p-5">
               <Meter
-                label="Stockage utilisé"
+                label={t("usedStorage")}
                 value={usedPercent}
                 customValue={`${formatFileSize(stats.usedBytes)} / ${formatFileSize(stats.quotaBytes)}`}
               />
 
               <div className="flex flex-col gap-3">
-                {CATEGORY_META.map(({ key, label, icon: Icon }) => {
+                {CATEGORY_META.map(({ key, labelKey, icon: Icon }) => {
                   const bytes = stats.categories[key];
                   const percent = stats.quotaBytes > 0 ? (bytes / stats.quotaBytes) * 100 : 0;
                   return (
                     <div key={key} className="flex items-center gap-3">
                       <Icon size={18} className="shrink-0 text-kumo-subtle" />
                       <div className="min-w-0 flex-1">
-                        <Meter label={label} value={percent} customValue={formatFileSize(bytes)} showValue />
+                        <Meter label={t(labelKey)} value={percent} customValue={formatFileSize(bytes)} showValue />
                       </div>
                     </div>
                   );
@@ -110,7 +113,7 @@ export default function StoragePage() {
               <GridItem>
                 <LayerCard className="flex flex-col gap-1 p-4">
                   <div className="flex items-center justify-between text-kumo-subtle">
-                    <Text as="span" variant="secondary" bold>Fichiers</Text>
+                    <Text as="span" variant="secondary" bold>{t("files")}</Text>
                     <FileIcon size={20} className="text-kumo-info" />
                   </div>
                   <Text as="p" variant="heading1" DANGEROUS_className="mt-1">
@@ -122,7 +125,7 @@ export default function StoragePage() {
               <GridItem>
                 <LayerCard className="flex flex-col gap-1 p-4">
                   <div className="flex items-center justify-between text-kumo-subtle">
-                    <Text as="span" variant="secondary" bold>Dossiers</Text>
+                    <Text as="span" variant="secondary" bold>{t("folders")}</Text>
                     <FolderIcon size={20} className="text-kumo-info" />
                   </div>
                   <Text as="p" variant="heading1" DANGEROUS_className="mt-1">
@@ -134,7 +137,7 @@ export default function StoragePage() {
               <GridItem>
                 <LayerCard className="flex flex-col gap-1 p-4">
                   <div className="flex items-center justify-between text-kumo-subtle">
-                    <Text as="span" variant="secondary" bold>Espace total</Text>
+                    <Text as="span" variant="secondary" bold>{t("totalSpace")}</Text>
                     <HardDriveIcon size={20} className="text-kumo-info" />
                   </div>
                   <Text as="p" variant="heading1" DANGEROUS_className="mt-1">
@@ -149,13 +152,13 @@ export default function StoragePage() {
               <GridItem>
                 <LayerCard className="flex flex-col gap-1 p-4">
                   <div className="flex items-center justify-between text-kumo-subtle">
-                    <Text as="span" variant="secondary" bold>Corbeille</Text>
+                    <Text as="span" variant="secondary" bold>{t("trash")}</Text>
                     <TrashIcon size={20} className="text-kumo-danger" />
                   </div>
                   <Text as="p" variant="heading1" DANGEROUS_className="mt-1">
                     {formatFileSize(stats.trashBytes)}
                   </Text>
-                  <Text as="span" variant="secondary" bold>{stats.trashCount} élément(s)</Text>
+                  <Text as="span" variant="secondary" bold>{t("itemCount", { count: stats.trashCount })}</Text>
                 </LayerCard>
               </GridItem>
             </Grid>

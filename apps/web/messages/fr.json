@@ -357,6 +357,20 @@
       "passwordRemovedDescription": "Le lien n'est plus protégé par mot de passe."
     }
   },
+  "storagePage": {
+    "title": "Analyse du stockage",
+    "description": "Visualisez l'occupation de votre espace de stockage S3/MinIO.",
+    "usedStorage": "Stockage utilisé",
+    "categoryImages": "Images",
+    "categoryDocuments": "Documents",
+    "categoryVideos": "Vidéos",
+    "categoryOther": "Autres",
+    "files": "Fichiers",
+    "folders": "Dossiers",
+    "totalSpace": "Espace total",
+    "trash": "Corbeille",
+    "itemCount": "{count, plural, one {# élément} other {# éléments}}"
+  },
   "settings": {
     "language": "Langue",
     "languageDescription": "Choisissez la langue utilisée dans l'interface.",

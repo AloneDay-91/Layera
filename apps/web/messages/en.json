@@ -357,6 +357,20 @@
       "passwordRemovedDescription": "The link is no longer password-protected."
     }
   },
+  "storagePage": {
+    "title": "Storage analysis",
+    "description": "Visualize how your S3/MinIO storage space is used.",
+    "usedStorage": "Storage used",
+    "categoryImages": "Images",
+    "categoryDocuments": "Documents",
+    "categoryVideos": "Videos",
+    "categoryOther": "Other",
+    "files": "Files",
+    "folders": "Folders",
+    "totalSpace": "Total space",
+    "trash": "Trash",
+    "itemCount": "{count, plural, one {# item} other {# items}}"
+  },
   "settings": {
     "language": "Language",
     "languageDescription": "Choose the language used across the interface.",
