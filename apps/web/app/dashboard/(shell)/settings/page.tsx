@@ -5,7 +5,6 @@ import { Badge, Breadcrumbs, Button, Input, LayerCard, Loader, Table, Text, useK
 import {
   UsersThreeIcon,
   PlusIcon,
-  ShieldCheckIcon,
   TrashIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
@@ -31,7 +30,7 @@ export default function SettingsPage() {
   const { data: activeOrg } = authClient.useActiveOrganization();
   const toasts = useKumoToastManager();
 
-  const [activeTab, setActiveTab] = useState<"profile" | "workspaces" | "storage">("profile");
+  const [activeTab, setActiveTab] = useState<"workspaces" | "storage">("workspaces");
   const [members, setMembers] = useState<MemberUI[]>([]);
   const [invitations, setInvitations] = useState<InvitationUI[]>([]);
   const [activeRole, setActiveRole] = useState<string | null>(null);
@@ -46,22 +45,11 @@ export default function SettingsPage() {
   // active (espace personnel), l'utilisateur est de facto seul "propriétaire".
   const canManageMembers = activeOrg ? activeRole === "owner" || activeRole === "admin" : true;
 
-  // État contrôlé pour les champs Profil
-  const [profileName, setProfileName] = useState(session?.user?.name ?? "");
-  const [profileEmail, setProfileEmail] = useState(session?.user?.email ?? "");
-
   // État contrôlé pour les champs S3
   const [s3Endpoint, setS3Endpoint] = useState("http://localhost:9000");
   const [s3Bucket, setS3Bucket] = useState("filecloud-data");
   const [s3Region, setS3Region] = useState("us-east-1");
   const [s3AccessKey, setS3AccessKey] = useState("minioadmin");
-
-  useEffect(() => {
-    if (session?.user) {
-      setProfileName(session.user.name ?? "");
-      setProfileEmail(session.user.email ?? "");
-    }
-  }, [session?.user]);
 
   // Synchroniser les vrais membres, invitations et rôle actif de l'organisation Better Auth
   const loadWorkspaceData = useCallback(async () => {
@@ -209,62 +197,16 @@ export default function SettingsPage() {
           </Breadcrumbs>
         }
         title="Réglages"
-        description="Gérez votre profil, vos espaces de travail et la configuration du stockage."
+        description="Gérez vos espaces de travail et la configuration du stockage."
         tabs={[
-          { value: "profile", label: "Profil & Compte" },
           { value: "workspaces", label: "Groupes & Équipes" },
           { value: "storage", label: "Stockage & S3" },
         ]}
         activeTab={activeTab}
-        onValueChange={(val) => setActiveTab(val as "profile" | "workspaces" | "storage")}
+        onValueChange={(val) => setActiveTab(val as "workspaces" | "storage")}
       />
 
       <div className="flex flex-1 flex-col gap-6 max-w-4xl pt-6">
-
-      {/* Onglet Profil & Compte */}
-      {activeTab === "profile" && (
-        <LayerCard className="flex flex-col gap-6 p-6">
-          <div>
-            <Text as="h2" variant="heading2">
-              Informations personnelles
-            </Text>
-            <Text variant="secondary">
-              Gérez votre nom, email et préférences de sécurité.
-            </Text>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              size="sm"
-              label="Nom complet"
-              value={profileName}
-              onChange={(e) => setProfileName(e.target.value)}
-            />
-            <Input
-              size="sm"
-              label="Adresse email"
-              value={profileEmail}
-              onChange={(e) => setProfileEmail(e.target.value)}
-              disabled
-            />
-          </div>
-
-          <div className="flex items-center justify-between border-t border-kumo-line pt-4">
-            <div>
-              <Text as="p" bold>Authentification 2FA</Text>
-              <Text variant="secondary">Sécurisez l&apos;accès avec un second facteur (TOTP / OTP).</Text>
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={ShieldCheckIcon}
-              onClick={() => toasts.add({ title: "2FA", description: "Configuration 2FA à venir." })}
-            >
-              Configurer la 2FA
-            </Button>
-          </div>
-        </LayerCard>
-      )}
 
       {/* Onglet Groupes & Équipes */}
       {activeTab === "workspaces" && (
