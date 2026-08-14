@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { db, workspace, folder, file, trashItem, favorite, provisionPersonalWorkspace, provisionOrganizationWorkspace, eq, and, isNull, ilike } from "@filecloud/db";
+import { db, workspace, folder, file, trashItem, favorite, tag, itemTag, provisionPersonalWorkspace, provisionOrganizationWorkspace, eq, and, isNull, ilike, inArray } from "@filecloud/db";
 
 export async function GET(request: Request) {
   try {
@@ -124,6 +124,22 @@ export async function GET(request: Request) {
       .where(and(eq(favorite.workspaceId, wsRecord.id), eq(favorite.userId, session.user.id)));
     const favoriteIds = new Set(favoriteRows.map((f) => f.itemId));
 
+    // 5b. Récupérer les tags des éléments affichés
+    const itemIds = [...dbFolders.map((f) => f.id), ...dbFiles.map((f) => f.id)];
+    const tagsByItemId = new Map<string, { id: string; name: string; color: string }[]>();
+    if (itemIds.length > 0) {
+      const tagRows = await db
+        .select({ itemId: itemTag.itemId, id: tag.id, name: tag.name, color: tag.color })
+        .from(itemTag)
+        .innerJoin(tag, eq(itemTag.tagId, tag.id))
+        .where(and(eq(itemTag.workspaceId, wsRecord.id), inArray(itemTag.itemId, itemIds)));
+      for (const row of tagRows) {
+        const list = tagsByItemId.get(row.itemId) ?? [];
+        list.push({ id: row.id, name: row.name, color: row.color });
+        tagsByItemId.set(row.itemId, list);
+      }
+    }
+
     // 5. Transformer au format d'affichage FileBrowser
     const formattedFolders = dbFolders
       .filter((f) => f.name !== "root")
@@ -137,6 +153,7 @@ export async function GET(request: Request) {
         updatedAt: f.updatedAt.toISOString(),
         owner: session.user.name,
         isFavorite: favoriteIds.has(f.id),
+        tags: tagsByItemId.get(f.id) ?? [],
       }));
 
     const formattedFiles = dbFiles.map((f) => ({
@@ -149,6 +166,7 @@ export async function GET(request: Request) {
       updatedAt: f.updatedAt.toISOString(),
       owner: session.user.name,
       isFavorite: favoriteIds.has(f.id),
+      tags: tagsByItemId.get(f.id) ?? [],
     }));
 
     // 5. Calculer le fil d'Ariane (breadcrumbs)
