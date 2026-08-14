@@ -29,6 +29,20 @@
       "when": 1786524609322,
       "tag": "0003_thin_taskmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786627852312,
+      "tag": "0004_aromatic_overlord",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786648905463,
+      "tag": "0005_fresh_azazel",
+      "breakpoints": true
     }
   ]
 }
