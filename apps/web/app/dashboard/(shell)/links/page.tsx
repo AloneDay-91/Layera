@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import {
   Badge,
   Breadcrumbs,
@@ -51,6 +52,11 @@ export default function LinksPage() {
   const [editPassword, setEditPassword] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
+  const t = useTranslations("linksPage");
+  const tToasts = useTranslations("linksPage.toasts");
+  const tBreadcrumbs = useTranslations("fileBreadcrumbs");
+  const locale = useLocale();
+
   async function fetchShares() {
     setLoading(true);
     try {
@@ -76,7 +82,7 @@ export default function LinksPage() {
 
   async function handleCopy(token: string) {
     await navigator.clipboard.writeText(shareUrl(token));
-    toasts.add({ title: "Lien copié", description: "Le lien de partage a été copié dans le presse-papiers." });
+    toasts.add({ title: tToasts("linkCopiedTitle"), description: tToasts("linkCopiedDescription") });
   }
 
   async function handleRevoke(share: ShareLinkItem) {
@@ -85,8 +91,8 @@ export default function LinksPage() {
       const res = await fetch(`/api/shares?id=${share.id}`, { method: "DELETE" });
       if (res.ok) {
         toasts.add({
-          title: "Lien révoqué",
-          description: `Le lien de partage pour "${share.itemName}" a été révoqué.`,
+          title: tToasts("linkRevokedTitle"),
+          description: tToasts("linkRevokedDescription", { name: share.itemName }),
         });
         fetchShares();
       }
@@ -120,11 +126,11 @@ export default function LinksPage() {
       });
 
       if (res.ok) {
-        toasts.add({ title: "Lien mis à jour", description: `Les paramètres de "${editShare.itemName}" ont été enregistrés.` });
+        toasts.add({ title: tToasts("linkUpdatedTitle"), description: tToasts("linkUpdatedDescription", { name: editShare.itemName }) });
         setEditShare(null);
         fetchShares();
       } else {
-        toasts.add({ title: "Erreur", description: "Impossible de mettre à jour le lien." });
+        toasts.add({ title: tToasts("genericError"), description: tToasts("linkUpdateErrorDescription") });
       }
     } catch (err) {
       console.error("Edit error:", err);
@@ -145,7 +151,7 @@ export default function LinksPage() {
       if (res.ok) {
         setEditShare({ ...editShare, hasPassword: false });
         setEditPassword("");
-        toasts.add({ title: "Mot de passe retiré", description: "Le lien n'est plus protégé par mot de passe." });
+        toasts.add({ title: tToasts("passwordRemovedTitle"), description: tToasts("passwordRemovedDescription") });
         fetchShares();
       }
     } catch (err) {
@@ -161,13 +167,13 @@ export default function LinksPage() {
         className="-mx-6 -mt-6"
         breadcrumbs={
           <Breadcrumbs>
-            <Breadcrumbs.Link href="/dashboard">Mes fichiers</Breadcrumbs.Link>
+            <Breadcrumbs.Link href="/dashboard">{tBreadcrumbs("myFiles")}</Breadcrumbs.Link>
             <Breadcrumbs.Separator />
-            <Breadcrumbs.Current>Liens de partage</Breadcrumbs.Current>
+            <Breadcrumbs.Current>{t("title")}</Breadcrumbs.Current>
           </Breadcrumbs>
         }
-        title="Liens de partage"
-        description="Gérez les liens de partage publics créés depuis vos fichiers et dossiers."
+        title={t("title")}
+        description={t("description")}
       />
 
       <div className="flex flex-1 flex-col gap-6 max-w-5xl pt-6">
@@ -191,10 +197,10 @@ export default function LinksPage() {
         <LayerCard className="flex flex-col items-center justify-center p-12 text-center">
           <LinkIcon size={48} className="text-kumo-subtle mb-3" />
           <Text as="p" variant="heading3" DANGEROUS_className="mb-1">
-            Aucun lien de partage actif
+            {t("emptyTitle")}
           </Text>
           <Text variant="secondary">
-            Partagez un fichier ou un dossier depuis l&apos;explorateur pour créer un lien.
+            {t("emptyDescription")}
           </Text>
         </LayerCard>
       ) : (
@@ -202,12 +208,12 @@ export default function LinksPage() {
           <Table>
             <Table.Header>
               <Table.Row>
-                <Table.Head>Nom</Table.Head>
-                <Table.Head>Type</Table.Head>
-                <Table.Head>Créé le</Table.Head>
-                <Table.Head>Expiration</Table.Head>
-                <Table.Head>Protection</Table.Head>
-                <Table.Head className="text-right">Actions</Table.Head>
+                <Table.Head>{t("nameColumn")}</Table.Head>
+                <Table.Head>{t("typeColumn")}</Table.Head>
+                <Table.Head>{t("createdColumn")}</Table.Head>
+                <Table.Head>{t("expiresColumn")}</Table.Head>
+                <Table.Head>{t("protectionColumn")}</Table.Head>
+                <Table.Head className="text-right">{t("actionsColumn")}</Table.Head>
               </Table.Row>
             </Table.Header>
             <Table.Body>
@@ -217,35 +223,35 @@ export default function LinksPage() {
                     <Text as="span" bold>{share.itemName}</Text>
                   </Table.Cell>
                   <Table.Cell>
-                    <Badge variant="neutral">{share.itemType === "folder" ? "Dossier" : "Fichier"}</Badge>
+                    <Badge variant="neutral">{share.itemType === "folder" ? t("folder") : t("file")}</Badge>
                   </Table.Cell>
-                  <Table.Cell>{new Date(share.createdAt).toLocaleDateString("fr-FR")}</Table.Cell>
+                  <Table.Cell>{new Date(share.createdAt).toLocaleDateString(locale)}</Table.Cell>
                   <Table.Cell>
                     {share.expiresAt ? (
                       <span className="inline-flex items-center gap-1">
                         <ClockIcon size={14} />
-                        {new Date(share.expiresAt).toLocaleString("fr-FR")}
+                        {new Date(share.expiresAt).toLocaleString(locale)}
                       </span>
                     ) : (
-                      <Text variant="secondary">Aucune</Text>
+                      <Text variant="secondary">{t("none")}</Text>
                     )}
                   </Table.Cell>
                   <Table.Cell>
                     {share.hasPassword ? (
                       <span className="inline-flex items-center gap-1">
-                        <LockIcon size={14} /> Protégé
+                        <LockIcon size={14} /> {t("protected")}
                       </span>
                     ) : (
-                      <Text variant="secondary">Aucune</Text>
+                      <Text variant="secondary">{t("none")}</Text>
                     )}
                   </Table.Cell>
                   <Table.Cell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button variant="secondary" size="sm" icon={PencilSimpleIcon} onClick={() => openEdit(share)}>
-                        Modifier
+                        {t("edit")}
                       </Button>
                       <Button variant="secondary" size="sm" icon={CopyIcon} onClick={() => handleCopy(share.token)}>
-                        Copier
+                        {t("copy")}
                       </Button>
                       <Button
                         variant="destructive"
@@ -254,7 +260,7 @@ export default function LinksPage() {
                         icon={XCircleIcon}
                         onClick={() => handleRevoke(share)}
                       >
-                        Révoquer
+                        {t("revoke")}
                       </Button>
                     </div>
                   </Table.Cell>
@@ -271,25 +277,25 @@ export default function LinksPage() {
         <Dialog className="p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
             <Dialog.Title className="text-lg font-semibold">
-              Modifier &quot;{editShare?.itemName}&quot;
+              {t("editDialogTitle", { name: editShare?.itemName ?? "" })}
             </Dialog.Title>
             <Dialog.Close
-              aria-label="Fermer"
+              aria-label={t("close")}
               render={(props) => (
-                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Fermer" />
+                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={t("close")} />
               )}
             />
           </div>
 
           <form onSubmit={handleSaveEdit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Text as="span" size="sm" bold>Date d&apos;expiration</Text>
+              <Text as="span" size="sm" bold>{t("expirationLabel")}</Text>
               <div className="flex items-center gap-2">
                 <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
                   <Popover.Trigger
                     render={
                       <Button variant="secondary" size="sm" icon={CalendarIcon}>
-                        {editExpiresDate ? editExpiresDate.toLocaleDateString("fr-FR") : "Aucune expiration"}
+                        {editExpiresDate ? editExpiresDate.toLocaleDateString(locale) : t("noExpiration")}
                       </Button>
                     }
                   />
@@ -307,12 +313,12 @@ export default function LinksPage() {
                 </Popover>
                 {editExpiresDate && (
                   <Button variant="ghost" size="sm" type="button" onClick={() => setEditExpiresDate(undefined)}>
-                    Effacer
+                    {t("clear")}
                   </Button>
                 )}
               </div>
               <Text as="span" size="sm" variant="secondary">
-                Le lien expire à 23:59 le jour sélectionné. Laissez vide pour un lien sans expiration.
+                {t("expirationHint")}
               </Text>
             </div>
 
@@ -320,12 +326,8 @@ export default function LinksPage() {
               <Input
                 size="sm"
                 type="password"
-                label={editShare?.hasPassword ? "Nouveau mot de passe" : "Mot de passe"}
-                description={
-                  editShare?.hasPassword
-                    ? "Laissez vide pour conserver le mot de passe actuel."
-                    : "Laissez vide pour ne pas protéger ce lien."
-                }
+                label={editShare?.hasPassword ? t("newPasswordLabel") : t("passwordLabel")}
+                description={editShare?.hasPassword ? t("passwordHintExisting") : t("passwordHintNew")}
                 placeholder="••••••••"
                 value={editPassword}
                 onChange={(e) => setEditPassword(e.target.value)}
@@ -339,22 +341,22 @@ export default function LinksPage() {
                   onClick={handleRemovePassword}
                   className="self-start"
                 >
-                  Retirer le mot de passe
+                  {t("removePassword")}
                 </Button>
               )}
             </div>
 
             <div className="flex justify-end gap-2 mt-2">
               <Button variant="secondary" size="sm" type="button" onClick={() => setEditShare(null)}>
-                Annuler
+                {t("cancel")}
               </Button>
               <Button variant="primary" size="sm" type="submit" disabled={savingEdit}>
                 {savingEdit ? (
                   <span className="flex items-center gap-1.5">
-                    <Loader size="sm" /> Enregistrement…
+                    <Loader size="sm" /> {t("saving")}
                   </span>
                 ) : (
-                  "Enregistrer"
+                  t("save")
                 )}
               </Button>
             </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { Breadcrumbs, Button, Dialog, Input, LayerCard, Loader, SkeletonLine, Table, Text, useKumoToastManager } from "@cloudflare/kumo";
 import { ClockIcon, CopyIcon, XIcon } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
@@ -23,6 +24,15 @@ export default function RecentPage() {
   const [shareItem, setShareItem] = useState<MockItem | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+
+  const t = useTranslations("recentPage");
+  const tToasts = useTranslations("recentPage.toasts");
+  const tBrowser = useTranslations("fileBrowser");
+  const tBrowserToasts = useTranslations("fileBrowser.toasts");
+  const tBreadcrumbs = useTranslations("fileBreadcrumbs");
+  const tSidebar = useTranslations("sidebar");
+  const tTable = useTranslations("fileTable");
+  const locale = useLocale();
 
   async function fetchRecent() {
     setLoading(true);
@@ -52,7 +62,7 @@ export default function RecentPage() {
     try {
       const res = await fetch(`/api/files?id=${item.id}&type=${item.type}`, { method: "DELETE" });
       if (res.ok) {
-        toasts.add({ title: "Élément supprimé", description: `"${item.name}" a été déplacé dans la corbeille.` });
+        toasts.add({ title: tToasts("itemDeletedTitle"), description: tToasts("itemDeletedDescription", { name: item.name }) });
         if (selectedItemId === item.id) setSelectedItemId(null);
         fetchRecent();
       }
@@ -75,7 +85,7 @@ export default function RecentPage() {
         const data = await res.json();
         setShareUrl(`${window.location.origin}${data.share.url}`);
       } else {
-        toasts.add({ title: "Erreur", description: "Impossible de créer le lien de partage." });
+        toasts.add({ title: tBrowserToasts("genericError"), description: tBrowserToasts("shareErrorDescription") });
         setShareItem(null);
       }
     } catch (err) {
@@ -89,11 +99,11 @@ export default function RecentPage() {
   async function handleCopyShareUrl() {
     if (!shareUrl) return;
     await navigator.clipboard.writeText(shareUrl);
-    toasts.add({ title: "Lien copié", description: "Le lien de partage a été copié dans le presse-papiers." });
+    toasts.add({ title: tBrowserToasts("linkCopiedTitle"), description: tBrowserToasts("linkCopiedDescription") });
   }
 
   function handleDetailAction(action: string) {
-    toasts.add({ title: "Action sur le fichier", description: `Action "${action}" exécutée sur le fichier.` });
+    toasts.add({ title: tBrowserToasts("fileActionTitle"), description: tBrowserToasts("fileActionDescription", { action }) });
   }
 
   return (
@@ -102,13 +112,13 @@ export default function RecentPage() {
         className="-mx-6 -mt-6"
         breadcrumbs={
           <Breadcrumbs>
-            <Breadcrumbs.Link href="/dashboard">Mes fichiers</Breadcrumbs.Link>
+            <Breadcrumbs.Link href="/dashboard">{tBreadcrumbs("myFiles")}</Breadcrumbs.Link>
             <Breadcrumbs.Separator />
-            <Breadcrumbs.Current>Récents</Breadcrumbs.Current>
+            <Breadcrumbs.Current>{tSidebar("recent")}</Breadcrumbs.Current>
           </Breadcrumbs>
         }
-        title="Fichiers récents"
-        description="Les 30 derniers fichiers modifiés dans votre espace, tous dossiers confondus."
+        title={t("title")}
+        description={t("description")}
       />
 
       <div className="flex flex-1 gap-6 pt-6">
@@ -133,19 +143,19 @@ export default function RecentPage() {
           <LayerCard className="flex flex-col items-center justify-center p-12 text-center">
             <ClockIcon size={48} className="text-kumo-subtle mb-3" />
             <Text as="p" variant="heading3" DANGEROUS_className="mb-1">
-              Aucun fichier récent
+              {t("emptyTitle")}
             </Text>
-            <Text variant="secondary">Les fichiers que vous créez ou modifiez apparaîtront ici.</Text>
+            <Text variant="secondary">{t("emptyDescription")}</Text>
           </LayerCard>
         ) : (
           <LayerCard className="p-0">
             <Table>
               <Table.Header>
                 <Table.Row>
-                  <Table.Head>Nom</Table.Head>
-                  <Table.Head>Emplacement</Table.Head>
-                  <Table.Head>Modifié</Table.Head>
-                  <Table.Head>Taille</Table.Head>
+                  <Table.Head>{tTable("name")}</Table.Head>
+                  <Table.Head>{t("locationColumn")}</Table.Head>
+                  <Table.Head>{t("modifiedColumn")}</Table.Head>
+                  <Table.Head>{t("sizeColumn")}</Table.Head>
                   <Table.Head></Table.Head>
                 </Table.Row>
               </Table.Header>
@@ -163,7 +173,7 @@ export default function RecentPage() {
                       </button>
                     </Table.Cell>
                     <Table.Cell>{item.location}</Table.Cell>
-                    <Table.Cell>{new Date(item.updatedAt).toLocaleDateString("fr-FR")}</Table.Cell>
+                    <Table.Cell>{new Date(item.updatedAt).toLocaleDateString(locale)}</Table.Cell>
                     <Table.Cell>{formatFileSize(item.size)}</Table.Cell>
                     <Table.Cell>
                       <FileRowMenu item={item} onShare={handleShareItem} onDelete={handleDeleteItem} />
@@ -189,28 +199,28 @@ export default function RecentPage() {
       <Dialog.Root open={shareItem !== null} onOpenChange={(open) => !open && setShareItem(null)}>
         <Dialog className="p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold">Partager &quot;{shareItem?.name}&quot;</Dialog.Title>
+            <Dialog.Title className="text-lg font-semibold">{tBrowser("shareTitle", { name: shareItem?.name ?? "" })}</Dialog.Title>
             <Dialog.Close
-              aria-label="Fermer"
+              aria-label={tBrowser("close")}
               render={(props) => (
-                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Fermer" />
+                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={tBrowser("close")} />
               )}
             />
           </div>
 
           {sharing ? (
             <div className="flex items-center gap-2 py-4">
-              <Loader size="sm" /> Création du lien…
+              <Loader size="sm" /> {tBrowser("creatingLink")}
             </div>
           ) : shareUrl ? (
             <div className="flex flex-col gap-4">
-              <Input size="sm" label="Lien de partage public" value={shareUrl} readOnly onFocus={(e) => e.target.select()} />
+              <Input size="sm" label={tBrowser("shareLinkLabel")} value={shareUrl} readOnly onFocus={(e) => e.target.select()} />
               <div className="flex justify-end gap-2">
                 <Button variant="secondary" size="sm" type="button" onClick={() => setShareItem(null)}>
-                  Fermer
+                  {tBrowser("close")}
                 </Button>
                 <Button variant="primary" size="sm" icon={CopyIcon} onClick={handleCopyShareUrl}>
-                  Copier le lien
+                  {tBrowser("copyLink")}
                 </Button>
               </div>
             </div>
