@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Input, Meter, Sidebar, Text } from "@cloudflare/kumo";
 import { AccountSwitcher } from "./account-switcher";
 import { authClient } from "@/lib/auth-client";
@@ -11,24 +12,26 @@ import { onStorageUpdated } from "@/lib/storage-events";
 
 type StorageSummary = { usedBytes: number; quotaBytes: number };
 
-const PAGE_LABELS: Record<string, string> = {
-  "/dashboard": "Mes fichiers",
-  "/dashboard/recent": "Récents",
-  "/dashboard/shared": "Partagés avec moi",
-  "/dashboard/favorites": "Favoris",
-  "/dashboard/links": "Liens de partage",
-  "/dashboard/trash": "Corbeille",
-  "/dashboard/tags": "Tags",
-  "/dashboard/storage": "Analyse du stockage",
-  "/dashboard/activity": "Journaux d'activité",
-  "/dashboard/admin": "Administration",
-  "/dashboard/settings": "Réglages",
-};
-
 export function DashboardHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations("header");
+  const tCommon = useTranslations("common");
+
+  const PAGE_LABELS: Record<string, string> = {
+    "/dashboard": t("pages.files"),
+    "/dashboard/recent": t("pages.recent"),
+    "/dashboard/shared": t("pages.shared"),
+    "/dashboard/favorites": t("pages.favorites"),
+    "/dashboard/links": t("pages.links"),
+    "/dashboard/trash": t("pages.trash"),
+    "/dashboard/tags": t("pages.tags"),
+    "/dashboard/storage": t("pages.storage"),
+    "/dashboard/activity": t("pages.activity"),
+    "/dashboard/admin": t("pages.admin"),
+    "/dashboard/settings": t("pages.settings"),
+  };
 
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") ?? "");
   const [storage, setStorage] = useState<StorageSummary | null>(null);
@@ -45,7 +48,7 @@ export function DashboardHeader() {
     return onStorageUpdated(fetchStorage);
   }, [activeOrg?.id]);
 
-  const pageLabel = PAGE_LABELS[pathname] ?? "Layera";
+  const pageLabel = PAGE_LABELS[pathname] ?? tCommon("appName");
   const usedPercent = storage && storage.quotaBytes > 0 ? Math.min(100, (storage.usedBytes / storage.quotaBytes) * 100) : 0;
 
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -74,10 +77,10 @@ export function DashboardHeader() {
 
       <Input
         size="sm"
-        placeholder="Rechercher des fichiers…"
+        placeholder={t("searchPlaceholder")}
         value={searchQuery}
         onChange={handleSearchChange}
-        aria-label="Rechercher des fichiers"
+        aria-label={t("searchAriaLabel")}
         className="min-w-0 flex-1 basis-40 sm:max-w-xs"
       />
 
@@ -87,7 +90,7 @@ export function DashboardHeader() {
             href="/dashboard/storage"
             className="hidden w-36 shrink-0 md:block **:text-xs!"
           >
-            <Meter label="Stockage" value={usedPercent} customValue={formatFileSize(storage.usedBytes)} />
+            <Meter label={t("storageLabel")} value={usedPercent} customValue={formatFileSize(storage.usedBytes)} />
           </Link>
         )}
         <AccountSwitcher />

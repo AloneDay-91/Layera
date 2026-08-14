@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { DropdownMenu, Button } from "@cloudflare/kumo";
 import { DotsThreeIcon, FileZipIcon, PackageIcon, PaintBucketIcon, PencilSimpleIcon, ShareIcon, StarIcon, TagIcon, TrashIcon } from "@phosphor-icons/react";
 import type { MockItem } from "@/lib/mock-files";
@@ -28,6 +29,9 @@ export function FileRowMenu({
   onDownloadZip,
   onExtractZip,
 }: FileRowMenuProps) {
+  const t = useTranslations("fileRowMenu");
+  const tTable = useTranslations("fileTable");
+
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger>
@@ -36,49 +40,49 @@ export function FileRowMenu({
           shape="square"
           size="sm"
           icon={DotsThreeIcon}
-          aria-label={`Actions pour ${item.name}`}
+          aria-label={tTable("actionsFor", { name: item.name })}
         />
       </DropdownMenu.Trigger>
       <DropdownMenu.Content>
         {onToggleFavorite && (
           <DropdownMenu.Item icon={StarIcon} onClick={() => onToggleFavorite(item)}>
-            {item.isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+            {item.isFavorite ? t("removeFavorite") : t("addFavorite")}
           </DropdownMenu.Item>
         )}
         {onShare && (
           <DropdownMenu.Item icon={ShareIcon} onClick={() => onShare(item)}>
-            Partager
+            {t("share")}
           </DropdownMenu.Item>
         )}
         {onRename && (
           <DropdownMenu.Item icon={PencilSimpleIcon} onClick={() => onRename(item)}>
-            Renommer
+            {t("rename")}
           </DropdownMenu.Item>
         )}
         {onManageTags && (
           <DropdownMenu.Item icon={TagIcon} onClick={() => onManageTags(item)}>
-            Tags
+            {t("tags")}
           </DropdownMenu.Item>
         )}
         {item.type === "folder" && onChangeColor && (
           <DropdownMenu.Item icon={PaintBucketIcon} onClick={() => onChangeColor(item)}>
-            Changer la couleur
+            {t("changeColor")}
           </DropdownMenu.Item>
         )}
         {item.type === "folder" && onDownloadZip && (
           <DropdownMenu.Item icon={FileZipIcon} onClick={() => onDownloadZip(item)}>
-            Télécharger en ZIP
+            {t("downloadZip")}
           </DropdownMenu.Item>
         )}
         {isZipFile(item) && onExtractZip && (
           <DropdownMenu.Item icon={PackageIcon} onClick={() => onExtractZip(item)}>
-            Extraire
+            {t("extract")}
           </DropdownMenu.Item>
         )}
         <DropdownMenu.Separator />
         {onDelete && (
           <DropdownMenu.Item variant="danger" icon={TrashIcon} onClick={() => onDelete(item)}>
-            Supprimer
+            {t("delete")}
           </DropdownMenu.Item>
         )}
       </DropdownMenu.Content>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button, DropdownMenu, Loader, Text, useKumoToastManager } from "@cloudflare/kumo";
 import {
   UserIcon,
@@ -15,11 +16,18 @@ import {
   PlusIcon,
   SignOutIcon,
   SparkleIcon,
+  TranslateIcon,
   XIcon,
 } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { getInitials } from "@/lib/avatar";
+import { SUPPORTED_LOCALES, useAppLocale } from "./locale-provider";
 import { useTheme } from "./theme-provider";
+
+const LOCALE_LABEL_KEYS = {
+  en: "languageEnglish",
+  fr: "languageFrench",
+} as const;
 
 type DeviceSession = {
   session: { token: string };
@@ -48,6 +56,8 @@ export function AccountSwitcher() {
   const { data: session } = authClient.useSession();
   const { data: activeOrg } = authClient.useActiveOrganization();
   const { mode, setMode } = useTheme();
+  const { locale, setLocale } = useAppLocale();
+  const tSettings = useTranslations("settings");
 
   const [deviceSessions, setDeviceSessions] = useState<DeviceSession[]>([]);
   const [switchingToken, setSwitchingToken] = useState<string | null>(null);
@@ -214,6 +224,17 @@ export function AccountSwitcher() {
                 <span className="flex-1">Système</span>
                 {mode === "system" && <CheckIcon size={14} className="ml-2 text-kumo-info" />}
               </DropdownMenu.Item>
+            </DropdownMenu.SubContent>
+          </DropdownMenu.Sub>
+          <DropdownMenu.Sub>
+            <DropdownMenu.SubTrigger icon={TranslateIcon}>{tSettings("language")}</DropdownMenu.SubTrigger>
+            <DropdownMenu.SubContent>
+              {SUPPORTED_LOCALES.map((loc) => (
+                <DropdownMenu.Item key={loc} onClick={() => setLocale(loc)}>
+                  <span className="flex-1">{tSettings(LOCALE_LABEL_KEYS[loc])}</span>
+                  {locale === loc && <CheckIcon size={14} className="ml-2 text-kumo-info" />}
+                </DropdownMenu.Item>
+              ))}
             </DropdownMenu.SubContent>
           </DropdownMenu.Sub>
         </DropdownMenu.Group>

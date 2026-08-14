@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { Badge, DropdownMenu, LayerCard, Table, cn } from "@cloudflare/kumo";
 import type { BadgeVariant } from "@cloudflare/kumo";
 import { CaretDownIcon, StarIcon, XCircleIcon } from "@phosphor-icons/react";
@@ -94,6 +95,8 @@ export function FileTable({
   onToggleTagFilter,
   onClearTagFilter,
 }: FileTableProps) {
+  const t = useTranslations("fileTable");
+  const locale = useLocale();
   const showSelection = Boolean(onToggleSelectItem);
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
@@ -138,55 +141,55 @@ export function FileTable({
                   checked={allSelected}
                   indeterminate={!allSelected && someSelected}
                   onCheckedChange={onToggleSelectAll}
-                  aria-label="Tout sélectionner"
+                  aria-label={t("selectAll")}
                 />
               )}
               <Table.Head></Table.Head>
               <Table.Head>
                 {onToggleTagFilter && workspaceTags.length > 0 ? (
-                  <HeaderFilterButton label="Nom" active={(tagFilterIds?.size ?? 0) > 0}>
-                    <DropdownMenu.Label>Filtrer par tag</DropdownMenu.Label>
-                    {workspaceTags.map((t) => (
+                  <HeaderFilterButton label={t("name")} active={(tagFilterIds?.size ?? 0) > 0}>
+                    <DropdownMenu.Label>{t("filterByTag")}</DropdownMenu.Label>
+                    {workspaceTags.map((tag) => (
                       <DropdownMenu.CheckboxItem
-                        key={t.id}
-                        checked={tagFilterIds?.has(t.id) ?? false}
-                        onCheckedChange={() => onToggleTagFilter(t.id)}
+                        key={tag.id}
+                        checked={tagFilterIds?.has(tag.id) ?? false}
+                        onCheckedChange={() => onToggleTagFilter(tag.id)}
                       >
-                        <Badge variant={t.color as BadgeVariant}>{t.name}</Badge>
+                        <Badge variant={tag.color as BadgeVariant}>{tag.name}</Badge>
                       </DropdownMenu.CheckboxItem>
                     ))}
                     {(tagFilterIds?.size ?? 0) > 0 && (
                       <>
                         <DropdownMenu.Separator />
                         <DropdownMenu.Item icon={XCircleIcon} onClick={onClearTagFilter}>
-                          Effacer le filtre
+                          {t("clearFilter")}
                         </DropdownMenu.Item>
                       </>
                     )}
                   </HeaderFilterButton>
                 ) : (
-                  "Nom"
+                  t("name")
                 )}
               </Table.Head>
               <Table.Head>
                 {onTypeFilterChange ? (
-                  <HeaderFilterButton label="Type" active={typeFilter !== "all"}>
+                  <HeaderFilterButton label={t("type")} active={typeFilter !== "all"}>
                     <DropdownMenu.RadioGroup
                       value={typeFilter}
                       onValueChange={(value) => onTypeFilterChange(value as TypeFilterValue)}
                     >
-                      <DropdownMenu.RadioItem value="all">Tous</DropdownMenu.RadioItem>
-                      <DropdownMenu.RadioItem value="folder">Dossiers</DropdownMenu.RadioItem>
-                      <DropdownMenu.RadioItem value="file">Fichiers</DropdownMenu.RadioItem>
+                      <DropdownMenu.RadioItem value="all">{t("all")}</DropdownMenu.RadioItem>
+                      <DropdownMenu.RadioItem value="folder">{t("folders")}</DropdownMenu.RadioItem>
+                      <DropdownMenu.RadioItem value="file">{t("files")}</DropdownMenu.RadioItem>
                     </DropdownMenu.RadioGroup>
                   </HeaderFilterButton>
                 ) : (
-                  "Type"
+                  t("type")
                 )}
               </Table.Head>
-              <Table.Head>Propriétaire</Table.Head>
-              <Table.Head>Modifié</Table.Head>
-              <Table.Head className="text-right">Taille</Table.Head>
+              <Table.Head>{t("owner")}</Table.Head>
+              <Table.Head>{t("modified")}</Table.Head>
+              <Table.Head className="text-right">{t("size")}</Table.Head>
               <Table.Head></Table.Head>
             </Table.Row>
           </Table.Header>
@@ -217,7 +220,7 @@ export function FileTable({
                     <Table.CheckCell
                       checked={selectedIds?.has(item.id) ?? false}
                       onCheckedChange={() => onToggleSelectItem?.(item.id)}
-                      aria-label={`Sélectionner "${item.name}"`}
+                      aria-label={t("selectItem", { name: item.name })}
                     />
                   )}
                   <Table.Cell>
@@ -228,7 +231,11 @@ export function FileTable({
                           e.stopPropagation();
                           onToggleFavorite(item);
                         }}
-                        aria-label={item.isFavorite ? `Retirer "${item.name}" des favoris` : `Ajouter "${item.name}" aux favoris`}
+                        aria-label={
+                          item.isFavorite
+                            ? t("removeFavorite", { name: item.name })
+                            : t("addFavorite", { name: item.name })
+                        }
                         aria-pressed={item.isFavorite}
                         className="flex items-center justify-center border-0 bg-transparent p-1"
                       >
@@ -255,7 +262,7 @@ export function FileTable({
                   </Table.Cell>
                   <Table.Cell className="text-kumo-subtle">{getFileTypeLabel(item)}</Table.Cell>
                   <Table.Cell>{item.owner}</Table.Cell>
-                  <Table.Cell>{new Date(item.updatedAt).toLocaleDateString("fr-FR")}</Table.Cell>
+                  <Table.Cell>{new Date(item.updatedAt).toLocaleDateString(locale)}</Table.Cell>
                   <Table.Cell className="text-right">{formatFileSize(item.size)}</Table.Cell>
                   <Table.Cell>
                     <FileRowMenu

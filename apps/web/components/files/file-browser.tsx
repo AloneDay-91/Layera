@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button, Dialog, Input, Loader, Pagination, SkeletonLine, Tabs, Text, useKumoToastManager } from "@cloudflare/kumo";
 import {
   GridFourIcon,
@@ -35,6 +36,8 @@ const DEFAULT_PAGE_SIZE = 25;
 type ViewMode = "table" | "grid";
 
 export function FileBrowser() {
+  const t = useTranslations("fileBrowser");
+  const tToasts = useTranslations("fileBrowser.toasts");
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -295,13 +298,13 @@ export function FileBrowser() {
 
       if (failedCount === 0) {
         toasts.add({
-          title: "Éléments supprimés",
-          description: `${targets.length} élément${targets.length > 1 ? "s" : ""} supprimé${targets.length > 1 ? "s" : ""}.`,
+          title: tToasts("itemsDeletedTitle"),
+          description: tToasts("itemsDeletedDescription", { count: targets.length }),
         });
       } else {
         toasts.add({
-          title: "Suppression partielle",
-          description: `${targets.length - failedCount}/${targets.length} éléments supprimés. Certains ont échoué.`,
+          title: tToasts("partialDeleteTitle"),
+          description: tToasts("partialDeleteDescription", { deleted: targets.length - failedCount, total: targets.length }),
         });
       }
 
@@ -311,7 +314,7 @@ export function FileBrowser() {
       notifyStorageUpdated();
     } catch (err) {
       console.error("Bulk delete error:", err);
-      toasts.add({ title: "Erreur", description: "Impossible de supprimer les éléments sélectionnés." });
+      toasts.add({ title: tToasts("genericError"), description: tToasts("bulkDeleteErrorDescription") });
     } finally {
       setBulkDeleting(false);
     }
@@ -335,16 +338,16 @@ export function FileBrowser() {
 
       if (res.ok) {
         toasts.add({
-          title: "Dossier créé",
-          description: `Le dossier "${newFolderName}" a été créé avec succès dans PostgreSQL.`,
+          title: tToasts("folderCreatedTitle"),
+          description: tToasts("folderCreatedDescription", { name: newFolderName }),
         });
         setNewFolderName("");
         setIsFolderModalOpen(false);
         fetchFiles(currentFolderId, searchQuery);
       } else {
         toasts.add({
-          title: "Erreur",
-          description: "Impossible de créer le dossier dans la base de données.",
+          title: tToasts("genericError"),
+          description: tToasts("folderCreateErrorDescription"),
         });
       }
     } catch (err) {
@@ -372,15 +375,15 @@ export function FileBrowser() {
 
       if (res.ok) {
         toasts.add({
-          title: "Élément renommé",
-          description: `Renommé en "${renameValue.trim()}" avec succès.`,
+          title: tToasts("itemRenamedTitle"),
+          description: tToasts("itemRenamedDescription", { name: renameValue.trim() }),
         });
         setRenameItem(null);
         fetchFiles(currentFolderId, searchQuery);
       } else {
         toasts.add({
-          title: "Erreur",
-          description: "Impossible de renommer cet élément.",
+          title: tToasts("genericError"),
+          description: tToasts("renameErrorDescription"),
         });
       }
     } catch (err) {
@@ -397,8 +400,8 @@ export function FileBrowser() {
       });
       if (res.ok) {
         toasts.add({
-          title: "Élément supprimé",
-          description: `"${item.name}" a été supprimé.`,
+          title: tToasts("itemDeletedTitle"),
+          description: tToasts("itemDeletedDescription", { name: item.name }),
         });
         fetchFiles(currentFolderId, searchQuery);
       }
@@ -424,10 +427,10 @@ export function FileBrowser() {
 
       if (res.ok) {
         const targetObj = targetFolderId ? items.find((i) => i.id === targetFolderId) : null;
-        const targetName = targetObj ? `"${targetObj.name}"` : "la racine (Mes fichiers)";
+        const targetName = targetObj ? `"${targetObj.name}"` : tToasts("rootLocationLabel");
         toasts.add({
-          title: "Élément déplacé par glisser-déposer",
-          description: `"${dragged.name}" a été déplacé dans ${targetName}.`,
+          title: tToasts("itemMovedTitle"),
+          description: tToasts("itemMovedDescription", { name: dragged.name, target: targetName }),
         });
         fetchFiles(currentFolderId, searchQuery);
       }
@@ -483,8 +486,8 @@ export function FileBrowser() {
         setShareUrl(`${window.location.origin}${data.share.url}`);
       } else {
         toasts.add({
-          title: "Erreur",
-          description: "Impossible de créer le lien de partage.",
+          title: tToasts("genericError"),
+          description: tToasts("shareErrorDescription"),
         });
         setShareItem(null);
       }
@@ -499,7 +502,7 @@ export function FileBrowser() {
   async function handleCopyShareUrl() {
     if (!shareUrl) return;
     await navigator.clipboard.writeText(shareUrl);
-    toasts.add({ title: "Lien copié", description: "Le lien de partage a été copié dans le presse-papiers." });
+    toasts.add({ title: tToasts("linkCopiedTitle"), description: tToasts("linkCopiedDescription") });
   }
 
   async function handleToggleFavorite(item: MockItem) {
@@ -513,20 +516,22 @@ export function FileBrowser() {
       });
       if (!res.ok) throw new Error("Failed to toggle favorite");
       toasts.add({
-        title: nextFavorite ? "Ajouté aux favoris" : "Retiré des favoris",
-        description: `"${item.name}" ${nextFavorite ? "a été ajouté à" : "a été retiré de"} vos favoris.`,
+        title: nextFavorite ? tToasts("favoriteAddedTitle") : tToasts("favoriteRemovedTitle"),
+        description: nextFavorite
+          ? tToasts("favoriteAddedDescription", { name: item.name })
+          : tToasts("favoriteRemovedDescription", { name: item.name }),
       });
     } catch (err) {
       console.error("Toggle favorite error:", err);
       setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, isFavorite: item.isFavorite } : i)));
-      toasts.add({ title: "Erreur", description: "Impossible de mettre à jour les favoris." });
+      toasts.add({ title: tToasts("genericError"), description: tToasts("favoriteErrorDescription") });
     }
   }
 
   function handleDetailAction(action: string) {
     toasts.add({
-      title: "Action sur le fichier",
-      description: `Action "${action}" exécutée sur le fichier.`,
+      title: tToasts("fileActionTitle"),
+      description: tToasts("fileActionDescription", { action }),
     });
   }
 
@@ -546,7 +551,7 @@ export function FileBrowser() {
     } catch (err) {
       console.error("Change folder color error:", err);
       setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, color: previousColor } : i)));
-      toasts.add({ title: "Erreur", description: "Impossible de changer la couleur du dossier." });
+      toasts.add({ title: tToasts("genericError"), description: tToasts("colorErrorDescription") });
     }
   }
 
@@ -570,7 +575,7 @@ export function FileBrowser() {
   }
 
   async function handleExtractZip(item: MockItem) {
-    toasts.add({ title: "Extraction en cours…", description: `Décompression de "${item.name}"…` });
+    toasts.add({ title: tToasts("extractingTitle"), description: tToasts("extractingDescription", { name: item.name }) });
     try {
       const res = await fetch("/api/files/unzip", {
         method: "POST",
@@ -581,15 +586,19 @@ export function FileBrowser() {
       if (!res.ok) throw new Error(data?.error ?? "Failed to extract archive");
 
       toasts.add({
-        title: "Archive extraite",
-        description: `"${item.name}" extrait dans "${data.folder.name}" (${data.extractedCount} élément${data.extractedCount > 1 ? "s" : ""}).`,
+        title: tToasts("extractedTitle"),
+        description: tToasts("extractedDescription", {
+          name: item.name,
+          folder: data.folder.name,
+          count: data.extractedCount,
+        }),
       });
       fetchFiles(currentFolderId, searchQuery);
       notifyStorageUpdated();
     } catch (err) {
       console.error("Extract zip error:", err);
-      const message = err instanceof Error ? err.message : "Impossible d'extraire cette archive.";
-      toasts.add({ title: "Erreur", description: message });
+      const message = err instanceof Error ? err.message : tToasts("extractErrorFallback");
+      toasts.add({ title: tToasts("genericError"), description: message });
     }
   }
 
@@ -617,7 +626,7 @@ export function FileBrowser() {
       console.error("Toggle tag error:", err);
       setManageTagsItem(item);
       setItems((prev) => prev.map((i) => (i.id === item.id ? item : i)));
-      toasts.add({ title: "Erreur", description: "Impossible de mettre à jour les tags." });
+      toasts.add({ title: tToasts("genericError"), description: tToasts("tagErrorDescription") });
     }
   }
 
@@ -633,27 +642,27 @@ export function FileBrowser() {
         setWorkspaceTags((prev) => [...prev, data.tag].sort((a, b) => a.name.localeCompare(b.name)));
       } else {
         const data = await res.json().catch(() => null);
-        toasts.add({ title: "Erreur", description: data?.error ?? "Impossible de créer le tag." });
+        toasts.add({ title: tToasts("genericError"), description: data?.error ?? tToasts("tagCreateErrorDescription") });
       }
     } catch (err) {
       console.error("Create tag error:", err);
-      toasts.add({ title: "Erreur", description: "Impossible de créer le tag." });
+      toasts.add({ title: tToasts("genericError"), description: tToasts("tagCreateErrorDescription") });
     }
   }
 
   async function handleDeleteTag(tag: WorkspaceTag) {
-    if (!confirm(`Supprimer définitivement le tag "${tag.name}" de cet espace ?`)) return;
+    if (!confirm(t("deleteTagConfirm", { name: tag.name }))) return;
     try {
       const res = await fetch(`/api/tags?id=${tag.id}`, { method: "DELETE" });
       if (res.ok) {
         setWorkspaceTags((prev) => prev.filter((t) => t.id !== tag.id));
         setItems((prev) => prev.map((i) => ({ ...i, tags: (i.tags ?? []).filter((t) => t.id !== tag.id) })));
         setManageTagsItem((prev) => (prev ? { ...prev, tags: (prev.tags ?? []).filter((t) => t.id !== tag.id) } : prev));
-        toasts.add({ title: "Tag supprimé", description: `"${tag.name}" a été supprimé de l'espace.` });
+        toasts.add({ title: tToasts("tagDeletedTitle"), description: tToasts("tagDeletedDescription", { name: tag.name }) });
       }
     } catch (err) {
       console.error("Delete tag error:", err);
-      toasts.add({ title: "Erreur", description: "Impossible de supprimer le tag." });
+      toasts.add({ title: tToasts("genericError"), description: tToasts("tagDeleteErrorDescription") });
     }
   }
 
@@ -669,7 +678,7 @@ export function FileBrowser() {
         {isDraggingFileOver && (
           <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-kumo-info bg-kumo-tint/90">
             <UploadSimpleIcon size={40} className="text-kumo-info" />
-            <span className="text-sm font-medium text-kumo-info">Déposez vos fichiers ici pour les téléverser</span>
+            <span className="text-sm font-medium text-kumo-info">{t("dropOverlay")}</span>
           </div>
         )}
         <div className="flex items-center justify-between">
@@ -697,7 +706,7 @@ export function FileBrowser() {
               icon={FolderPlusIcon}
               onClick={() => setIsFolderModalOpen(true)}
             >
-              Nouveau dossier
+              {t("newFolder")}
             </Button>
             <Button
               variant="primary"
@@ -705,7 +714,7 @@ export function FileBrowser() {
               icon={UploadSimpleIcon}
               onClick={() => document.getElementById("toolbar-file-upload")?.click()}
             >
-              Téléverser
+              {t("upload")}
             </Button>
             <Tabs
               variant="segmented"
@@ -715,7 +724,7 @@ export function FileBrowser() {
                   value: "table",
                   label: (
                     <span className="flex items-center gap-1">
-                      <ListBulletsIcon size={16} /> Liste
+                      <ListBulletsIcon size={16} /> {t("viewList")}
                     </span>
                   ),
                 },
@@ -723,7 +732,7 @@ export function FileBrowser() {
                   value: "grid",
                   label: (
                     <span className="flex items-center gap-1">
-                      <GridFourIcon size={16} /> Grille
+                      <GridFourIcon size={16} /> {t("viewGrid")}
                     </span>
                   ),
                 },
@@ -736,12 +745,10 @@ export function FileBrowser() {
 
         {selectedIds.size > 0 && (
           <div className="flex items-center justify-between gap-2 rounded-lg bg-kumo-tint px-3 py-2">
-            <Text variant="secondary">
-              {selectedIds.size} élément{selectedIds.size > 1 ? "s" : ""} sélectionné{selectedIds.size > 1 ? "s" : ""}
-            </Text>
+            <Text variant="secondary">{t("selectedCount", { count: selectedIds.size })}</Text>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
-                Tout désélectionner
+                {t("deselectAll")}
               </Button>
               <Button
                 variant="secondary"
@@ -749,7 +756,7 @@ export function FileBrowser() {
                 icon={FileZipIcon}
                 onClick={handleDownloadSelectedZip}
               >
-                Compresser
+                {t("compress")}
               </Button>
               <Button
                 variant="destructive"
@@ -757,7 +764,7 @@ export function FileBrowser() {
                 icon={TrashIcon}
                 onClick={() => setBulkDeleteOpen(true)}
               >
-                Supprimer
+                {t("delete")}
               </Button>
             </div>
           </div>
@@ -792,7 +799,7 @@ export function FileBrowser() {
           <UploadDropzone onFilesSelected={handleUploadFiles} />
         ) : filteredItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-kumo-line bg-kumo-base p-10">
-            <Text variant="secondary">Aucun élément ne correspond à ces filtres.</Text>
+            <Text variant="secondary">{t("noItemsMatchFilters")}</Text>
             <Button
               variant="secondary"
               size="sm"
@@ -801,7 +808,7 @@ export function FileBrowser() {
                 setTagFilterIds(new Set());
               }}
             >
-              Réinitialiser les filtres
+              {t("resetFilters")}
             </Button>
           </div>
         ) : viewMode === "table" ? (
@@ -860,7 +867,7 @@ export function FileBrowser() {
                 value={pageSize}
                 onChange={(size) => updateQueryParams({ pageSize: size === DEFAULT_PAGE_SIZE ? null : String(size), page: null })}
                 options={PAGE_SIZE_OPTIONS}
-                label="Par page :"
+                label={t("perPage")}
               />
               <Pagination.Controls pageSelector="input" />
             </div>
@@ -899,11 +906,11 @@ export function FileBrowser() {
       <Dialog.Root open={isFolderModalOpen} onOpenChange={setIsFolderModalOpen}>
         <Dialog className="p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold">Créer un nouveau dossier</Dialog.Title>
+            <Dialog.Title className="text-lg font-semibold">{t("createFolderTitle")}</Dialog.Title>
             <Dialog.Close
-              aria-label="Fermer"
+              aria-label={t("close")}
               render={(props) => (
-                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Fermer" />
+                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={t("close")} />
               )}
             />
           </div>
@@ -911,8 +918,8 @@ export function FileBrowser() {
           <form onSubmit={handleCreateFolder} className="flex flex-col gap-4">
             <Input
               size="sm"
-              label="Nom du dossier"
-              placeholder="ex: Rapports 2026"
+              label={t("folderName")}
+              placeholder={t("folderNamePlaceholder")}
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
               required
@@ -921,15 +928,15 @@ export function FileBrowser() {
 
             <div className="flex justify-end gap-2 mt-2">
               <Button variant="secondary" size="sm" type="button" onClick={() => setIsFolderModalOpen(false)}>
-                Annuler
+                {t("cancel")}
               </Button>
               <Button variant="primary" size="sm" type="submit" disabled={creatingFolder}>
                 {creatingFolder ? (
                   <span className="flex items-center gap-1.5">
-                    <Loader size="sm" /> Création…
+                    <Loader size="sm" /> {t("creating")}
                   </span>
                 ) : (
-                  "Créer le dossier"
+                  t("createFolder")
                 )}
               </Button>
             </div>
@@ -942,12 +949,12 @@ export function FileBrowser() {
         <Dialog className="p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
             <Dialog.Title className="text-lg font-semibold">
-              Renommer &quot;{renameItem?.name}&quot;
+              {t("renameTitle", { name: renameItem?.name ?? "" })}
             </Dialog.Title>
             <Dialog.Close
-              aria-label="Fermer"
+              aria-label={t("close")}
               render={(props) => (
-                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Fermer" />
+                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={t("close")} />
               )}
             />
           </div>
@@ -955,7 +962,7 @@ export function FileBrowser() {
           <form onSubmit={handleRenameSubmit} className="flex flex-col gap-4">
             <Input
               size="sm"
-              label="Nouveau nom"
+              label={t("newName")}
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value)}
               required
@@ -964,15 +971,15 @@ export function FileBrowser() {
 
             <div className="flex justify-end gap-2 mt-2">
               <Button variant="secondary" size="sm" type="button" onClick={() => setRenameItem(null)}>
-                Annuler
+                {t("cancel")}
               </Button>
               <Button variant="primary" size="sm" type="submit" disabled={renaming}>
                 {renaming ? (
                   <span className="flex items-center gap-1.5">
-                    <Loader size="sm" /> Renommage…
+                    <Loader size="sm" /> {t("renaming")}
                   </span>
                 ) : (
-                  "Renommer"
+                  t("rename")
                 )}
               </Button>
             </div>
@@ -985,29 +992,29 @@ export function FileBrowser() {
         <Dialog className="p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
             <Dialog.Title className="text-lg font-semibold">
-              Partager &quot;{shareItem?.name}&quot;
+              {t("shareTitle", { name: shareItem?.name ?? "" })}
             </Dialog.Title>
             <Dialog.Close
-              aria-label="Fermer"
+              aria-label={t("close")}
               render={(props) => (
-                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Fermer" />
+                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={t("close")} />
               )}
             />
           </div>
 
           {sharing ? (
             <div className="flex items-center gap-2 py-4">
-              <Loader size="sm" /> Création du lien…
+              <Loader size="sm" /> {t("creatingLink")}
             </div>
           ) : shareUrl ? (
             <div className="flex flex-col gap-4">
-              <Input size="sm" label="Lien de partage public" value={shareUrl} readOnly onFocus={(e) => e.target.select()} />
+              <Input size="sm" label={t("shareLinkLabel")} value={shareUrl} readOnly onFocus={(e) => e.target.select()} />
               <div className="flex justify-end gap-2">
                 <Button variant="secondary" size="sm" type="button" onClick={() => setShareItem(null)}>
-                  Fermer
+                  {t("close")}
                 </Button>
                 <Button variant="primary" size="sm" icon={CopyIcon} onClick={handleCopyShareUrl}>
-                  Copier le lien
+                  {t("copyLink")}
                 </Button>
               </div>
             </div>
@@ -1019,11 +1026,11 @@ export function FileBrowser() {
       <Dialog.Root open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
         <Dialog className="p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold">Téléversement</Dialog.Title>
+            <Dialog.Title className="text-lg font-semibold">{t("uploadTitle")}</Dialog.Title>
             <Dialog.Close
-              aria-label="Fermer"
+              aria-label={t("close")}
               render={(props) => (
-                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Fermer" />
+                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={t("close")} />
               )}
             />
           </div>
@@ -1036,7 +1043,11 @@ export function FileBrowser() {
                 {item.status === "error" && <XCircleIcon size={18} className="text-kumo-danger" />}
                 <span className="flex-1 truncate">{item.name}</span>
                 <span className="text-kumo-subtle">
-                  {item.status === "uploading" ? "Envoi…" : item.status === "success" ? "Terminé" : "Échec"}
+                  {item.status === "uploading"
+                    ? t("uploadStatusUploading")
+                    : item.status === "success"
+                      ? t("uploadStatusSuccess")
+                      : t("uploadStatusError")}
                 </span>
               </div>
             ))}
@@ -1045,7 +1056,7 @@ export function FileBrowser() {
           {uploadQueue.length > 0 && uploadQueue.every((item) => item.status !== "uploading") && (
             <div className="flex justify-end mt-4">
               <Button variant="secondary" size="sm" onClick={() => setIsUploadDialogOpen(false)}>
-                Fermer
+                {t("close")}
               </Button>
             </div>
           )}
@@ -1057,31 +1068,29 @@ export function FileBrowser() {
         <Dialog className="p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
             <Dialog.Title className="text-lg font-semibold">
-              Supprimer {selectedIds.size} élément{selectedIds.size > 1 ? "s" : ""} ?
+              {t("deleteConfirmTitle", { count: selectedIds.size })}
             </Dialog.Title>
             <Dialog.Close
-              aria-label="Fermer"
+              aria-label={t("close")}
               render={(props) => (
-                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label="Fermer" disabled={bulkDeleting} />
+                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={t("close")} disabled={bulkDeleting} />
               )}
             />
           </div>
 
-          <Text variant="secondary">
-            Cette action déplacera les éléments sélectionnés vers la corbeille. Vous pourrez les restaurer tant qu&apos;elle n&apos;a pas été vidée.
-          </Text>
+          <Text variant="secondary">{t("deleteConfirmBody")}</Text>
 
           <div className="mt-4 flex justify-end gap-2">
             <Button variant="secondary" size="sm" onClick={() => setBulkDeleteOpen(false)} disabled={bulkDeleting}>
-              Annuler
+              {t("cancel")}
             </Button>
             <Button variant="destructive" size="sm" onClick={handleBulkDeleteConfirm} disabled={bulkDeleting}>
               {bulkDeleting ? (
                 <span className="flex items-center gap-1.5">
-                  <Loader size="sm" /> Suppression…
+                  <Loader size="sm" /> {t("deleting")}
                 </span>
               ) : (
-                "Supprimer"
+                t("delete")
               )}
             </Button>
           </div>
