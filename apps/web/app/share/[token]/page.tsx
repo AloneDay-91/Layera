@@ -6,6 +6,8 @@ import { ShareDownloadButton } from "@/components/files/share-download-button";
 import { InvalidShareLink } from "@/components/files/invalid-share-link";
 import { SharePasswordGate } from "@/components/files/share-password-gate";
 import { shareUnlockCookieName, verifyShareUnlock } from "@/lib/share-unlock";
+import en from "@/messages/en.json";
+import fr from "@/messages/fr.json";
 
 type SharePageProps = {
   params: Promise<{ token: string }>;
@@ -13,6 +15,8 @@ type SharePageProps = {
 
 export default async function PublicSharePage({ params }: SharePageProps) {
   const { token } = await params;
+  const cookieStoreForLocale = await cookies();
+  const t = cookieStoreForLocale.get("filecloud-locale")?.value === "fr" ? fr.sharePage : en.sharePage;
 
   const [sRecord] = await db
     .select()
@@ -58,8 +62,7 @@ export default async function PublicSharePage({ params }: SharePageProps) {
   }
 
   if (sRecord.passwordHash) {
-    const cookieStore = await cookies();
-    const unlocked = verifyShareUnlock(token, cookieStore.get(shareUnlockCookieName(token))?.value);
+    const unlocked = verifyShareUnlock(token, cookieStoreForLocale.get(shareUnlockCookieName(token))?.value);
     if (!unlocked) {
       return <SharePasswordGate token={token} />;
     }
@@ -77,7 +80,7 @@ export default async function PublicSharePage({ params }: SharePageProps) {
             {itemInfo.name}
           </Text>
           <Text variant="secondary" DANGEROUS_className="mt-1">
-            {itemInfo.type === "folder" ? "Dossier partagé" : `${itemInfo.mimeType ?? "Fichier"} • ${Math.round((itemInfo.size ?? 0) / 1024)} KB`}
+            {itemInfo.type === "folder" ? t.sharedFolder : `${itemInfo.mimeType ?? t.genericFile} • ${Math.round((itemInfo.size ?? 0) / 1024)} KB`}
           </Text>
         </div>
 
@@ -85,7 +88,7 @@ export default async function PublicSharePage({ params }: SharePageProps) {
           <ShareDownloadButton href={`/api/shares/download?token=${token}`} filename={itemInfo.name} />
         ) : (
           <Button variant="secondary" size="base" className="w-full" disabled>
-            Aperçu du dossier partagé
+            {t.sharedFolderPreview}
           </Button>
         )}
       </LayerCard>

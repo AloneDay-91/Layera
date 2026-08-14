@@ -505,6 +505,28 @@
       "oauthSignUpDescription": "Connexion avec {provider}…"
     }
   },
+  "sharePage": {
+    "sharedFolder": "Dossier partagé",
+    "sharedFolderPreview": "Aperçu du dossier partagé",
+    "genericFile": "Fichier"
+  },
+  "sharePasswordGate": {
+    "title": "Ce lien est protégé",
+    "description": "Entrez le mot de passe fourni par la personne qui a partagé ce contenu.",
+    "passwordLabel": "Mot de passe",
+    "wrongPassword": "Mot de passe incorrect.",
+    "genericError": "Une erreur est survenue.",
+    "verifying": "Vérification…",
+    "unlock": "Déverrouiller"
+  },
+  "invalidShareLink": {
+    "title": "Ce lien n'est plus valide",
+    "description": "Il a peut-être expiré, été révoqué par son propriétaire, ou l'élément partagé a été supprimé.",
+    "backHome": "Retour à l'accueil"
+  },
+  "shareDownloadButton": {
+    "download": "Télécharger le fichier"
+  },
   "settings": {
     "language": "Langue",
     "languageDescription": "Choisissez la langue utilisée dans l'interface.",

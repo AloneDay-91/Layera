@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button, Input, LayerCard, Loader, Text } from "@cloudflare/kumo";
 import { LockIcon } from "@phosphor-icons/react";
 
 export function SharePasswordGate({ token }: { token: string }) {
   const router = useRouter();
+  const t = useTranslations("sharePasswordGate");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -27,11 +29,11 @@ export function SharePasswordGate({ token }: { token: string }) {
       if (res.ok) {
         router.refresh();
       } else {
-        setError("Mot de passe incorrect.");
+        setError(t("wrongPassword"));
       }
     } catch (err) {
       console.error("Unlock error:", err);
-      setError("Une erreur est survenue.");
+      setError(t("genericError"));
     } finally {
       setSubmitting(false);
     }
@@ -46,10 +48,10 @@ export function SharePasswordGate({ token }: { token: string }) {
 
         <div>
           <Text as="h1" variant="heading2">
-            Ce lien est protégé
+            {t("title")}
           </Text>
           <Text variant="secondary" DANGEROUS_className="mt-1">
-            Entrez le mot de passe fourni par la personne qui a partagé ce contenu.
+            {t("description")}
           </Text>
         </div>
 
@@ -57,7 +59,7 @@ export function SharePasswordGate({ token }: { token: string }) {
           <Input
             size="sm"
             type="password"
-            label="Mot de passe"
+            label={t("passwordLabel")}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -71,10 +73,10 @@ export function SharePasswordGate({ token }: { token: string }) {
           <Button variant="primary" size="base" type="submit" className="w-full" disabled={submitting}>
             {submitting ? (
               <span className="flex items-center gap-1.5">
-                <Loader size="sm" /> Vérification…
+                <Loader size="sm" /> {t("verifying")}
               </span>
             ) : (
-              "Déverrouiller"
+              t("unlock")
             )}
           </Button>
         </form>
