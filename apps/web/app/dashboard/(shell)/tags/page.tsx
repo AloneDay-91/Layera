@@ -18,12 +18,14 @@ import {
 } from "@cloudflare/kumo";
 import type { BadgeVariant } from "@cloudflare/kumo";
 import { PencilSimpleIcon, PlusIcon, TagIcon, TrashIcon, XIcon } from "@phosphor-icons/react";
+import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
 import { ClientOnly } from "@/components/shell/client-only";
 import { TAG_COLOR_OPTIONS, type TagColorValue, type WorkspaceTag } from "@/lib/tags";
 
 export default function TagsPage() {
   const toasts = useKumoToastManager();
+  const { data: activeOrg } = authClient.useActiveOrganization();
 
   const [tags, setTags] = useState<WorkspaceTag[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +60,7 @@ export default function TagsPage() {
 
   useEffect(() => {
     fetchTags();
-  }, []);
+  }, [activeOrg?.id]);
 
   async function handleCreateSubmit(e: React.FormEvent) {
     e.preventDefault();

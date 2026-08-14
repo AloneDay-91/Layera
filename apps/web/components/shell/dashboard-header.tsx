@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Input, Meter, Sidebar, Text } from "@cloudflare/kumo";
 import { AccountSwitcher } from "./account-switcher";
+import { authClient } from "@/lib/auth-client";
 import { formatFileSize } from "@/lib/mock-files";
 import { onStorageUpdated } from "@/lib/storage-events";
 
@@ -31,6 +32,7 @@ export function DashboardHeader() {
 
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") ?? "");
   const [storage, setStorage] = useState<StorageSummary | null>(null);
+  const { data: activeOrg } = authClient.useActiveOrganization();
 
   useEffect(() => {
     function fetchStorage() {
@@ -41,9 +43,9 @@ export function DashboardHeader() {
     }
     fetchStorage();
     return onStorageUpdated(fetchStorage);
-  }, []);
+  }, [activeOrg?.id]);
 
-  const pageLabel = PAGE_LABELS[pathname] ?? "FileCloud";
+  const pageLabel = PAGE_LABELS[pathname] ?? "Layera";
   const usedPercent = storage && storage.quotaBytes > 0 ? Math.min(100, (storage.usedBytes / storage.quotaBytes) * 100) : 0;
 
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {

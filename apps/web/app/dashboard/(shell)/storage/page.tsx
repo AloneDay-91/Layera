@@ -12,6 +12,7 @@ import {
   FilmStripIcon,
   DotsThreeCircleIcon,
 } from "@phosphor-icons/react";
+import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
 import { ClientOnly } from "@/components/shell/client-only";
 import { formatFileSize } from "@/lib/mock-files";
@@ -34,6 +35,7 @@ const CATEGORY_META = [
 ];
 
 export default function StoragePage() {
+  const { data: activeOrg } = authClient.useActiveOrganization();
   const [stats, setStats] = useState<StorageStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -52,7 +54,7 @@ export default function StoragePage() {
       }
     }
     fetchStats();
-  }, []);
+  }, [activeOrg?.id]);
 
   const usedPercent = stats && stats.quotaBytes > 0 ? Math.min(100, (stats.usedBytes / stats.quotaBytes) * 100) : 0;
 

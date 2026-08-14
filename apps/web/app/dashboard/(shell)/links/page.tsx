@@ -17,6 +17,7 @@ import {
   useKumoToastManager,
 } from "@cloudflare/kumo";
 import { LinkIcon, CopyIcon, XCircleIcon, PencilSimpleIcon, XIcon, LockIcon, ClockIcon, CalendarIcon } from "@phosphor-icons/react";
+import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
 import { ClientOnly } from "@/components/shell/client-only";
 
@@ -39,6 +40,7 @@ function endOfDay(date: Date): Date {
 
 export default function LinksPage() {
   const toasts = useKumoToastManager();
+  const { data: activeOrg } = authClient.useActiveOrganization();
   const [shares, setShares] = useState<ShareLinkItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [revokingId, setRevokingId] = useState<string | null>(null);
@@ -66,7 +68,7 @@ export default function LinksPage() {
 
   useEffect(() => {
     fetchShares();
-  }, []);
+  }, [activeOrg?.id]);
 
   function shareUrl(token: string) {
     return `${window.location.origin}/share/${token}`;

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Badge, Breadcrumbs, Button, LayerCard, Loader, SkeletonLine, Table, Text, useKumoToastManager } from "@cloudflare/kumo";
 import { TrashIcon, ArrowCounterClockwiseIcon, XCircleIcon } from "@phosphor-icons/react";
+import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
 import { ClientOnly } from "@/components/shell/client-only";
 import { notifyStorageUpdated } from "@/lib/storage-events";
@@ -21,6 +22,7 @@ type TrashedItem = {
 
 export default function TrashPage() {
   const toasts = useKumoToastManager();
+  const { data: activeOrg } = authClient.useActiveOrganization();
   const [items, setItems] = useState<TrashedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
@@ -42,7 +44,7 @@ export default function TrashPage() {
 
   useEffect(() => {
     fetchTrash();
-  }, []);
+  }, [activeOrg?.id]);
 
   async function handleRestore(item: TrashedItem) {
     setActionId(item.id);

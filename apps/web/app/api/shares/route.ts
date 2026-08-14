@@ -6,6 +6,20 @@ import { randomBytes } from "crypto";
 import { hashSharePassword } from "@/lib/share-password";
 import { checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 
+async function getActiveWorkspace(session: NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>) {
+  const activeOrgId = session.session.activeOrganizationId;
+  if (activeOrgId) {
+    const found = await db.select().from(workspace).where(eq(workspace.organizationId, activeOrgId)).limit(1);
+    return found[0];
+  }
+  const found = await db
+    .select()
+    .from(workspace)
+    .where(and(eq(workspace.ownerId, session.user.id), isNull(workspace.organizationId)))
+    .limit(1);
+  return found[0];
+}
+
 export async function GET() {
   try {
     const session = await auth.api.getSession({
@@ -16,10 +30,21 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const wsRecord = await getActiveWorkspace(session);
+    if (!wsRecord) {
+      return NextResponse.json({ shares: [] });
+    }
+
     const shares = await db
       .select()
       .from(shareLink)
-      .where(and(eq(shareLink.createdBy, session.user.id), isNull(shareLink.revokedAt)));
+      .where(
+        and(
+          eq(shareLink.workspaceId, wsRecord.id),
+          eq(shareLink.createdBy, session.user.id),
+          isNull(shareLink.revokedAt),
+        ),
+      );
 
     const result = [];
     for (const s of shares) {
@@ -80,23 +105,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing itemId or itemType" }, { status: 400 });
     }
 
-    const activeOrgId = session.session.activeOrganizationId;
-    let wsRecord;
-    if (activeOrgId) {
-      const found = await db
-        .select()
-        .from(workspace)
-        .where(eq(workspace.organizationId, activeOrgId))
-        .limit(1);
-      wsRecord = found[0];
-    } else {
-      const found = await db
-        .select()
-        .from(workspace)
-        .where(and(eq(workspace.ownerId, session.user.id), isNull(workspace.organizationId)))
-        .limit(1);
-      wsRecord = found[0];
-    }
+    const wsRecord = await getActiveWorkspace(session);
 
     if (!wsRecord) {
       return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
@@ -123,6 +132,7 @@ export async function POST(request: Request) {
     const values: {
       token: string;
       createdBy: string;
+      workspaceId: string;
       fileId?: string;
       folderId?: string;
       expiresAt?: Date;
@@ -130,6 +140,7 @@ export async function POST(request: Request) {
     } = {
       token,
       createdBy: session.user.id,
+      workspaceId: wsRecord.id,
     };
 
     if (itemType === "file") {

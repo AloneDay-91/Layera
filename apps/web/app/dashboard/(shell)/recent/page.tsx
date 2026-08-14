@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Breadcrumbs, Button, Dialog, Input, LayerCard, Loader, SkeletonLine, Table, Text, useKumoToastManager } from "@cloudflare/kumo";
 import { ClockIcon, CopyIcon, XIcon } from "@phosphor-icons/react";
+import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
 import { ClientOnly } from "@/components/shell/client-only";
 import { FilePreviewIcon } from "@/components/files/file-preview";
@@ -14,6 +15,7 @@ type RecentItem = MockItem & { location: string };
 
 export default function RecentPage() {
   const toasts = useKumoToastManager();
+  const { data: activeOrg } = authClient.useActiveOrganization();
   const [items, setItems] = useState<RecentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export default function RecentPage() {
 
   useEffect(() => {
     fetchRecent();
-  }, []);
+  }, [activeOrg?.id]);
 
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedItemId) ?? null,

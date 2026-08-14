@@ -17,6 +17,7 @@ export type MockItem = {
   owner: string;
   isFavorite?: boolean;
   tags?: ItemTag[];
+  color?: string | null;
 };
 
 export const MOCK_ITEMS: MockItem[] = [
