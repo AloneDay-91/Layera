@@ -13,6 +13,7 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   TrashIcon,
+  FileZipIcon,
 } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { ClientOnly } from "@/components/shell/client-only";
@@ -549,6 +550,49 @@ export function FileBrowser() {
     }
   }
 
+  function triggerDownload(url: string) {
+    const link = document.createElement("a");
+    link.href = url;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  function handleDownloadZip(item: MockItem) {
+    triggerDownload(`/api/files/zip?items=${item.id}:${item.type}`);
+  }
+
+  function handleDownloadSelectedZip() {
+    const targets = items.filter((i) => selectedIds.has(i.id));
+    if (targets.length === 0) return;
+    const query = targets.map((i) => `${i.id}:${i.type}`).join(",");
+    triggerDownload(`/api/files/zip?items=${encodeURIComponent(query)}`);
+  }
+
+  async function handleExtractZip(item: MockItem) {
+    toasts.add({ title: "Extraction en cours…", description: `Décompression de "${item.name}"…` });
+    try {
+      const res = await fetch("/api/files/unzip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Failed to extract archive");
+
+      toasts.add({
+        title: "Archive extraite",
+        description: `"${item.name}" extrait dans "${data.folder.name}" (${data.extractedCount} élément${data.extractedCount > 1 ? "s" : ""}).`,
+      });
+      fetchFiles(currentFolderId, searchQuery);
+      notifyStorageUpdated();
+    } catch (err) {
+      console.error("Extract zip error:", err);
+      const message = err instanceof Error ? err.message : "Impossible d'extraire cette archive.";
+      toasts.add({ title: "Erreur", description: message });
+    }
+  }
+
   async function handleToggleTag(tag: WorkspaceTag) {
     const item = manageTagsItem;
     if (!item) return;
@@ -700,6 +744,14 @@ export function FileBrowser() {
                 Tout désélectionner
               </Button>
               <Button
+                variant="secondary"
+                size="sm"
+                icon={FileZipIcon}
+                onClick={handleDownloadSelectedZip}
+              >
+                Compresser
+              </Button>
+              <Button
                 variant="destructive"
                 size="sm"
                 icon={TrashIcon}
@@ -767,6 +819,8 @@ export function FileBrowser() {
             onToggleFavorite={handleToggleFavorite}
             onManageTags={setManageTagsItem}
             onChangeColor={setColorItem}
+            onDownloadZip={handleDownloadZip}
+            onExtractZip={handleExtractZip}
             onMoveItem={handleMoveItem}
             selectedIds={selectedIds}
             onToggleSelectItem={toggleSelectItem}

@@ -24,6 +24,8 @@ type FileTableProps = {
   onToggleFavorite?: (item: MockItem) => void;
   onManageTags?: (item: MockItem) => void;
   onChangeColor?: (item: MockItem) => void;
+  onDownloadZip?: (item: MockItem) => void;
+  onExtractZip?: (item: MockItem) => void;
   onMoveItem?: (draggedItem: { id: string; type: "file" | "folder"; name: string }, targetFolderId: string) => void;
   selectedIds?: Set<string>;
   onToggleSelectItem?: (id: string) => void;
@@ -77,6 +79,8 @@ export function FileTable({
   onToggleFavorite,
   onManageTags,
   onChangeColor,
+  onDownloadZip,
+  onExtractZip,
   onMoveItem,
   selectedIds,
   onToggleSelectItem,
@@ -262,6 +266,8 @@ export function FileTable({
                       onToggleFavorite={onToggleFavorite}
                       onManageTags={onManageTags}
                       onChangeColor={onChangeColor}
+                      onDownloadZip={onDownloadZip}
+                      onExtractZip={onExtractZip}
                     />
                   </Table.Cell>
                 </Table.Row>

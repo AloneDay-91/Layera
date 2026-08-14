@@ -1,8 +1,9 @@
 "use client";
 
 import { DropdownMenu, Button } from "@cloudflare/kumo";
-import { DotsThreeIcon, PaintBucketIcon, PencilSimpleIcon, ShareIcon, StarIcon, TagIcon, TrashIcon } from "@phosphor-icons/react";
+import { DotsThreeIcon, FileZipIcon, PackageIcon, PaintBucketIcon, PencilSimpleIcon, ShareIcon, StarIcon, TagIcon, TrashIcon } from "@phosphor-icons/react";
 import type { MockItem } from "@/lib/mock-files";
+import { isZipFile } from "./file-preview";
 
 type FileRowMenuProps = {
   item: MockItem;
@@ -12,9 +13,21 @@ type FileRowMenuProps = {
   onToggleFavorite?: (item: MockItem) => void;
   onManageTags?: (item: MockItem) => void;
   onChangeColor?: (item: MockItem) => void;
+  onDownloadZip?: (item: MockItem) => void;
+  onExtractZip?: (item: MockItem) => void;
 };
 
-export function FileRowMenu({ item, onRename, onShare, onDelete, onToggleFavorite, onManageTags, onChangeColor }: FileRowMenuProps) {
+export function FileRowMenu({
+  item,
+  onRename,
+  onShare,
+  onDelete,
+  onToggleFavorite,
+  onManageTags,
+  onChangeColor,
+  onDownloadZip,
+  onExtractZip,
+}: FileRowMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger>
@@ -50,6 +63,16 @@ export function FileRowMenu({ item, onRename, onShare, onDelete, onToggleFavorit
         {item.type === "folder" && onChangeColor && (
           <DropdownMenu.Item icon={PaintBucketIcon} onClick={() => onChangeColor(item)}>
             Changer la couleur
+          </DropdownMenu.Item>
+        )}
+        {item.type === "folder" && onDownloadZip && (
+          <DropdownMenu.Item icon={FileZipIcon} onClick={() => onDownloadZip(item)}>
+            Télécharger en ZIP
+          </DropdownMenu.Item>
+        )}
+        {isZipFile(item) && onExtractZip && (
+          <DropdownMenu.Item icon={PackageIcon} onClick={() => onExtractZip(item)}>
+            Extraire
           </DropdownMenu.Item>
         )}
         <DropdownMenu.Separator />

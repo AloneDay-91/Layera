@@ -55,6 +55,10 @@ export function isPreviewableMarkdown(item: MockItem): boolean {
   return item.type === "file" && (item.mimeType === "text/markdown" || item.name.toLowerCase().endsWith(".md"));
 }
 
+export function isZipFile(item: MockItem): boolean {
+  return item.type === "file" && (item.mimeType === "application/zip" || item.name.toLowerCase().endsWith(".zip"));
+}
+
 export function isPreviewable(item: MockItem): boolean {
   return (
     isPreviewableImage(item) ||
