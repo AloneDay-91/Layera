@@ -40,7 +40,7 @@ export function PageHeader({
   children,
 }: PageHeaderProps) {
   return (
-    <header className={cn("flex flex-col border-b border-kumo-line px-6", SPACING_CLASSES[spacing], className)}>
+    <header className={cn("flex flex-col px-6", SPACING_CLASSES[spacing], className)}>
       {breadcrumbs && <div className="min-w-0">{breadcrumbs}</div>}
 
       {(title || description || children) && (
@@ -65,8 +65,9 @@ export function PageHeader({
       )}
 
       {tabs && tabs.length > 0 && (
-        <div className="-mb-4 mt-2">
+        <div className="-mb-2 mt-2">
           <Tabs
+            variant="underline"
             tabs={tabs}
             selectedValue={defaultTab}
             value={activeTab}

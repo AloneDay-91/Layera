@@ -68,7 +68,7 @@ export default async function PublicSharePage({ params }: SharePageProps) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-kumo-base p-6 text-kumo-default">
       <LayerCard className="w-full max-w-md px-8 py-7 flex flex-col items-center text-center gap-6">
-        <div className="flex size-16 items-center justify-center rounded-full bg-kumo-tint text-kumo-brand">
+        <div className="flex size-16 items-center justify-center rounded-full bg-kumo-tint text-kumo-info">
           {itemInfo.type === "folder" ? <FolderIcon size={36} /> : <FileIcon size={36} />}
         </div>
 

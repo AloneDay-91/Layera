@@ -25,6 +25,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" data-mode="light" className="h-full">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* eslint-disable-next-line @next/next/no-page-custom-font -- this is the root layout, applies to every route, not a single page; next/font/google doesn't bundle this font */}
+        <link
+          href="https://fonts.googleapis.com/css2?family=Stack+Sans+Notch:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-kumo-base text-kumo-default h-full`}
       >

@@ -121,7 +121,7 @@ export default function StoragePage() {
                 <LayerCard className="flex flex-col gap-1 p-4">
                   <div className="flex items-center justify-between text-kumo-subtle">
                     <Text as="span" variant="secondary" bold>Dossiers</Text>
-                    <FolderIcon size={20} className="text-kumo-warning" />
+                    <FolderIcon size={20} className="text-kumo-info" />
                   </div>
                   <Text as="p" variant="heading1" DANGEROUS_className="mt-1">
                     {stats.folderCount}
@@ -133,10 +133,13 @@ export default function StoragePage() {
                 <LayerCard className="flex flex-col gap-1 p-4">
                   <div className="flex items-center justify-between text-kumo-subtle">
                     <Text as="span" variant="secondary" bold>Espace total</Text>
-                    <HardDriveIcon size={20} className="text-kumo-brand" />
+                    <HardDriveIcon size={20} className="text-kumo-info" />
                   </div>
                   <Text as="p" variant="heading1" DANGEROUS_className="mt-1">
                     {formatFileSize(stats.usedBytes)}
+                  </Text>
+                  <Text as="span" variant="secondary" bold>
+                    {formatFileSize(stats.quotaBytes)}
                   </Text>
                 </LayerCard>
               </GridItem>

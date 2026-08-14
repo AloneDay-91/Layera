@@ -50,7 +50,7 @@ export function FileBreadcrumbs({ path, onNavigate, onMoveItem }: FileBreadcrumb
         onDrop={(e) => handleDropOnSegment(e, null)}
         className={
           isRootHovered
-            ? "text-sm text-kumo-strong font-semibold bg-kumo-tint px-2 py-0.5 rounded border border-dashed border-kumo-brand"
+            ? "text-sm text-kumo-strong font-semibold bg-kumo-tint px-2 py-0.5 rounded border border-dashed border-kumo-info"
             : "text-sm text-kumo-subtle hover:text-kumo-default hover:underline"
         }
       >
@@ -74,7 +74,7 @@ export function FileBreadcrumbs({ path, onNavigate, onMoveItem }: FileBreadcrumb
                 onDrop={(e) => handleDropOnSegment(e, folder.id)}
                 className={
                   isHovered
-                    ? "text-sm font-semibold bg-kumo-tint px-2 py-0.5 rounded border border-dashed border-kumo-brand"
+                    ? "text-sm font-semibold bg-kumo-tint px-2 py-0.5 rounded border border-dashed border-kumo-info"
                     : "text-sm"
                 }
               >
@@ -92,7 +92,7 @@ export function FileBreadcrumbs({ path, onNavigate, onMoveItem }: FileBreadcrumb
                 onDrop={(e) => handleDropOnSegment(e, folder.id)}
                 className={
                   isHovered
-                    ? "text-sm text-kumo-strong font-semibold bg-kumo-tint px-2 py-0.5 rounded border border-dashed border-kumo-brand"
+                    ? "text-sm text-kumo-strong font-semibold bg-kumo-tint px-2 py-0.5 rounded border border-dashed border-kumo-info"
                     : "text-sm text-kumo-subtle hover:text-kumo-default hover:underline"
                 }
               >

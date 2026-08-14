@@ -179,7 +179,7 @@ export default function FavoritesPage() {
                           aria-pressed
                           className="flex items-center justify-center border-0 bg-transparent p-1"
                         >
-                          <StarIcon size={16} weight="fill" className="text-kumo-warning" />
+                          <StarIcon size={16} weight="fill" className="text-kumo-info" />
                         </button>
                       </Table.Cell>
                       <Table.Cell>
