@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { authClient } from "@/lib/auth-client";
 import { Button, Input, LayerCard, Link, Loader, Tabs, Text, useKumoToastManager } from "@cloudflare/kumo";
 import {
@@ -31,6 +32,10 @@ export default function LoginPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
 
+  const t = useTranslations("loginPage");
+  const tErrors = useTranslations("loginPage.errors");
+  const tToasts = useTranslations("loginPage.toasts");
+
   async function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
@@ -38,7 +43,7 @@ export default function LoginPage() {
     const { data, error: signInError } = await authClient.signIn.email({ email, password });
     setSubmitting(false);
     if (signInError) {
-      setError(signInError.message ?? "Échec de la connexion");
+      setError(signInError.message ?? tErrors("signInFailed"));
       return;
     }
     if (data && "twoFactorRedirect" in data && data.twoFactorRedirect) {
@@ -46,7 +51,7 @@ export default function LoginPage() {
       // dans le client Better Auth ; on n'ouvre pas de session ici.
       return;
     }
-    toasts.add({ title: "Connexion réussie", description: "Bienvenue sur Layera." });
+    toasts.add({ title: tToasts("signInSuccessTitle"), description: tToasts("signInSuccessDescription") });
     router.push("/dashboard");
   }
 
@@ -60,13 +65,13 @@ export default function LoginPage() {
     });
     setSendingOtp(false);
     if (otpError) {
-      setError(otpError.message ?? "Impossible d'envoyer le code OTP");
+      setError(otpError.message ?? tErrors("otpSendFailed"));
       return;
     }
     setOtpSent(true);
     toasts.add({
-      title: "Code envoyé",
-      description: `Un code de vérification OTP a été envoyé à ${otpEmail}.`,
+      title: tToasts("codeSentTitle"),
+      description: tToasts("codeSentDescription", { email: otpEmail }),
     });
   }
 
@@ -80,17 +85,17 @@ export default function LoginPage() {
     });
     setSubmitting(false);
     if (verifyError) {
-      setError(verifyError.message ?? "Code OTP invalide ou expiré");
+      setError(verifyError.message ?? tErrors("otpInvalid"));
       return;
     }
-    toasts.add({ title: "Validation OTP réussie", description: "Connexion autorisée." });
+    toasts.add({ title: tToasts("otpSuccessTitle"), description: tToasts("otpSuccessDescription") });
     router.push("/dashboard");
   }
 
   async function handleSocialSignIn(provider: "github" | "google") {
     toasts.add({
-      title: "Redirection OAuth",
-      description: `Connexion avec ${provider === "github" ? "GitHub" : "Google"} en cours…`,
+      title: tToasts("oauthRedirectTitle"),
+      description: tToasts("oauthRedirectDescription", { provider: provider === "github" ? "GitHub" : "Google" }),
     });
     await authClient.signIn.social({
       provider,
@@ -109,7 +114,7 @@ export default function LoginPage() {
               Layera
             </Text>
           </div>
-          <Text variant="secondary">Connecte-toi à tes fichiers et espaces</Text>
+          <Text variant="secondary">{t("tagline")}</Text>
         </div>
 
         {/* Boutons de connexion Sociale */}
@@ -121,7 +126,7 @@ export default function LoginPage() {
             onClick={() => handleSocialSignIn("github")}
             className="w-full justify-center"
           >
-            Continuer avec GitHub
+            {t("continueWithGithub")}
           </Button>
           <Button
             variant="secondary"
@@ -130,7 +135,7 @@ export default function LoginPage() {
             onClick={() => handleSocialSignIn("google")}
             className="w-full justify-center"
           >
-            Continuer avec Google
+            {t("continueWithGoogle")}
           </Button>
         </div>
 
@@ -138,7 +143,7 @@ export default function LoginPage() {
         <div className="relative my-6 flex items-center justify-center">
           <div className="w-full border-t border-kumo-line" />
           <Text as="span" variant="secondary" DANGEROUS_className="absolute bg-kumo-base px-3">
-            Ou email
+            {t("orEmail")}
           </Text>
         </div>
 
@@ -153,7 +158,7 @@ export default function LoginPage() {
                 value: "password",
                 label: (
                   <span className="flex items-center justify-center gap-1.5 w-full">
-                    <KeyIcon size={14} /> Mot de passe
+                    <KeyIcon size={14} /> {t("password")}
                   </span>
                 ),
                 className: "w-full flex items-center justify-center text-center"
@@ -162,7 +167,7 @@ export default function LoginPage() {
                 value: "otp",
                 label: (
                   <span className="flex items-center justify-center gap-1.5 w-full">
-                    <EnvelopeSimpleIcon size={14} /> Code OTP Email
+                    <EnvelopeSimpleIcon size={14} /> {t("otp")}
                   </span>
                 ),
                 className: "w-full flex items-center justify-center text-center"
@@ -182,18 +187,18 @@ export default function LoginPage() {
             <Input
               size="sm"
               type="email"
-              label="Email"
+              label={t("emailLabel")}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              placeholder="toi@exemple.com"
+              placeholder={t("emailPlaceholder")}
             />
 
             <Input
               size="sm"
               type="password"
-              label="Mot de passe"
+              label={t("passwordLabel")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -212,10 +217,10 @@ export default function LoginPage() {
             >
               {submitting ? (
                 <span className="flex items-center gap-1.5">
-                  <Loader size="sm" /> Connexion en cours…
+                  <Loader size="sm" /> {t("signingIn")}
                 </span>
               ) : (
-                "Se connecter"
+                t("signIn")
               )}
             </Button>
           </form>
@@ -229,12 +234,12 @@ export default function LoginPage() {
                 <Input
                   size="sm"
                   type="email"
-                  label="Adresse email"
+                  label={t("emailAddressLabel")}
                   value={otpEmail}
                   onChange={(e) => setOtpEmail(e.target.value)}
                   required
                   autoComplete="email"
-                  placeholder="toi@exemple.com"
+                  placeholder={t("emailPlaceholder")}
                   error={error ?? undefined}
                 />
                 <Button
@@ -247,22 +252,22 @@ export default function LoginPage() {
                 >
                   {sendingOtp ? (
                     <span className="flex items-center gap-1.5">
-                      <Loader size="sm" /> Envoi du code…
+                      <Loader size="sm" /> {t("sendingCode")}
                     </span>
                   ) : (
-                    "Recevoir un code par email"
+                    t("receiveCodeByEmail")
                   )}
                 </Button>
               </form>
             ) : (
               <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
                 <Text variant="secondary">
-                  Code à 6 chiffres envoyé à <strong className="text-kumo-strong">{otpEmail}</strong>.
+                  {t("codeSentTo")} <strong className="text-kumo-strong">{otpEmail}</strong>.
                 </Text>
                 <Input
                   size="sm"
                   type="text"
-                  label="Code de vérification OTP"
+                  label={t("otpCodeLabel")}
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value)}
                   required
@@ -278,7 +283,7 @@ export default function LoginPage() {
                     onClick={() => setOtpSent(false)}
                     className="w-1/3 justify-center"
                   >
-                    Changer
+                    {t("change")}
                   </Button>
                   <Button
                     variant="primary"
@@ -290,10 +295,10 @@ export default function LoginPage() {
                   >
                     {submitting ? (
                       <span className="flex items-center gap-1.5">
-                        <Loader size="sm" /> Vérification…
+                        <Loader size="sm" /> {t("verifying")}
                       </span>
                     ) : (
-                      "Valider le code"
+                      t("validateCode")
                     )}
                   </Button>
                 </div>
@@ -305,8 +310,8 @@ export default function LoginPage() {
         {/* Footer redirection vers l'inscription */}
         <div className="mt-6 text-center">
           <Text variant="secondary">
-            Pas encore de compte ?{" "}
-            <Link href="/register">Créer un compte</Link>
+            {t("noAccountYet")}{" "}
+            <Link href="/register">{t("createAccount")}</Link>
           </Text>
         </div>
       </LayerCard>

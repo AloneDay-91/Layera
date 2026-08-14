@@ -433,6 +433,44 @@
       "keyboardShortcutsFeature": "Raccourcis Clavier"
     }
   },
+  "loginPage": {
+    "tagline": "Connecte-toi à tes fichiers et espaces",
+    "continueWithGithub": "Continuer avec GitHub",
+    "continueWithGoogle": "Continuer avec Google",
+    "orEmail": "Ou email",
+    "password": "Mot de passe",
+    "otp": "Code OTP Email",
+    "emailLabel": "Email",
+    "emailPlaceholder": "toi@exemple.com",
+    "passwordLabel": "Mot de passe",
+    "signingIn": "Connexion en cours…",
+    "signIn": "Se connecter",
+    "emailAddressLabel": "Adresse email",
+    "sendingCode": "Envoi du code…",
+    "receiveCodeByEmail": "Recevoir un code par email",
+    "codeSentTo": "Code à 6 chiffres envoyé à",
+    "otpCodeLabel": "Code de vérification OTP",
+    "change": "Changer",
+    "verifying": "Vérification…",
+    "validateCode": "Valider le code",
+    "noAccountYet": "Pas encore de compte ?",
+    "createAccount": "Créer un compte",
+    "errors": {
+      "signInFailed": "Échec de la connexion",
+      "otpSendFailed": "Impossible d'envoyer le code OTP",
+      "otpInvalid": "Code OTP invalide ou expiré"
+    },
+    "toasts": {
+      "signInSuccessTitle": "Connexion réussie",
+      "signInSuccessDescription": "Bienvenue sur Layera.",
+      "codeSentTitle": "Code envoyé",
+      "codeSentDescription": "Un code de vérification OTP a été envoyé à {email}.",
+      "otpSuccessTitle": "Validation OTP réussie",
+      "otpSuccessDescription": "Connexion autorisée.",
+      "oauthRedirectTitle": "Redirection OAuth",
+      "oauthRedirectDescription": "Connexion avec {provider} en cours…"
+    }
+  },
   "settings": {
     "language": "Langue",
     "languageDescription": "Choisissez la langue utilisée dans l'interface.",

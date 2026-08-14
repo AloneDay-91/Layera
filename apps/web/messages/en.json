@@ -433,6 +433,44 @@
       "keyboardShortcutsFeature": "Keyboard Shortcuts"
     }
   },
+  "loginPage": {
+    "tagline": "Sign in to your files and workspaces",
+    "continueWithGithub": "Continue with GitHub",
+    "continueWithGoogle": "Continue with Google",
+    "orEmail": "Or email",
+    "password": "Password",
+    "otp": "Email OTP code",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "passwordLabel": "Password",
+    "signingIn": "Signing in…",
+    "signIn": "Sign in",
+    "emailAddressLabel": "Email address",
+    "sendingCode": "Sending code…",
+    "receiveCodeByEmail": "Receive a code by email",
+    "codeSentTo": "A 6-digit code was sent to",
+    "otpCodeLabel": "OTP verification code",
+    "change": "Change",
+    "verifying": "Verifying…",
+    "validateCode": "Validate code",
+    "noAccountYet": "Don't have an account yet?",
+    "createAccount": "Create an account",
+    "errors": {
+      "signInFailed": "Sign-in failed",
+      "otpSendFailed": "Could not send the OTP code",
+      "otpInvalid": "Invalid or expired OTP code"
+    },
+    "toasts": {
+      "signInSuccessTitle": "Signed in successfully",
+      "signInSuccessDescription": "Welcome to Layera.",
+      "codeSentTitle": "Code sent",
+      "codeSentDescription": "A verification OTP code was sent to {email}.",
+      "otpSuccessTitle": "OTP verified",
+      "otpSuccessDescription": "Sign-in authorized.",
+      "oauthRedirectTitle": "OAuth redirect",
+      "oauthRedirectDescription": "Signing in with {provider}…"
+    }
+  },
   "settings": {
     "language": "Language",
     "languageDescription": "Choose the language used across the interface.",
