@@ -6,36 +6,10 @@ import { getMimeTypeFromFilename } from "@/lib/mime";
 import { checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 import { getAuthorizedWorkspace } from "@/lib/services/permissions";
 import { jsonError } from "@/lib/services/http";
+import { uniqueFolderName, uniqueFileName } from "@/lib/services/names";
 
 const MAX_ZIP_ENTRIES = 2000;
 const MAX_TOTAL_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
-
-async function dedupeFolderName(workspaceId: string, parentId: string, baseName: string) {
-  const siblings = await db
-    .select({ name: folder.name })
-    .from(folder)
-    .where(and(eq(folder.workspaceId, workspaceId), eq(folder.parentId, parentId)));
-  const taken = new Set(siblings.map((s) => s.name));
-  if (!taken.has(baseName)) return baseName;
-  let n = 2;
-  while (taken.has(`${baseName} (${n})`)) n++;
-  return `${baseName} (${n})`;
-}
-
-async function dedupeFileName(workspaceId: string, folderId: string, baseName: string) {
-  const siblings = await db
-    .select({ name: file.name })
-    .from(file)
-    .where(and(eq(file.workspaceId, workspaceId), eq(file.folderId, folderId)));
-  const taken = new Set(siblings.map((s) => s.name));
-  if (!taken.has(baseName)) return baseName;
-  const dot = baseName.lastIndexOf(".");
-  const stem = dot > 0 ? baseName.slice(0, dot) : baseName;
-  const ext = dot > 0 ? baseName.slice(dot) : "";
-  let n = 2;
-  while (taken.has(`${stem} (${n})${ext}`)) n++;
-  return `${stem} (${n})${ext}`;
-}
 
 export async function POST(request: Request) {
   try {
@@ -80,14 +54,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const baseFolderName = await dedupeFolderName(
+    const baseFolderName = await uniqueFolderName(
       workspaceId,
       zipFile.folderId,
       zipFile.name.replace(/\.zip$/i, "") || "archive",
     );
     const [destFolder] = await db
       .insert(folder)
-      .values({ workspaceId, parentId: zipFile.folderId, name: baseFolderName })
+      .values({ workspaceId, parentId: zipFile.folderId, name: baseFolderName, createdBy: ctx.actor.id })
       .returning();
     if (!destFolder) {
       return NextResponse.json({ error: "Failed to create destination folder" }, { status: 500 });
@@ -104,10 +78,10 @@ export async function POST(request: Request) {
       const parentPath = segments.slice(0, -1).join("/");
       const parentId = await ensureFolder(parentPath);
 
-      const finalName = await dedupeFolderName(workspaceId, parentId, name);
+      const finalName = await uniqueFolderName(workspaceId, parentId, name);
       const [created] = await db
         .insert(folder)
-        .values({ workspaceId, parentId, name: finalName })
+        .values({ workspaceId, parentId, name: finalName, createdBy: ctx.actor.id })
         .returning();
       folderIdByPath.set(dirPath, created!.id);
       return created!.id;
@@ -141,7 +115,7 @@ export async function POST(request: Request) {
       }
 
       const parentId = await ensureFolder(dirPath);
-      const finalName = await dedupeFileName(workspaceId, parentId, rawName);
+      const finalName = await uniqueFileName(workspaceId, parentId, rawName);
       const mimeType = getMimeTypeFromFilename(finalName);
       const storageKey = `workspaces/${workspaceId}/${crypto.randomUUID()}`;
 
@@ -155,6 +129,7 @@ export async function POST(request: Request) {
         mimeType,
         size: content.length,
         storageKey,
+        createdBy: ctx.actor.id,
       });
       extractedCount++;
     }

@@ -12,6 +12,7 @@ import {
 import { ServiceError } from "./errors";
 import type { AuthorizedContext } from "./permissions";
 import { resolveFolderInWorkspace } from "./files";
+import { uniqueFileName } from "./names";
 import { recordAudit } from "./audit";
 
 const PRESIGN_EXPIRY_SECONDS = 15 * 60;
@@ -104,15 +105,17 @@ export async function completeUpload(ctx: AuthorizedContext, uploadId: string) {
     throw new ServiceError(400, "Uploaded size does not match");
   }
 
+  const name = await uniqueFileName(ctx.workspace.id, row.folderId, row.fileName);
   const [created] = await db
     .insert(file)
     .values({
       workspaceId: ctx.workspace.id,
       folderId: row.folderId,
-      name: row.fileName,
+      name,
       mimeType: row.mimeType,
       size: storedSize,
       storageKey: row.storageKey,
+      createdBy: ctx.actor.id,
     })
     .returning();
   if (!created) throw new ServiceError(500, "Failed to create file");
