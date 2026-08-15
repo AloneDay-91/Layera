@@ -4,6 +4,7 @@ import { hashSharePassword } from "@/lib/share-password";
 import { ServiceError } from "./errors";
 import type { AuthorizedContext } from "./permissions";
 import { getFileInWorkspace, getFolderInWorkspace } from "./files";
+import { recordAudit } from "./audit";
 
 export async function listShareLinks(ctx: AuthorizedContext) {
   const shares = await db
@@ -87,6 +88,14 @@ export async function createShareLink(
   }
 
   const [created] = await db.insert(shareLink).values(values).returning();
+  await recordAudit({
+    workspaceId: ctx.workspace.id,
+    actorId: ctx.actor.id,
+    action: "share.create",
+    targetType: "share",
+    targetId: created?.id,
+    metadata: { itemType: input.itemType, itemId: input.itemId },
+  });
   return {
     id: created?.id,
     token: created?.token,
@@ -139,4 +148,11 @@ export async function revokeShareLink(ctx: AuthorizedContext, shareId: string) {
     )
     .returning();
   if (!updated) throw new ServiceError(404, "Share link not found");
+  await recordAudit({
+    workspaceId: ctx.workspace.id,
+    actorId: ctx.actor.id,
+    action: "share.revoke",
+    targetType: "share",
+    targetId: updated.id,
+  });
 }

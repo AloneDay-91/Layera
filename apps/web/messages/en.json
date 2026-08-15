@@ -374,7 +374,33 @@
   },
   "activityPage": {
     "title": "Activity logs",
-    "description": "History of actions, creations, deletions, and shares."
+    "description": "History of actions, creations, deletions, and shares.",
+    "emptyTitle": "No activity yet",
+    "emptyDescription": "File, folder, and sharing actions will show up here.",
+    "columns": {
+      "when": "When",
+      "actor": "Actor",
+      "action": "Action",
+      "target": "Target"
+    },
+    "actions": {
+      "file.upload": "File uploaded",
+      "file.rename": "File renamed",
+      "file.move": "File moved",
+      "file.trash": "File moved to trash",
+      "file.delete": "File deleted",
+      "file.download": "File downloaded",
+      "file.restore": "File restored",
+      "folder.create": "Folder created",
+      "folder.rename": "Folder renamed",
+      "folder.move": "Folder moved",
+      "folder.trash": "Folder moved to trash",
+      "folder.delete": "Folder deleted",
+      "folder.restore": "Folder restored",
+      "share.create": "Share link created",
+      "share.revoke": "Share link revoked",
+      "share.download": "Downloaded via public link"
+    }
   },
   "sharedPage": {
     "breadcrumb": "Shared with me",

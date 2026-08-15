@@ -3,6 +3,7 @@ import { minioClient, S3_BUCKET } from "@filecloud/storage";
 import { getAuthorizedWorkspace } from "@/lib/services/permissions";
 import { getFileInWorkspace } from "@/lib/services/files";
 import { jsonError } from "@/lib/services/http";
+import { recordAudit } from "@/lib/services/audit";
 
 // SVG and HTML are deliberately excluded — they can embed <script> and
 // execute it when navigated to directly (Content-Disposition: inline),
@@ -37,6 +38,17 @@ export async function GET(request: Request) {
     }
 
     const fRecord = await getFileInWorkspace(ctx.workspace.id, id);
+    const rangeHeader = request.headers.get("range");
+    if (!rangeHeader || rangeHeader.startsWith("bytes=0-") || rangeHeader.startsWith("bytes=-")) {
+      void recordAudit({
+        workspaceId: ctx.workspace.id,
+        actorId: ctx.actor.id,
+        action: "file.download",
+        targetType: "file",
+        targetId: fRecord.id,
+        metadata: { name: fRecord.name },
+      });
+    }
 
     const isSafeInline = INLINE_SAFE_MIME_TYPES.has(fRecord.mimeType);
     const contentType = isSafeInline ? fRecord.mimeType : "application/octet-stream";

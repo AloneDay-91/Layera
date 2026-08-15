@@ -374,7 +374,33 @@
   },
   "activityPage": {
     "title": "Journaux d'activité",
-    "description": "Historique des actions, créations, suppressions et partages."
+    "description": "Historique des actions, créations, suppressions et partages.",
+    "emptyTitle": "Aucune activité",
+    "emptyDescription": "Les actions sur les fichiers, dossiers et partages apparaîtront ici.",
+    "columns": {
+      "when": "Date",
+      "actor": "Auteur",
+      "action": "Action",
+      "target": "Cible"
+    },
+    "actions": {
+      "file.upload": "Fichier envoyé",
+      "file.rename": "Fichier renommé",
+      "file.move": "Fichier déplacé",
+      "file.trash": "Fichier mis à la corbeille",
+      "file.delete": "Fichier supprimé",
+      "file.download": "Fichier téléchargé",
+      "file.restore": "Fichier restauré",
+      "folder.create": "Dossier créé",
+      "folder.rename": "Dossier renommé",
+      "folder.move": "Dossier déplacé",
+      "folder.trash": "Dossier mis à la corbeille",
+      "folder.delete": "Dossier supprimé",
+      "folder.restore": "Dossier restauré",
+      "share.create": "Lien de partage créé",
+      "share.revoke": "Lien de partage révoqué",
+      "share.download": "Téléchargement via un lien public"
+    }
   },
   "sharedPage": {
     "breadcrumb": "Partagés avec moi",

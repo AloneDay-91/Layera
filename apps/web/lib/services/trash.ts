@@ -10,6 +10,7 @@ import {
 import { ServiceError } from "./errors";
 import type { AuthorizedContext } from "./permissions";
 import { getFileInWorkspace, getFolderInWorkspace } from "./files";
+import { recordAudit } from "./audit";
 
 export async function listTrashedItems(ctx: AuthorizedContext) {
   const trashedRows = await db.select().from(trashItem).where(eq(trashItem.workspaceId, ctx.workspace.id));
@@ -60,6 +61,13 @@ export async function restoreTrashedItem(ctx: AuthorizedContext, input: { id: st
     .limit(1);
   if (!row) throw new ServiceError(404, "Item not found");
   await db.delete(trashItem).where(eq(trashItem.id, row.id));
+  await recordAudit({
+    workspaceId: ctx.workspace.id,
+    actorId: ctx.actor.id,
+    action: input.type === "file" ? "file.restore" : "folder.restore",
+    targetType: input.type,
+    targetId: input.id,
+  });
 }
 
 export async function emptyTrash(ctx: AuthorizedContext) {
@@ -73,6 +81,13 @@ export async function emptyTrash(ctx: AuthorizedContext) {
     await db.delete(favorite).where(and(eq(favorite.itemId, tRow.itemId), eq(favorite.workspaceId, ctx.workspace.id)));
   }
   await db.delete(trashItem).where(eq(trashItem.workspaceId, ctx.workspace.id));
+  await recordAudit({
+    workspaceId: ctx.workspace.id,
+    actorId: ctx.actor.id,
+    action: "file.delete",
+    targetType: "folder",
+    metadata: { emptied: true, count: trashedRows.length },
+  });
 }
 
 export async function permanentlyDeleteTrashedItem(
@@ -95,4 +110,11 @@ export async function permanentlyDeleteTrashedItem(
   }
   await db.delete(favorite).where(and(eq(favorite.itemId, input.id), eq(favorite.workspaceId, ctx.workspace.id)));
   await db.delete(trashItem).where(eq(trashItem.id, row.id));
+  await recordAudit({
+    workspaceId: ctx.workspace.id,
+    actorId: ctx.actor.id,
+    action: input.type === "file" ? "file.delete" : "folder.delete",
+    targetType: input.type,
+    targetId: input.id,
+  });
 }

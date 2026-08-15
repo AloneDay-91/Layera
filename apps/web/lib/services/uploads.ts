@@ -12,6 +12,7 @@ import {
 import { ServiceError } from "./errors";
 import type { AuthorizedContext } from "./permissions";
 import { resolveFolderInWorkspace } from "./files";
+import { recordAudit } from "./audit";
 
 const PRESIGN_EXPIRY_SECONDS = 15 * 60;
 const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES ?? 5 * 1024 * 1024 * 1024);
@@ -117,6 +118,15 @@ export async function completeUpload(ctx: AuthorizedContext, uploadId: string) {
   if (!created) throw new ServiceError(500, "Failed to create file");
 
   await db.update(upload).set({ status: "completed" }).where(eq(upload.id, row.id));
+
+  await recordAudit({
+    workspaceId: ctx.workspace.id,
+    actorId: ctx.actor.id,
+    action: "file.upload",
+    targetType: "file",
+    targetId: created.id,
+    metadata: { name: created.name, size: created.size },
+  });
 
   return {
     id: created.id,

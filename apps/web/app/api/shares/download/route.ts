@@ -4,6 +4,7 @@ import { db, shareLink, file, eq } from "@filecloud/db";
 import { minioClient, S3_BUCKET } from "@filecloud/storage";
 import { shareUnlockCookieName, verifyShareUnlock } from "@/lib/share-unlock";
 import { checkRateLimit, getClientIp, rateLimitedResponse } from "@/lib/rate-limit";
+import { recordAudit } from "@/lib/services/audit";
 
 export async function GET(request: Request) {
   try {
@@ -60,6 +61,15 @@ export async function GET(request: Request) {
         chunks.push(Buffer.from(chunk));
       }
       const fileBuffer = Buffer.concat(chunks);
+
+      void recordAudit({
+        workspaceId: sRecord.workspaceId,
+        actorId: sRecord.createdBy,
+        action: "share.download",
+        targetType: "file",
+        targetId: fRecord.id,
+        metadata: { name: fRecord.name, public: true },
+      });
 
       return new NextResponse(fileBuffer, {
         headers: {

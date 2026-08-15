@@ -15,6 +15,7 @@ import {
 import { FOLDER_COLOR_OPTIONS } from "@/lib/folder-colors";
 import { ServiceError } from "./errors";
 import type { AuthorizedContext } from "./permissions";
+import { recordAudit } from "./audit";
 
 const FOLDER_COLOR_VALUES = new Set<string>(FOLDER_COLOR_OPTIONS.map((opt) => opt.value));
 
@@ -201,6 +202,16 @@ export async function createFolder(ctx: AuthorizedContext, input: { name: string
       name,
     })
     .returning();
+  if (created) {
+    await recordAudit({
+      workspaceId: ctx.workspace.id,
+      actorId: ctx.actor.id,
+      action: "folder.create",
+      targetType: "folder",
+      targetId: created.id,
+      metadata: { name: created.name },
+    });
+  }
   return created;
 }
 
@@ -236,6 +247,25 @@ export async function updateFolder(
     .where(and(eq(folder.id, input.id), eq(folder.workspaceId, ctx.workspace.id)))
     .returning();
   if (!updated) throw new ServiceError(404, "Folder not found");
+  if (input.name !== undefined) {
+    await recordAudit({
+      workspaceId: ctx.workspace.id,
+      actorId: ctx.actor.id,
+      action: "folder.rename",
+      targetType: "folder",
+      targetId: updated.id,
+      metadata: { name: updated.name },
+    });
+  } else if (input.targetFolderId !== undefined) {
+    await recordAudit({
+      workspaceId: ctx.workspace.id,
+      actorId: ctx.actor.id,
+      action: "folder.move",
+      targetType: "folder",
+      targetId: updated.id,
+      metadata: { name: updated.name },
+    });
+  }
   return updated;
 }
 
@@ -264,6 +294,25 @@ export async function updateFile(
     .where(and(eq(file.id, input.id), eq(file.workspaceId, ctx.workspace.id)))
     .returning();
   if (!updated) throw new ServiceError(404, "File not found");
+  if (input.name !== undefined) {
+    await recordAudit({
+      workspaceId: ctx.workspace.id,
+      actorId: ctx.actor.id,
+      action: "file.rename",
+      targetType: "file",
+      targetId: updated.id,
+      metadata: { name: updated.name },
+    });
+  } else if (input.targetFolderId !== undefined) {
+    await recordAudit({
+      workspaceId: ctx.workspace.id,
+      actorId: ctx.actor.id,
+      action: "file.move",
+      targetType: "file",
+      targetId: updated.id,
+      metadata: { name: updated.name },
+    });
+  }
   return updated;
 }
 
@@ -294,6 +343,13 @@ export async function trashItemInWorkspace(
     deletedBy: ctx.actor.id,
     purgeAt,
   });
+  await recordAudit({
+    workspaceId: ctx.workspace.id,
+    actorId: ctx.actor.id,
+    action: input.type === "file" ? "file.trash" : "folder.trash",
+    targetType: input.type,
+    targetId: input.id,
+  });
 }
 
 export async function permanentlyDeleteItem(
@@ -309,4 +365,11 @@ export async function permanentlyDeleteItem(
   }
   await db.delete(trashItem).where(and(eq(trashItem.itemId, input.id), eq(trashItem.workspaceId, ctx.workspace.id)));
   await db.delete(favorite).where(and(eq(favorite.itemId, input.id), eq(favorite.workspaceId, ctx.workspace.id)));
+  await recordAudit({
+    workspaceId: ctx.workspace.id,
+    actorId: ctx.actor.id,
+    action: input.type === "file" ? "file.delete" : "folder.delete",
+    targetType: input.type,
+    targetId: input.id,
+  });
 }
