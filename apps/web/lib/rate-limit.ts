@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { db, rateLimit, eq } from "@filecloud/db";
+import { db, rateLimit, sql } from "@filecloud/db";
 
 type RateLimitRule = { windowSeconds: number; max: number };
 
@@ -14,11 +14,9 @@ export function getClientIp(request: Request): string {
   return "unknown";
 }
 
-// Read-then-write against a shared Postgres table (reuses Better Auth's own
-// `rate_limit` schema/table). Not perfectly atomic under heavy concurrency,
-// but sufficient as an abuse guard on our own routes (upload, share creation,
-// share password unlock) — Better Auth's built-in limiter only covers its
-// own auth endpoints, not these custom ones.
+// Atomic upsert against Better Auth's `rate_limit` table. Concurrent first
+// hits (e.g. many /api/files/content thumbnail requests) used to race on
+// INSERT and 500 with rate_limit_key_unique.
 export async function checkRateLimit(
   key: string,
   rule: RateLimitRule,
@@ -26,26 +24,33 @@ export async function checkRateLimit(
   const now = Date.now();
   const windowMs = rule.windowSeconds * 1000;
 
-  const [existing] = await db.select().from(rateLimit).where(eq(rateLimit.key, key)).limit(1);
+  const [row] = await db
+    .insert(rateLimit)
+    .values({ id: randomUUID(), key, count: 1, lastRequest: now })
+    .onConflictDoUpdate({
+      target: rateLimit.key,
+      set: {
+        count: sql`CASE
+          WHEN ${now} - COALESCE(${rateLimit.lastRequest}, 0) > ${windowMs} THEN 1
+          ELSE COALESCE(${rateLimit.count}, 0) + 1
+        END`,
+        lastRequest: sql`CASE
+          WHEN ${now} - COALESCE(${rateLimit.lastRequest}, 0) > ${windowMs} THEN ${now}
+          WHEN COALESCE(${rateLimit.count}, 0) >= ${rule.max} THEN ${rateLimit.lastRequest}
+          ELSE ${now}
+        END`,
+      },
+    })
+    .returning();
 
-  if (!existing) {
-    await db.insert(rateLimit).values({ id: randomUUID(), key, count: 1, lastRequest: now });
-    return { allowed: true, retryAfter: null };
-  }
+  const count = row?.count ?? 1;
+  const lastRequest = row?.lastRequest ?? now;
 
-  const lastRequest = existing.lastRequest ?? 0;
-  if (now - lastRequest > windowMs) {
-    await db.update(rateLimit).set({ count: 1, lastRequest: now }).where(eq(rateLimit.key, key));
-    return { allowed: true, retryAfter: null };
-  }
-
-  const count = existing.count ?? 0;
-  if (count >= rule.max) {
+  if (count > rule.max) {
     const retryAfter = Math.max(1, Math.ceil((lastRequest + windowMs - now) / 1000));
     return { allowed: false, retryAfter };
   }
 
-  await db.update(rateLimit).set({ count: count + 1, lastRequest: now }).where(eq(rateLimit.key, key));
   return { allowed: true, retryAfter: null };
 }
 
