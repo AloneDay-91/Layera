@@ -30,6 +30,7 @@ export async function POST(request: Request) {
     cookieStore.set(WORKSPACE_COOKIE, workspaceId, {
       httpOnly: true,
       sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
       path: "/",
     });
     return NextResponse.json({ success: true, workspaceId });

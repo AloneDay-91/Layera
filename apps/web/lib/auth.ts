@@ -111,6 +111,9 @@ export const auth = betterAuth({
   ],
   secret: betterAuthSecret,
   baseURL: process.env.BETTER_AUTH_URL,
+  trustedOrigins: [process.env.BETTER_AUTH_URL, process.env.NEXT_PUBLIC_BETTER_AUTH_URL].filter(
+    (value): value is string => Boolean(value),
+  ),
   databaseHooks: {
     user: {
       create: {

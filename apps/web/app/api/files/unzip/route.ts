@@ -1,15 +1,22 @@
 import { NextResponse } from "next/server";
 import JSZip from "jszip";
 import { db, folder, file, eq, and } from "@filecloud/db";
-import { minioClient, S3_BUCKET } from "@filecloud/storage";
+import { ensureBucket, objectStorageKey, putStoredObject, minioClient, S3_BUCKET } from "@filecloud/storage";
 import { getMimeTypeFromFilename } from "@/lib/mime";
 import { checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 import { getAuthorizedWorkspace } from "@/lib/services/permissions";
 import { jsonError } from "@/lib/services/http";
 import { uniqueFolderName, uniqueFileName } from "@/lib/services/names";
+import { sanitizeZipDirPath, sanitizeZipEntryPath } from "@/lib/zip-path";
 
-const MAX_ZIP_ENTRIES = 2000;
-const MAX_TOTAL_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
+const MAX_ZIP_ENTRIES = 500;
+const MAX_COMPRESSED_BYTES = 512 * 1024 * 1024;
+const MAX_TOTAL_UNCOMPRESSED_BYTES = 512 * 1024 * 1024;
+
+function declaredUncompressedSize(entry: JSZip.JSZipObject): number {
+  const data = (entry as { _data?: { uncompressedSize?: number } })._data;
+  return typeof data?.uncompressedSize === "number" ? data.uncompressedSize : 0;
+}
 
 export async function POST(request: Request) {
   try {
@@ -40,6 +47,9 @@ export async function POST(request: Request) {
     if (zipFile.mimeType !== "application/zip" && !zipFile.name.toLowerCase().endsWith(".zip")) {
       return NextResponse.json({ error: "Not a zip file" }, { status: 400 });
     }
+    if (zipFile.size > MAX_COMPRESSED_BYTES) {
+      return NextResponse.json({ error: "Archive is too large to extract" }, { status: 413 });
+    }
 
     const stream = await minioClient.getObject(S3_BUCKET, zipFile.storageKey);
     const chunks: Buffer[] = [];
@@ -52,6 +62,23 @@ export async function POST(request: Request) {
         { error: `Archive contains too many entries (max ${MAX_ZIP_ENTRIES})` },
         { status: 400 },
       );
+    }
+
+    let declaredTotal = 0;
+    for (const entry of entries) {
+      if (entry.dir) {
+        if (sanitizeZipDirPath(entry.name) === null) {
+          return NextResponse.json({ error: "Archive contains an unsafe path" }, { status: 400 });
+        }
+        continue;
+      }
+      if (!sanitizeZipEntryPath(entry.name)) {
+        return NextResponse.json({ error: "Archive contains an unsafe path" }, { status: 400 });
+      }
+      declaredTotal += declaredUncompressedSize(entry);
+      if (declaredTotal > MAX_TOTAL_UNCOMPRESSED_BYTES) {
+        return NextResponse.json({ error: "Archive is too large once extracted" }, { status: 413 });
+      }
     }
 
     const baseFolderName = await uniqueFolderName(
@@ -87,41 +114,36 @@ export async function POST(request: Request) {
       return created!.id;
     }
 
-    const bucketExists = await minioClient.bucketExists(S3_BUCKET).catch(() => false);
-    if (!bucketExists) {
-      await minioClient.makeBucket(S3_BUCKET, "").catch(() => {});
-    }
+    await ensureBucket();
 
     let totalUncompressedBytes = 0;
     let extractedCount = 0;
 
     for (const entry of entries) {
-      const normalizedPath = entry.name.replace(/\/+$/, "");
-
       if (entry.dir) {
-        await ensureFolder(normalizedPath);
+        const dirPath = sanitizeZipDirPath(entry.name);
+        if (dirPath === null) {
+          return NextResponse.json({ error: "Archive contains an unsafe path" }, { status: 400 });
+        }
+        if (dirPath) await ensureFolder(dirPath);
         continue;
       }
 
-      const lastSlash = normalizedPath.lastIndexOf("/");
-      const dirPath = lastSlash >= 0 ? normalizedPath.slice(0, lastSlash) : "";
-      const rawName = lastSlash >= 0 ? normalizedPath.slice(lastSlash + 1) : normalizedPath;
-      if (!rawName) continue;
+      const parsed = sanitizeZipEntryPath(entry.name);
+      if (!parsed) continue;
 
       const content = await entry.async("nodebuffer");
       totalUncompressedBytes += content.length;
       if (totalUncompressedBytes > MAX_TOTAL_UNCOMPRESSED_BYTES) {
-        return NextResponse.json({ error: "Archive is too large once extracted" }, { status: 400 });
+        return NextResponse.json({ error: "Archive is too large once extracted" }, { status: 413 });
       }
 
-      const parentId = await ensureFolder(dirPath);
-      const finalName = await uniqueFileName(workspaceId, parentId, rawName);
+      const parentId = await ensureFolder(parsed.dirPath);
+      const finalName = await uniqueFileName(workspaceId, parentId, parsed.fileName);
       const mimeType = getMimeTypeFromFilename(finalName);
-      const storageKey = `workspaces/${workspaceId}/${crypto.randomUUID()}`;
+      const storageKey = objectStorageKey(workspaceId, crypto.randomUUID());
 
-      await minioClient.putObject(S3_BUCKET, storageKey, content, content.length, {
-        "Content-Type": mimeType,
-      });
+      await putStoredObject(storageKey, content, content.length, mimeType);
       await db.insert(file).values({
         workspaceId,
         folderId: parentId,

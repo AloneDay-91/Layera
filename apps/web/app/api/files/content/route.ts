@@ -7,6 +7,7 @@ import { jsonError } from "@/lib/services/http";
 import { recordAudit } from "@/lib/services/audit";
 import { ServiceError } from "@/lib/services/errors";
 import { storedObjectResponse } from "@/lib/http-file";
+import { checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 
 // SVG and HTML are deliberately excluded — they can embed <script> and
 // execute it when navigated to directly (Content-Disposition: inline),
@@ -33,6 +34,11 @@ const INLINE_SAFE_MIME_TYPES = new Set([
 export async function GET(request: Request) {
   try {
     const session = await requireSession();
+    const { allowed, retryAfter } = await checkRateLimit(`file-content:${session.user.id}`, {
+      windowSeconds: 60,
+      max: 120,
+    });
+    if (!allowed) return rateLimitedResponse(retryAfter!);
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 

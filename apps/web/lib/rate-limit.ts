@@ -4,9 +4,14 @@ import { db, rateLimit, eq } from "@filecloud/db";
 type RateLimitRule = { windowSeconds: number; max: number };
 
 export function getClientIp(request: Request): string {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  if (forwardedFor) return forwardedFor.split(",")[0]!.trim();
-  return request.headers.get("x-real-ip") ?? "unknown";
+  const trustProxy = process.env.TRUST_PROXY === "true" || process.env.NODE_ENV === "production";
+  if (trustProxy) {
+    const forwardedFor = request.headers.get("x-forwarded-for");
+    if (forwardedFor) return forwardedFor.split(",")[0]!.trim();
+    const realIp = request.headers.get("x-real-ip");
+    if (realIp) return realIp;
+  }
+  return "unknown";
 }
 
 // Read-then-write against a shared Postgres table (reuses Better Auth's own
