@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { db, user, organization, workspaceMember } from "./client";
+import { db, user, organization, workspaceMember, file } from "./client";
 import { provisionOrganizationWorkspace, provisionPersonalWorkspace } from "./provisioning";
 import { requireWorkspaceAccess, requireWorkspaceMember, WorkspaceAccessError } from "./access";
 
@@ -89,5 +89,33 @@ describe("workspace access", () => {
       .where(eq(workspaceMember.userId, memberId));
     expect(row?.workspaceId).toBe(provisioned.workspaceId);
     expect(row?.role).toBe("member");
+  });
+
+  it("does not leak files from one personal workspace into another", async () => {
+    const ownerA = await insertUser("Owner A");
+    const ownerB = await insertUser("Owner B");
+    createdUserIds.push(ownerA, ownerB);
+
+    const wsA = await provisionPersonalWorkspace({ userId: ownerA, userName: "Owner A" });
+    const wsB = await provisionPersonalWorkspace({ userId: ownerB, userName: "Owner B" });
+
+    await db.insert(file).values({
+      workspaceId: wsA.workspaceId,
+      folderId: wsA.rootFolderId,
+      name: "secret.txt",
+      mimeType: "text/plain",
+      size: 12,
+      storageKey: `workspaces/${wsA.workspaceId}/${randomUUID()}`,
+    });
+
+    const filesInB = await db.select().from(file).where(eq(file.workspaceId, wsB.workspaceId));
+    expect(filesInB).toHaveLength(0);
+
+    const [secret] = await db.select().from(file).where(eq(file.workspaceId, wsA.workspaceId));
+    expect(secret?.name).toBe("secret.txt");
+
+    await expect(requireWorkspaceMember(ownerB, wsA.workspaceId)).rejects.toSatisfy(
+      (error: unknown) => error instanceof WorkspaceAccessError && error.status === 403,
+    );
   });
 });
