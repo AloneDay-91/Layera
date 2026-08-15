@@ -1,15 +1,9 @@
 import { db, workspace, workspaceMember, user, eq, and } from "@filecloud/db";
 import type { WorkspaceRole } from "@filecloud/types";
 import { ServiceError } from "./errors";
-import type { AuthorizedContext } from "./permissions";
+import { assertOwner, type AuthorizedContext } from "./permissions";
 import { findUserByEmail } from "./users";
 import { recordAudit } from "./audit";
-
-function assertOwner(ctx: AuthorizedContext) {
-  if (ctx.role !== "owner") {
-    throw new ServiceError(403, "Only the workspace owner can manage members");
-  }
-}
 
 export async function listAccessibleWorkspaces(actorId: string) {
   const rows = await db
@@ -60,7 +54,7 @@ export async function listWorkspaceMembers(ctx: AuthorizedContext) {
 export async function inviteWorkspaceMember(ctx: AuthorizedContext, email: string) {
   assertOwner(ctx);
   const target = await findUserByEmail(email);
-  if (!target) throw new ServiceError(404, "No account with this email");
+  if (!target) throw new ServiceError(400, "Unable to add this user");
   if (target.id === ctx.actor.id) throw new ServiceError(400, "You are already a member");
 
   const [existing] = await db

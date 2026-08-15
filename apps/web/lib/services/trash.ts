@@ -15,6 +15,7 @@ import { getFileInWorkspace, getFolderInWorkspace } from "./files";
 import { recordAudit } from "./audit";
 import { collectItemStorageKeys, deleteStoredFiles } from "./storage-cleanup";
 import { collectDescendantItems } from "./tree";
+import { assertOwner } from "./permissions";
 
 export async function listTrashedItems(ctx: AuthorizedContext) {
   await purgeExpiredTrash(ctx.workspace.id);
@@ -81,6 +82,7 @@ export async function restoreTrashedItem(ctx: AuthorizedContext, input: { id: st
 }
 
 export async function emptyTrash(ctx: AuthorizedContext) {
+  assertOwner(ctx);
   const trashedRows = await db.select().from(trashItem).where(eq(trashItem.workspaceId, ctx.workspace.id));
   const storageKeys: string[] = [];
   for (const tRow of trashedRows) {
@@ -112,6 +114,7 @@ export async function permanentlyDeleteTrashedItem(
   ctx: AuthorizedContext,
   input: { id: string; type: "file" | "folder" },
 ) {
+  assertOwner(ctx);
   const [row] = await db
     .select()
     .from(trashItem)

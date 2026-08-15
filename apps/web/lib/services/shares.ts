@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { hashSharePassword } from "@/lib/share-password";
 import { ServiceError } from "./errors";
 import type { AuthorizedContext } from "./permissions";
+import { assertOwner } from "./permissions";
 import { getFileInWorkspace, getFolderInWorkspace } from "./files";
 import { recordAudit } from "./audit";
 
@@ -55,6 +56,7 @@ export async function createShareLink(
   ctx: AuthorizedContext,
   input: { itemId: string; itemType: "file" | "folder"; expiresAt?: string | null; password?: string },
 ) {
+  assertOwner(ctx);
   if (input.itemType === "file") {
     await getFileInWorkspace(ctx.workspace.id, input.itemId);
   } else {
@@ -107,6 +109,7 @@ export async function updateShareLink(
   ctx: AuthorizedContext,
   input: { id: string; expiresAt?: string | null; password?: string | null },
 ) {
+  assertOwner(ctx);
   const [existing] = await db
     .select()
     .from(shareLink)
@@ -140,6 +143,7 @@ export async function updateShareLink(
 }
 
 export async function revokeShareLink(ctx: AuthorizedContext, shareId: string) {
+  assertOwner(ctx);
   const [updated] = await db
     .update(shareLink)
     .set({ revokedAt: new Date() })

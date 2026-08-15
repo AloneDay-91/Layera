@@ -6,6 +6,7 @@ import { recordAudit } from "./audit";
 import { usersByIds } from "./users";
 import { collectItemStorageKeys, deleteStoredFiles } from "./storage-cleanup";
 import { collectDescendantItems } from "./tree";
+import { assertOwner } from "./permissions";
 
 export async function listArchivedItems(ctx: AuthorizedContext) {
   const rows = await db.select().from(archiveItem).where(eq(archiveItem.workspaceId, ctx.workspace.id));
@@ -116,6 +117,7 @@ export async function permanentlyDeleteArchivedItem(
   ctx: AuthorizedContext,
   input: { id: string; type: "file" | "folder" },
 ) {
+  assertOwner(ctx);
   const [row] = await db
     .select()
     .from(archiveItem)

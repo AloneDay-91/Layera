@@ -28,6 +28,7 @@ export default function ArchivePage() {
   const [items, setItems] = useState<ArchivedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [canManage, setCanManage] = useState(false);
   const t = useTranslations("archivePage");
   const tToasts = useTranslations("archivePage.toasts");
   const tBreadcrumbs = useTranslations("fileBreadcrumbs");
@@ -50,6 +51,10 @@ export default function ArchivePage() {
 
   useEffect(() => {
     fetchArchive();
+    fetch("/api/workspace/members")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setCanManage(Boolean(data?.canManage)))
+      .catch(() => setCanManage(false));
   }, [activeOrg?.id]);
 
   async function handleRestore(item: ArchivedItem) {
@@ -161,6 +166,7 @@ export default function ArchivePage() {
                         >
                           {actionId === item.id ? <Loader size="sm" /> : t("restore")}
                         </Button>
+                        {canManage ? (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -170,6 +176,7 @@ export default function ArchivePage() {
                         >
                           {t("delete")}
                         </Button>
+                        ) : null}
                       </div>
                     </Table.Cell>
                   </Table.Row>

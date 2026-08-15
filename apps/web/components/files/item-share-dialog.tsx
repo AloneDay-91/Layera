@@ -27,6 +27,7 @@ export function ItemShareDialog({
   const [shares, setShares] = useState<ShareRow[]>([]);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [sharing, setSharing] = useState(false);
+  const [canManage, setCanManage] = useState(false);
 
   useEffect(() => {
     if (!item) return;
@@ -35,8 +36,14 @@ export function ItemShareDialog({
     setSelectedUserId("");
     fetch("/api/workspace/members")
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setMembers(data?.members ?? []))
-      .catch(() => setMembers([]));
+      .then((data) => {
+        setMembers(data?.members ?? []);
+        setCanManage(Boolean(data?.canManage));
+      })
+      .catch(() => {
+        setMembers([]);
+        setCanManage(false);
+      });
     fetch(`/api/item-shares?itemId=${item.id}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setShares(data?.shares ?? []))
@@ -126,10 +133,14 @@ export function ItemShareDialog({
         <Tabs
           variant="segmented"
           size="sm"
-          tabs={[
-            { value: "members", label: t("membersTab") },
-            { value: "link", label: t("linkTab") },
-          ]}
+          tabs={
+            canManage
+              ? [
+                  { value: "members", label: t("membersTab") },
+                  { value: "link", label: t("linkTab") },
+                ]
+              : [{ value: "members", label: t("membersTab") }]
+          }
           value={tab}
           onValueChange={(value) => {
             setTab(value);

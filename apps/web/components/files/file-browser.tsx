@@ -95,6 +95,7 @@ export function FileBrowser() {
 
   // État modale de couleur de dossier
   const [colorItem, setColorItem] = useState<FileItem | null>(null);
+  const [canManage, setCanManage] = useState(false);
 
   // État de sélection multiple et suppression groupée
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -190,6 +191,10 @@ export function FileBrowser() {
 
   useEffect(() => {
     fetchTags();
+    fetch("/api/workspace/members")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setCanManage(Boolean(data?.canManage)))
+      .catch(() => setCanManage(false));
   }, [activeOrg?.id]);
 
   const selectedItem = useMemo(
@@ -822,7 +827,7 @@ export function FileBrowser() {
             onDownloadZip={handleDownloadZip}
             onExtractZip={handleExtractZip}
             onArchive={handleArchiveItem}
-            onTransfer={setTransferItem}
+            onTransfer={canManage ? setTransferItem : undefined}
             onMoveItem={handleMoveItem}
             selectedIds={selectedIds}
             onToggleSelectItem={toggleSelectItem}

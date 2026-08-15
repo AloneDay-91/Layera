@@ -31,6 +31,7 @@ import { hiddenItemIds } from "./hidden";
 import { usersByIds } from "./users";
 import { collectItemStorageKeys, deleteStoredFiles } from "./storage-cleanup";
 import { assertFolderMoveAllowed, collectDescendantItems } from "./tree";
+import { assertOwner } from "./permissions";
 
 const FOLDER_COLOR_VALUES = new Set<string>(FOLDER_COLOR_OPTIONS.map((opt) => opt.value));
 
@@ -419,6 +420,7 @@ export async function permanentlyDeleteItem(
   ctx: AuthorizedContext,
   input: { id: string; type: "file" | "folder" },
 ) {
+  assertOwner(ctx);
   if (input.type === "file") {
     await getFileInWorkspace(ctx.workspace.id, input.id);
   } else {
@@ -481,6 +483,7 @@ export async function transferItem(
   ctx: AuthorizedContext,
   input: { id: string; type: "file" | "folder"; targetWorkspaceId: string; targetFolderId?: string | null },
 ) {
+  assertOwner(ctx);
   if (input.targetWorkspaceId === ctx.workspace.id) {
     throw new ServiceError(400, "Choose a different workspace");
   }

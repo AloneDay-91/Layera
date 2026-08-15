@@ -16,6 +16,12 @@ export type AuthorizedContext = AuthorizedWorkspace & {
   actor: SessionUser;
 };
 
+export function assertOwner(ctx: AuthorizedContext) {
+  if (ctx.role !== "owner") {
+    throw new ServiceError(403, "Only the workspace owner can perform this action");
+  }
+}
+
 export async function requireSession() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) {
