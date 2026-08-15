@@ -2,17 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Breadcrumbs, Button, Dialog, Input, LayerCard, Loader, SkeletonLine, Table, Text, useKumoToastManager } from "@cloudflare/kumo";
-import { CopyIcon, StarIcon, XIcon } from "@phosphor-icons/react";
+import { Breadcrumbs, LayerCard, SkeletonLine, Table, Text, useKumoToastManager } from "@cloudflare/kumo";
+import { PushPinIcon, StarIcon } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
 import { ClientOnly } from "@/components/shell/client-only";
 import { FilePreviewIcon } from "@/components/files/file-preview";
 import { FileRowMenu } from "@/components/files/file-row-menu";
 import { FileDetailsPanel } from "@/components/files/file-details-panel";
+import { ItemShareDialog } from "@/components/files/item-share-dialog";
 import { formatFileSize, type FileItem } from "@/lib/file-item";
 
-type FavoriteItem = FileItem & { location: string };
+type FavoriteItem = FileItem & { location: string; isPinned?: boolean };
 
 export default function FavoritesPage() {
   const toasts = useKumoToastManager();
@@ -22,12 +23,9 @@ export default function FavoritesPage() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   const [shareItem, setShareItem] = useState<FileItem | null>(null);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [sharing, setSharing] = useState(false);
 
   const t = useTranslations("favoritesPage");
   const tToasts = useTranslations("favoritesPage.toasts");
-  const tBrowser = useTranslations("fileBrowser");
   const tBrowserToasts = useTranslations("fileBrowser.toasts");
   const tTable = useTranslations("fileTable");
   const tBreadcrumbs = useTranslations("fileBreadcrumbs");
@@ -56,6 +54,33 @@ export default function FavoritesPage() {
     () => items.find((item) => item.id === selectedItemId) ?? null,
     [items, selectedItemId],
   );
+
+  async function handlePin(item: FileItem) {
+    const nextPinned = !item.isPinned;
+    setItems((prev) =>
+      [...prev.map((i) => (i.id === item.id ? { ...i, isPinned: nextPinned } : i))].sort((a, b) => {
+        if (Boolean(a.isPinned) !== Boolean(b.isPinned)) return a.isPinned ? -1 : 1;
+        return 0;
+      }),
+    );
+    try {
+      const res = await fetch("/api/favorites", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, pinned: nextPinned }),
+      });
+      if (!res.ok) throw new Error("Failed to pin favorite");
+      toasts.add({
+        title: nextPinned ? tToasts("pinnedTitle") : tToasts("unpinnedTitle"),
+        description: nextPinned
+          ? tToasts("pinnedDescription", { name: item.name })
+          : tToasts("unpinnedDescription", { name: item.name }),
+      });
+    } catch (err) {
+      console.error("Pin favorite error:", err);
+      fetchFavorites();
+    }
+  }
 
   async function handleToggleFavorite(item: FileItem) {
     setItems((prev) => prev.filter((i) => i.id !== item.id));
@@ -88,35 +113,8 @@ export default function FavoritesPage() {
     }
   }
 
-  async function handleShareItem(item: FileItem) {
+  function handleShareItem(item: FileItem) {
     setShareItem(item);
-    setShareUrl(null);
-    setSharing(true);
-    try {
-      const res = await fetch("/api/shares", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: item.id, itemType: item.type }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setShareUrl(`${window.location.origin}${data.share.url}`);
-      } else {
-        toasts.add({ title: tBrowserToasts("genericError"), description: tBrowserToasts("shareErrorDescription") });
-        setShareItem(null);
-      }
-    } catch (err) {
-      console.error("Share error:", err);
-      setShareItem(null);
-    } finally {
-      setSharing(false);
-    }
-  }
-
-  async function handleCopyShareUrl() {
-    if (!shareUrl) return;
-    await navigator.clipboard.writeText(shareUrl);
-    toasts.add({ title: tBrowserToasts("linkCopiedTitle"), description: tBrowserToasts("linkCopiedDescription") });
   }
 
   function handleDetailAction(action: string) {
@@ -180,18 +178,36 @@ export default function FavoritesPage() {
                   {items.map((item) => (
                     <Table.Row key={item.id} variant={selectedItemId === item.id ? "selected" : "default"}>
                       <Table.Cell>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleFavorite(item);
-                          }}
-                          aria-label={tTable("removeFavorite", { name: item.name })}
-                          aria-pressed
-                          className="flex items-center justify-center border-0 bg-transparent p-1"
-                        >
-                          <StarIcon size={16} weight="fill" className="text-kumo-info" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePin(item);
+                            }}
+                            aria-label={item.isPinned ? t("unpinAria", { name: item.name }) : t("pinAria", { name: item.name })}
+                            aria-pressed={item.isPinned}
+                            className="flex items-center justify-center border-0 bg-transparent p-1"
+                          >
+                            <PushPinIcon
+                              size={16}
+                              weight={item.isPinned ? "fill" : "regular"}
+                              className={item.isPinned ? "text-kumo-info" : "text-kumo-subtle"}
+                            />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleFavorite(item);
+                            }}
+                            aria-label={tTable("removeFavorite", { name: item.name })}
+                            aria-pressed
+                            className="flex items-center justify-center border-0 bg-transparent p-1"
+                          >
+                            <StarIcon size={16} weight="fill" className="text-kumo-info" />
+                          </button>
+                        </div>
                       </Table.Cell>
                       <Table.Cell>
                         <button
@@ -212,6 +228,7 @@ export default function FavoritesPage() {
                           onShare={handleShareItem}
                           onDelete={handleDeleteItem}
                           onToggleFavorite={handleToggleFavorite}
+                          onPin={handlePin}
                         />
                       </Table.Cell>
                     </Table.Row>
@@ -233,37 +250,7 @@ export default function FavoritesPage() {
         )}
       </div>
 
-      <Dialog.Root open={shareItem !== null} onOpenChange={(open) => !open && setShareItem(null)}>
-        <Dialog className="p-6">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold">{tBrowser("shareTitle", { name: shareItem?.name ?? "" })}</Dialog.Title>
-            <Dialog.Close
-              aria-label={tBrowser("close")}
-              render={(props) => (
-                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={tBrowser("close")} />
-              )}
-            />
-          </div>
-
-          {sharing ? (
-            <div className="flex items-center gap-2 py-4">
-              <Loader size="sm" /> {tBrowser("creatingLink")}
-            </div>
-          ) : shareUrl ? (
-            <div className="flex flex-col gap-4">
-              <Input size="sm" label={tBrowser("shareLinkLabel")} value={shareUrl} readOnly onFocus={(e) => e.target.select()} />
-              <div className="flex justify-end gap-2">
-                <Button variant="secondary" size="sm" type="button" onClick={() => setShareItem(null)}>
-                  {tBrowser("close")}
-                </Button>
-                <Button variant="primary" size="sm" icon={CopyIcon} onClick={handleCopyShareUrl}>
-                  {tBrowser("copyLink")}
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </Dialog>
-      </Dialog.Root>
+      <ItemShareDialog item={shareItem} onClose={() => setShareItem(null)} />
     </div>
   );
 }
