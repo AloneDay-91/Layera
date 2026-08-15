@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { db, folder, file, trashItem, eq, and, notInArray, desc } from "@filecloud/db";
+import { db, folder, file, eq, and, notInArray, desc } from "@filecloud/db";
 import { getAuthorizedWorkspace } from "@/lib/services/permissions";
 import { jsonError } from "@/lib/services/http";
+import { hiddenItemIds } from "@/lib/services/hidden";
+import { usersByIds } from "@/lib/services/users";
 
 const RECENT_LIMIT = 30;
 
@@ -10,18 +12,14 @@ export async function GET() {
     const ctx = await getAuthorizedWorkspace();
     const workspaceId = ctx.workspace.id;
 
-    const trashedRows = await db
-      .select({ itemId: trashItem.itemId })
-      .from(trashItem)
-      .where(eq(trashItem.workspaceId, workspaceId));
-    const trashedIds = trashedRows.map((t) => t.itemId);
+    const hiddenIds = [...(await hiddenItemIds(workspaceId))];
 
     const recentFiles = await db
       .select()
       .from(file)
       .where(
-        trashedIds.length > 0
-          ? and(eq(file.workspaceId, workspaceId), notInArray(file.id, trashedIds))
+        hiddenIds.length > 0
+          ? and(eq(file.workspaceId, workspaceId), notInArray(file.id, hiddenIds))
           : eq(file.workspaceId, workspaceId),
       )
       .orderBy(desc(file.updatedAt))
@@ -29,6 +27,7 @@ export async function GET() {
 
     const folders = await db.select().from(folder).where(eq(folder.workspaceId, workspaceId));
     const folderNameById = new Map(folders.map((f) => [f.id, f.name === "root" ? "Mes fichiers" : f.name]));
+    const owners = await usersByIds(recentFiles.map((f) => f.createdBy));
 
     const items = recentFiles.map((f) => ({
       id: f.id,
@@ -38,7 +37,8 @@ export async function GET() {
       mimeType: f.mimeType,
       size: f.size,
       updatedAt: f.updatedAt.toISOString(),
-      owner: ctx.actor.name,
+      owner: (f.createdBy && owners.get(f.createdBy)?.name) || ctx.actor.name,
+      ownerId: f.createdBy ?? ctx.actor.id,
       location: folderNameById.get(f.folderId) ?? "Mes fichiers",
     }));
 

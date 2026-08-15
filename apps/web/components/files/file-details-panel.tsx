@@ -9,6 +9,7 @@ import { formatFileSize } from "@/lib/file-item";
 import { FilePreviewIcon, getFileTypeLabel, isPreviewable } from "./file-preview";
 import { FilePreviewContent } from "./file-preview-content";
 import { TagBadgeList } from "./tag-badge-list";
+import { UserAvatar } from "./user-avatar";
 
 export function FileDetailsPanel({
   item,
@@ -77,9 +78,12 @@ export function FileDetailsPanel({
           <Text as="dt" variant="secondary">{t("size")}</Text>
           <dd className="font-medium text-kumo-default">{formatFileSize(item.size)}</dd>
         </div>
-        <div className="flex justify-between">
+        <div className="flex justify-between gap-2">
           <Text as="dt" variant="secondary">{t("owner")}</Text>
-          <dd className="font-medium text-kumo-default">{item.owner}</dd>
+          <dd className="flex items-center gap-2 font-medium text-kumo-default">
+            <UserAvatar userId={item.ownerId} name={item.owner} />
+            {item.owner}
+          </dd>
         </div>
         <div className="flex justify-between">
           <Text as="dt" variant="secondary">{t("modified")}</Text>
