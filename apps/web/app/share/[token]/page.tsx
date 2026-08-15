@@ -34,7 +34,6 @@ export default async function PublicSharePage({ params }: SharePageProps) {
     type: "file" | "folder";
     size?: number | null;
     mimeType?: string | null;
-    storageKey?: string;
     ownerId?: string | null;
     ownerName?: string | null;
   } | null = null;
@@ -50,7 +49,6 @@ export default async function PublicSharePage({ params }: SharePageProps) {
         type: "file",
         size: f.size,
         mimeType: f.mimeType,
-        storageKey: f.storageKey,
         ownerId: owner?.id ?? f.createdBy,
         ownerName: owner?.name ?? null,
       };
@@ -103,7 +101,7 @@ export default async function PublicSharePage({ params }: SharePageProps) {
           ) : null}
         </div>
 
-        {itemInfo.type === "file" && itemInfo.storageKey ? (
+        {itemInfo.type === "file" ? (
           <ShareDownloadButton href={`/api/shares/download?token=${token}`} filename={itemInfo.name} />
         ) : (
           <Button variant="secondary" size="base" className="w-full" disabled>

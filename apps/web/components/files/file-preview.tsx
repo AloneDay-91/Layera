@@ -111,7 +111,7 @@ export function FilePreviewIcon({ item, size = 20 }: { item: FileItem; size?: nu
   const [imgFailed, setImgFailed] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
 
-  if (isPreviewableImage(item) && !imgFailed) {
+  if (isPreviewableImage(item) && !imgFailed && (item.size == null || item.size <= 512 * 1024)) {
     return (
       <span className="relative inline-block shrink-0" style={{ width: size, height: size }}>
         {!imgLoaded && (
