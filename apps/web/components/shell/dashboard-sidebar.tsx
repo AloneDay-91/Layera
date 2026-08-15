@@ -14,6 +14,7 @@ import {
   ShareIcon,
   StarIcon,
   TagIcon,
+  ArchiveIcon,
 } from "@phosphor-icons/react";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 import { authClient } from "@/lib/auth-client";
@@ -26,6 +27,7 @@ export function DashboardSidebar() {
 
   const ORGANIZER_SUB_ITEMS = [
     { href: "/dashboard/links", label: t("shareLinks") },
+    { href: "/dashboard/archive", label: t("archive") },
     { href: "/dashboard/trash", label: t("trash") },
   ];
 
@@ -47,6 +49,9 @@ export function DashboardSidebar() {
             </Sidebar.MenuButton>
             <Sidebar.MenuButton icon={StarIcon} href="/dashboard/favorites" active={pathname === "/dashboard/favorites"}>
               {t("favorites")}
+            </Sidebar.MenuButton>
+            <Sidebar.MenuButton icon={ShareIcon} href="/dashboard/shared" active={pathname === "/dashboard/shared"}>
+              {t("sharedWithMe")}
             </Sidebar.MenuButton>
           </Sidebar.Menu>
         </Sidebar.Group>
@@ -116,20 +121,6 @@ export function DashboardSidebar() {
                 {t("admin")}
               </Sidebar.MenuButton>
             ) : null}
-          </Sidebar.Menu>
-        </Sidebar.Group>
-
-        {/* Bientôt disponible — pages pas encore branchées sur de vraies données */}
-        <Sidebar.Group>
-          <Sidebar.GroupLabel>{t("comingSoon")}</Sidebar.GroupLabel>
-          <Sidebar.Menu>
-            <Sidebar.MenuButton
-              icon={ShareIcon}
-              href="/dashboard/shared"
-              active={pathname === "/dashboard/shared"}
-            >
-              {t("sharedWithMe")}
-            </Sidebar.MenuButton>
           </Sidebar.Menu>
         </Sidebar.Group>
       </Sidebar.Content>

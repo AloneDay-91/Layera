@@ -25,6 +25,7 @@ export function DashboardHeader() {
     "/dashboard/shared": t("pages.shared"),
     "/dashboard/favorites": t("pages.favorites"),
     "/dashboard/links": t("pages.links"),
+    "/dashboard/archive": t("pages.archive"),
     "/dashboard/trash": t("pages.trash"),
     "/dashboard/tags": t("pages.tags"),
     "/dashboard/storage": t("pages.storage"),

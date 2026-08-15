@@ -9,15 +9,26 @@ export type AuditAction =
   | "file.delete"
   | "file.download"
   | "file.restore"
+  | "file.edit"
+  | "file.archive"
+  | "file.unarchive"
+  | "file.transfer"
   | "folder.create"
   | "folder.rename"
   | "folder.move"
   | "folder.trash"
   | "folder.delete"
   | "folder.restore"
+  | "folder.archive"
+  | "folder.unarchive"
+  | "folder.transfer"
   | "share.create"
   | "share.revoke"
-  | "share.download";
+  | "share.download"
+  | "share.internal"
+  | "share.internal-revoke"
+  | "member.invite"
+  | "member.remove";
 
 export async function recordAudit(input: {
   workspaceId: string;

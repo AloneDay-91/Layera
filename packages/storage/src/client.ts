@@ -77,3 +77,7 @@ export async function putStoredObject(
     "Content-Type": contentType,
   });
 }
+
+export async function copyStoredObject(sourceKey: string, destKey: string) {
+  await minioClient.copyObject(S3_BUCKET, destKey, `/${S3_BUCKET}/${sourceKey}`);
+}

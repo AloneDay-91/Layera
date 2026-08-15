@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { DropdownMenu, Button } from "@cloudflare/kumo";
-import { DotsThreeIcon, FileZipIcon, PackageIcon, PaintBucketIcon, PencilSimpleIcon, ShareIcon, StarIcon, TagIcon, TrashIcon } from "@phosphor-icons/react";
+import { DotsThreeIcon, ArchiveIcon, ArrowsLeftRightIcon, FileZipIcon, PackageIcon, PaintBucketIcon, PencilSimpleIcon, PushPinIcon, ShareIcon, StarIcon, TagIcon, TrashIcon } from "@phosphor-icons/react";
 import type { FileItem } from "@/lib/file-item";
 import { isZipFile } from "./file-preview";
 
@@ -16,6 +16,9 @@ type FileRowMenuProps = {
   onChangeColor?: (item: FileItem) => void;
   onDownloadZip?: (item: FileItem) => void;
   onExtractZip?: (item: FileItem) => void;
+  onArchive?: (item: FileItem) => void;
+  onTransfer?: (item: FileItem) => void;
+  onPin?: (item: FileItem) => void;
 };
 
 export function FileRowMenu({
@@ -28,6 +31,9 @@ export function FileRowMenu({
   onChangeColor,
   onDownloadZip,
   onExtractZip,
+  onArchive,
+  onTransfer,
+  onPin,
 }: FileRowMenuProps) {
   const t = useTranslations("fileRowMenu");
   const tTable = useTranslations("fileTable");
@@ -49,9 +55,19 @@ export function FileRowMenu({
             {item.isFavorite ? t("removeFavorite") : t("addFavorite")}
           </DropdownMenu.Item>
         )}
+        {onPin && (
+          <DropdownMenu.Item icon={PushPinIcon} onClick={() => onPin(item)}>
+            {item.isPinned ? t("unpin") : t("pin")}
+          </DropdownMenu.Item>
+        )}
         {onShare && (
           <DropdownMenu.Item icon={ShareIcon} onClick={() => onShare(item)}>
             {t("share")}
+          </DropdownMenu.Item>
+        )}
+        {onTransfer && (
+          <DropdownMenu.Item icon={ArrowsLeftRightIcon} onClick={() => onTransfer(item)}>
+            {t("transfer")}
           </DropdownMenu.Item>
         )}
         {onRename && (
@@ -77,6 +93,11 @@ export function FileRowMenu({
         {isZipFile(item) && onExtractZip && (
           <DropdownMenu.Item icon={PackageIcon} onClick={() => onExtractZip(item)}>
             {t("extract")}
+          </DropdownMenu.Item>
+        )}
+        {onArchive && (
+          <DropdownMenu.Item icon={ArchiveIcon} onClick={() => onArchive(item)}>
+            {t("archive")}
           </DropdownMenu.Item>
         )}
         <DropdownMenu.Separator />

@@ -10,7 +10,6 @@ import {
   FolderPlusIcon,
   UploadSimpleIcon,
   XIcon,
-  CopyIcon,
   CheckCircleIcon,
   XCircleIcon,
   TrashIcon,
@@ -28,6 +27,8 @@ import { FileTable, type TypeFilterValue } from "./file-table";
 import { FileGrid } from "./file-grid";
 import { FileDetailsPanel } from "./file-details-panel";
 import { UploadDropzone } from "./upload-dropzone";
+import { ItemShareDialog } from "./item-share-dialog";
+import { TransferDialog } from "./transfer-dialog";
 import { ManageTagsDialog } from "./manage-tags-dialog";
 import { FolderColorDialog } from "./folder-color-dialog";
 
@@ -77,10 +78,9 @@ export function FileBrowser() {
   const [renameValue, setRenameValue] = useState("");
   const [renaming, setRenaming] = useState(false);
 
-  // État modale partage
+  // État modale partage / transfert
   const [shareItem, setShareItem] = useState<FileItem | null>(null);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [sharing, setSharing] = useState(false);
+  const [transferItem, setTransferItem] = useState<FileItem | null>(null);
 
   // État modale d'upload
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
@@ -382,9 +382,11 @@ export function FileBrowser() {
         setRenameItem(null);
         fetchFiles(currentFolderId, searchQuery);
       } else {
+        const data = await res.json().catch(() => null);
         toasts.add({
           title: tToasts("genericError"),
-          description: tToasts("renameErrorDescription"),
+          description:
+            res.status === 409 ? tToasts("renameConflictDescription") : (data?.error ?? tToasts("renameErrorDescription")),
         });
       }
     } catch (err) {
@@ -472,38 +474,28 @@ export function FileBrowser() {
     }
   }
 
-  async function handleShareItem(item: FileItem) {
+  function handleShareItem(item: FileItem) {
     setShareItem(item);
-    setShareUrl(null);
-    setSharing(true);
-    try {
-      const res = await fetch("/api/shares", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: item.id, itemType: item.type }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setShareUrl(`${window.location.origin}${data.share.url}`);
-      } else {
-        toasts.add({
-          title: tToasts("genericError"),
-          description: tToasts("shareErrorDescription"),
-        });
-        setShareItem(null);
-      }
-    } catch (err) {
-      console.error("Share error:", err);
-      setShareItem(null);
-    } finally {
-      setSharing(false);
-    }
   }
 
-  async function handleCopyShareUrl() {
-    if (!shareUrl) return;
-    await navigator.clipboard.writeText(shareUrl);
-    toasts.add({ title: tToasts("linkCopiedTitle"), description: tToasts("linkCopiedDescription") });
+  async function handleArchiveItem(item: FileItem) {
+    try {
+      const res = await fetch("/api/archive", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, type: item.type }),
+      });
+      if (!res.ok) throw new Error("archive failed");
+      toasts.add({
+        title: tToasts("itemArchivedTitle"),
+        description: tToasts("itemArchivedDescription", { name: item.name }),
+      });
+      if (selectedItemId === item.id) setSelectedItemId(null);
+      fetchFiles(currentFolderId, searchQuery);
+    } catch (err) {
+      console.error("Archive error:", err);
+      toasts.add({ title: tToasts("genericError"), description: tToasts("archiveErrorDescription") });
+    }
   }
 
   async function handleToggleFavorite(item: FileItem) {
@@ -829,6 +821,8 @@ export function FileBrowser() {
             onChangeColor={setColorItem}
             onDownloadZip={handleDownloadZip}
             onExtractZip={handleExtractZip}
+            onArchive={handleArchiveItem}
+            onTransfer={setTransferItem}
             onMoveItem={handleMoveItem}
             selectedIds={selectedIds}
             onToggleSelectItem={toggleSelectItem}
@@ -988,40 +982,12 @@ export function FileBrowser() {
         </Dialog>
       </Dialog.Root>
 
-      {/* Modale de partage d'un fichier / dossier */}
-      <Dialog.Root open={shareItem !== null} onOpenChange={(open) => !open && setShareItem(null)}>
-        <Dialog className="p-6">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold">
-              {t("shareTitle", { name: shareItem?.name ?? "" })}
-            </Dialog.Title>
-            <Dialog.Close
-              aria-label={t("close")}
-              render={(props) => (
-                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={t("close")} />
-              )}
-            />
-          </div>
-
-          {sharing ? (
-            <div className="flex items-center gap-2 py-4">
-              <Loader size="sm" /> {t("creatingLink")}
-            </div>
-          ) : shareUrl ? (
-            <div className="flex flex-col gap-4">
-              <Input size="sm" label={t("shareLinkLabel")} value={shareUrl} readOnly onFocus={(e) => e.target.select()} />
-              <div className="flex justify-end gap-2">
-                <Button variant="secondary" size="sm" type="button" onClick={() => setShareItem(null)}>
-                  {t("close")}
-                </Button>
-                <Button variant="primary" size="sm" icon={CopyIcon} onClick={handleCopyShareUrl}>
-                  {t("copyLink")}
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </Dialog>
-      </Dialog.Root>
+      <ItemShareDialog item={shareItem} onClose={() => setShareItem(null)} />
+      <TransferDialog
+        item={transferItem}
+        onClose={() => setTransferItem(null)}
+        onTransferred={() => fetchFiles(currentFolderId, searchQuery)}
+      />
 
       {/* Modale de progression d'upload */}
       <Dialog.Root open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>

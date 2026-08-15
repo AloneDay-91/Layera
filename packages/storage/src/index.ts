@@ -8,4 +8,5 @@ export {
   presignPutObject,
   statStoredObject,
   putStoredObject,
+  copyStoredObject,
 } from "./client";
