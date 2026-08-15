@@ -44,10 +44,8 @@ export default function SettingsPage() {
   const [newTeamName, setNewTeamName] = useState("");
   const [submittingOrg, setSubmittingOrg] = useState(false);
 
-  // Le personnel/le membre "simple" ne peut ni inviter ni retirer quelqu'un —
-  // seuls owner/admin de l'organisation active le peuvent. Sans organisation
-  // active (espace personnel), l'utilisateur est de facto seul "propriétaire".
-  const canManageMembers = activeOrg ? activeRole === "owner" || activeRole === "admin" : true;
+  const [canManageMembers, setCanManageMembers] = useState(false);
+  const [workspaceName, setWorkspaceName] = useState("");
 
   // État contrôlé pour les champs S3
   const [s3Endpoint, setS3Endpoint] = useState("http://localhost:9000");
@@ -57,37 +55,35 @@ export default function SettingsPage() {
 
   // Synchroniser les vrais membres, invitations et rôle actif de l'organisation Better Auth
   const loadWorkspaceData = useCallback(async () => {
+    const membersRes = await fetch("/api/workspace/members");
+    if (membersRes.ok) {
+      const data = await membersRes.json();
+      setMembers(
+        (data.members ?? []).map((m: { id: string; name: string; email: string; role: string }) => ({
+          id: m.id,
+          name: m.name,
+          email: m.email,
+          role: m.role,
+        })),
+      );
+      setCanManageMembers(Boolean(data.canManage));
+      setActiveRole(data.role ?? null);
+      setWorkspaceName(data.workspaceName ?? "");
+    } else if (session?.user) {
+      setMembers([{ id: session.user.id, name: session.user.name, email: session.user.email, role: "owner" }]);
+      setCanManageMembers(true);
+    }
+
     if (!activeOrg) {
-      setActiveRole(null);
       setInvitations([]);
-      if (session?.user) {
-        setMembers([
-          { id: session.user.id, name: session.user.name, email: session.user.email, role: "owner" },
-        ]);
-      }
       return;
     }
 
-    const [{ data: memberData }, { data: invitationData }, { data: roleData }] = await Promise.all([
-      authClient.organization.listMembers({ query: { organizationId: activeOrg.id } }),
+    const [{ data: invitationData }] = await Promise.all([
       authClient.organization.listInvitations({ query: { organizationId: activeOrg.id } }),
-      authClient.organization.getActiveMemberRole(),
     ]);
-
-    const memberList = memberData?.members ?? [];
-    setMembers(
-      memberList.map((m) => ({
-        id: m.id,
-        name: m.user?.name ?? m.user?.email?.split("@")[0] ?? t("defaultUser"),
-        email: m.user?.email ?? "",
-        role: m.role ?? "member",
-      })),
-    );
-
     const pending = (invitationData ?? []).filter((inv) => inv.status === "pending");
     setInvitations(pending.map((inv) => ({ id: inv.id, email: inv.email, role: inv.role ?? "member", status: inv.status })));
-
-    setActiveRole(roleData?.role ?? null);
   }, [activeOrg, session?.user]);
 
   useEffect(() => {
@@ -132,36 +128,61 @@ export default function SettingsPage() {
 
   async function handleInviteMember(e: React.FormEvent) {
     e.preventDefault();
-    if (!newMemberEmail.trim() || !activeOrg) return;
+    if (!newMemberEmail.trim()) return;
 
     setInvitingMember(true);
     try {
-      const { error } = await authClient.organization.inviteMember({
-        email: newMemberEmail.trim(),
-        role: "member",
+      const res = await fetch("/api/workspace/members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: newMemberEmail.trim() }),
       });
-      if (error) {
+      if (res.ok) {
         toasts.add({
-          title: tToasts("inviteErrorTitle"),
-          description: error.message ?? tToasts("inviteErrorFallback"),
+          title: tToasts("memberAddedTitle"),
+          description: tToasts("memberAddedDescription", { email: newMemberEmail }),
         });
+        setNewMemberEmail("");
+        loadWorkspaceData();
         return;
       }
+
+      const data = await res.json().catch(() => null);
+      if (res.status === 404 && activeOrg) {
+        const { error } = await authClient.organization.inviteMember({
+          email: newMemberEmail.trim(),
+          role: "member",
+        });
+        if (error) {
+          toasts.add({
+            title: tToasts("inviteErrorTitle"),
+            description: error.message ?? tToasts("inviteErrorFallback"),
+          });
+          return;
+        }
+        toasts.add({
+          title: tToasts("invitationSentTitle"),
+          description: tToasts("invitationSentDescription", { email: newMemberEmail }),
+        });
+        setNewMemberEmail("");
+        loadWorkspaceData();
+        return;
+      }
+
       toasts.add({
-        title: tToasts("invitationSentTitle"),
-        description: tToasts("invitationSentDescription", { email: newMemberEmail }),
+        title: tToasts("inviteErrorTitle"),
+        description: data?.error ?? tToasts("inviteErrorFallback"),
       });
-      setNewMemberEmail("");
-      loadWorkspaceData();
     } finally {
       setInvitingMember(false);
     }
   }
 
   async function handleRemoveMember(memberId: string, email: string) {
-    const { error } = await authClient.organization.removeMember({ memberIdOrEmail: memberId });
-    if (error) {
-      toasts.add({ title: tToasts("genericError"), description: error.message ?? tToasts("removeMemberErrorFallback") });
+    const res = await fetch(`/api/workspace/members?userId=${memberId}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      toasts.add({ title: tToasts("genericError"), description: data?.error ?? tToasts("removeMemberErrorFallback") });
       return;
     }
     toasts.add({ title: tToasts("memberRemovedTitle"), description: tToasts("memberRemovedDescription", { email }) });
@@ -276,15 +297,15 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <Text as="h2" variant="heading2">
-                  {t("membersTitle", { name: activeOrg?.name ?? t("personalWorkspace") })}
+                  {t("membersTitle", { name: workspaceName || activeOrg?.name || t("personalWorkspace") })}
                 </Text>
                 <Text variant="secondary">
-                  {activeOrg ? t("membersDescriptionWithOrg") : t("membersDescriptionNoOrg")}
+                  {t("membersDescriptionWithOrg")}
                 </Text>
               </div>
             </div>
 
-            {activeOrg && canManageMembers && (
+            {canManageMembers && (
               <form onSubmit={handleInviteMember} className="flex gap-3 my-2">
                 <Input
                   size="sm"
