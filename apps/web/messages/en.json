@@ -400,33 +400,41 @@
       "target": "Target"
     },
     "actions": {
-      "file.upload": "File uploaded",
-      "file.rename": "File renamed",
-      "file.move": "File moved",
-      "file.trash": "File moved to trash",
-      "file.delete": "File deleted",
-      "file.download": "File downloaded",
-      "file.restore": "File restored",
-      "file.edit": "File edited",
-      "file.archive": "File archived",
-      "file.unarchive": "File restored from archive",
-      "file.transfer": "File transferred",
-      "folder.create": "Folder created",
-      "folder.rename": "Folder renamed",
-      "folder.move": "Folder moved",
-      "folder.trash": "Folder moved to trash",
-      "folder.delete": "Folder deleted",
-      "folder.restore": "Folder restored",
-      "folder.archive": "Folder archived",
-      "folder.unarchive": "Folder restored from archive",
-      "folder.transfer": "Folder transferred",
-      "share.create": "Share link created",
-      "share.revoke": "Share link revoked",
-      "share.download": "Downloaded via public link",
-      "share.internal": "Internal share created",
-      "share.internal-revoke": "Internal share revoked",
-      "member.invite": "Member added",
-      "member.remove": "Member removed"
+      "file": {
+        "upload": "File uploaded",
+        "rename": "File renamed",
+        "move": "File moved",
+        "trash": "File moved to trash",
+        "delete": "File deleted",
+        "download": "File downloaded",
+        "restore": "File restored",
+        "edit": "File edited",
+        "archive": "File archived",
+        "unarchive": "File restored from archive",
+        "transfer": "File transferred"
+      },
+      "folder": {
+        "create": "Folder created",
+        "rename": "Folder renamed",
+        "move": "Folder moved",
+        "trash": "Folder moved to trash",
+        "delete": "Folder deleted",
+        "restore": "Folder restored",
+        "archive": "Folder archived",
+        "unarchive": "Folder restored from archive",
+        "transfer": "Folder transferred"
+      },
+      "share": {
+        "create": "Share link created",
+        "revoke": "Share link revoked",
+        "download": "Downloaded via public link",
+        "internal": "Internal share created",
+        "internal-revoke": "Internal share revoked"
+      },
+      "member": {
+        "invite": "Member added",
+        "remove": "Member removed"
+      }
     }
   },
   "sharedPage": {
