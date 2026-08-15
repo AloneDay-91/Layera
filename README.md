@@ -31,7 +31,7 @@ specs.
   workspaces, each fully isolated (files, tags, shares, storage stats)
 - **Files & folders** — create, rename, move (drag-and-drop), trash with
   restore, multi-select bulk delete, folder color customization
-- **Upload** — multi-file upload with progress, whole-page drag-and-drop
+- **Upload** — multi-file upload with progress (presigned MinIO PUT, UUID object keys)
 - **Views** — sortable/filterable table and grid views, URL-driven
   pagination, favorites, recents
 - **Tags** — workspace-wide colored tags, assignable to any file or folder

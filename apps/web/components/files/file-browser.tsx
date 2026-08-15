@@ -10,7 +10,6 @@ import {
   FolderPlusIcon,
   UploadSimpleIcon,
   XIcon,
-  CopyIcon,
   CheckCircleIcon,
   XCircleIcon,
   TrashIcon,
@@ -18,8 +17,9 @@ import {
 } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { ClientOnly } from "@/components/shell/client-only";
-import { MockItem } from "@/lib/mock-files";
+import { FileItem } from "@/lib/file-item";
 import { notifyStorageUpdated } from "@/lib/storage-events";
+import { uploadFileDirect } from "@/lib/upload-file";
 import type { TagColorValue, WorkspaceTag } from "@/lib/tags";
 import type { FolderColorValue } from "@/lib/folder-colors";
 import { FileBreadcrumbs } from "./file-breadcrumbs";
@@ -27,6 +27,8 @@ import { FileTable, type TypeFilterValue } from "./file-table";
 import { FileGrid } from "./file-grid";
 import { FileDetailsPanel } from "./file-details-panel";
 import { UploadDropzone } from "./upload-dropzone";
+import { ItemShareDialog } from "./item-share-dialog";
+import { TransferDialog } from "./transfer-dialog";
 import { ManageTagsDialog } from "./manage-tags-dialog";
 import { FolderColorDialog } from "./folder-color-dialog";
 
@@ -63,7 +65,7 @@ export function FileBrowser() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [breadcrumbsPath, setBreadcrumbsPath] = useState<Array<{ id: string | null; name: string }>>([]);
-  const [items, setItems] = useState<MockItem[]>([]);
+  const [items, setItems] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   // État modale création dossier
@@ -72,28 +74,28 @@ export function FileBrowser() {
   const [creatingFolder, setCreatingFolder] = useState(false);
 
   // État modale renommage
-  const [renameItem, setRenameItem] = useState<MockItem | null>(null);
+  const [renameItem, setRenameItem] = useState<FileItem | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renaming, setRenaming] = useState(false);
 
-  // État modale partage
-  const [shareItem, setShareItem] = useState<MockItem | null>(null);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [sharing, setSharing] = useState(false);
+  // État modale partage / transfert
+  const [shareItem, setShareItem] = useState<FileItem | null>(null);
+  const [transferItem, setTransferItem] = useState<FileItem | null>(null);
 
   // État modale d'upload
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<
-    Array<{ name: string; status: "uploading" | "success" | "error" }>
+    Array<{ name: string; status: "uploading" | "success" | "error"; progress: number }>
   >([]);
 
   // État modale de gestion des tags
   const [workspaceTags, setWorkspaceTags] = useState<WorkspaceTag[]>([]);
   const [loadingTags, setLoadingTags] = useState(true);
-  const [manageTagsItem, setManageTagsItem] = useState<MockItem | null>(null);
+  const [manageTagsItem, setManageTagsItem] = useState<FileItem | null>(null);
 
   // État modale de couleur de dossier
-  const [colorItem, setColorItem] = useState<MockItem | null>(null);
+  const [colorItem, setColorItem] = useState<FileItem | null>(null);
+  const [canManage, setCanManage] = useState(false);
 
   // État de sélection multiple et suppression groupée
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -189,6 +191,10 @@ export function FileBrowser() {
 
   useEffect(() => {
     fetchTags();
+    fetch("/api/workspace/members")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setCanManage(Boolean(data?.canManage)))
+      .catch(() => setCanManage(false));
   }, [activeOrg?.id]);
 
   const selectedItem = useMemo(
@@ -381,9 +387,11 @@ export function FileBrowser() {
         setRenameItem(null);
         fetchFiles(currentFolderId, searchQuery);
       } else {
+        const data = await res.json().catch(() => null);
         toasts.add({
           title: tToasts("genericError"),
-          description: tToasts("renameErrorDescription"),
+          description:
+            res.status === 409 ? tToasts("renameConflictDescription") : (data?.error ?? tToasts("renameErrorDescription")),
         });
       }
     } catch (err) {
@@ -393,7 +401,7 @@ export function FileBrowser() {
     }
   }
 
-  async function handleDeleteItem(item: MockItem) {
+  async function handleDeleteItem(item: FileItem) {
     try {
       const res = await fetch(`/api/files?id=${item.id}&type=${item.type}`, {
         method: "DELETE",
@@ -443,22 +451,22 @@ export function FileBrowser() {
     if (files.length === 0) return;
 
     const fileArray = Array.from(files);
-    setUploadQueue(fileArray.map((f) => ({ name: f.name, status: "uploading" })));
+    setUploadQueue(fileArray.map((f) => ({ name: f.name, status: "uploading", progress: 0 })));
     setIsUploadDialogOpen(true);
 
     let successCount = 0;
 
     for (let i = 0; i < fileArray.length; i++) {
       const fileToUpload = fileArray[i]!;
-      const formData = new FormData();
-      formData.append("file", fileToUpload);
-      if (currentFolderId) formData.append("folderId", currentFolderId);
 
       try {
-        const res = await fetch("/api/upload", { method: "POST", body: formData });
-        const status = res.ok ? "success" : "error";
-        if (res.ok) successCount++;
-        setUploadQueue((prev) => prev.map((item, idx) => (idx === i ? { ...item, status } : item)));
+        await uploadFileDirect(fileToUpload, currentFolderId, (progress) => {
+          setUploadQueue((prev) => prev.map((item, idx) => (idx === i ? { ...item, progress } : item)));
+        });
+        successCount++;
+        setUploadQueue((prev) =>
+          prev.map((item, idx) => (idx === i ? { ...item, status: "success", progress: 100 } : item)),
+        );
       } catch (err) {
         console.error("Upload error:", err);
         setUploadQueue((prev) => prev.map((item, idx) => (idx === i ? { ...item, status: "error" } : item)));
@@ -471,41 +479,31 @@ export function FileBrowser() {
     }
   }
 
-  async function handleShareItem(item: MockItem) {
+  function handleShareItem(item: FileItem) {
     setShareItem(item);
-    setShareUrl(null);
-    setSharing(true);
+  }
+
+  async function handleArchiveItem(item: FileItem) {
     try {
-      const res = await fetch("/api/shares", {
+      const res = await fetch("/api/archive", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: item.id, itemType: item.type }),
+        body: JSON.stringify({ id: item.id, type: item.type }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        setShareUrl(`${window.location.origin}${data.share.url}`);
-      } else {
-        toasts.add({
-          title: tToasts("genericError"),
-          description: tToasts("shareErrorDescription"),
-        });
-        setShareItem(null);
-      }
+      if (!res.ok) throw new Error("archive failed");
+      toasts.add({
+        title: tToasts("itemArchivedTitle"),
+        description: tToasts("itemArchivedDescription", { name: item.name }),
+      });
+      if (selectedItemId === item.id) setSelectedItemId(null);
+      fetchFiles(currentFolderId, searchQuery);
     } catch (err) {
-      console.error("Share error:", err);
-      setShareItem(null);
-    } finally {
-      setSharing(false);
+      console.error("Archive error:", err);
+      toasts.add({ title: tToasts("genericError"), description: tToasts("archiveErrorDescription") });
     }
   }
 
-  async function handleCopyShareUrl() {
-    if (!shareUrl) return;
-    await navigator.clipboard.writeText(shareUrl);
-    toasts.add({ title: tToasts("linkCopiedTitle"), description: tToasts("linkCopiedDescription") });
-  }
-
-  async function handleToggleFavorite(item: MockItem) {
+  async function handleToggleFavorite(item: FileItem) {
     const nextFavorite = !item.isFavorite;
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, isFavorite: nextFavorite } : i)));
     try {
@@ -535,7 +533,7 @@ export function FileBrowser() {
     });
   }
 
-  async function handleChangeFolderColor(item: MockItem, color: FolderColorValue) {
+  async function handleChangeFolderColor(item: FileItem, color: FolderColorValue) {
     const previousColor = item.color;
     const nextColor = color === "default" ? null : color;
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, color: nextColor } : i)));
@@ -563,7 +561,7 @@ export function FileBrowser() {
     link.remove();
   }
 
-  function handleDownloadZip(item: MockItem) {
+  function handleDownloadZip(item: FileItem) {
     triggerDownload(`/api/files/zip?items=${item.id}:${item.type}`);
   }
 
@@ -574,7 +572,7 @@ export function FileBrowser() {
     triggerDownload(`/api/files/zip?items=${encodeURIComponent(query)}`);
   }
 
-  async function handleExtractZip(item: MockItem) {
+  async function handleExtractZip(item: FileItem) {
     toasts.add({ title: tToasts("extractingTitle"), description: tToasts("extractingDescription", { name: item.name }) });
     try {
       const res = await fetch("/api/files/unzip", {
@@ -828,6 +826,8 @@ export function FileBrowser() {
             onChangeColor={setColorItem}
             onDownloadZip={handleDownloadZip}
             onExtractZip={handleExtractZip}
+            onArchive={handleArchiveItem}
+            onTransfer={canManage ? setTransferItem : undefined}
             onMoveItem={handleMoveItem}
             selectedIds={selectedIds}
             onToggleSelectItem={toggleSelectItem}
@@ -987,40 +987,12 @@ export function FileBrowser() {
         </Dialog>
       </Dialog.Root>
 
-      {/* Modale de partage d'un fichier / dossier */}
-      <Dialog.Root open={shareItem !== null} onOpenChange={(open) => !open && setShareItem(null)}>
-        <Dialog className="p-6">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold">
-              {t("shareTitle", { name: shareItem?.name ?? "" })}
-            </Dialog.Title>
-            <Dialog.Close
-              aria-label={t("close")}
-              render={(props) => (
-                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={t("close")} />
-              )}
-            />
-          </div>
-
-          {sharing ? (
-            <div className="flex items-center gap-2 py-4">
-              <Loader size="sm" /> {t("creatingLink")}
-            </div>
-          ) : shareUrl ? (
-            <div className="flex flex-col gap-4">
-              <Input size="sm" label={t("shareLinkLabel")} value={shareUrl} readOnly onFocus={(e) => e.target.select()} />
-              <div className="flex justify-end gap-2">
-                <Button variant="secondary" size="sm" type="button" onClick={() => setShareItem(null)}>
-                  {t("close")}
-                </Button>
-                <Button variant="primary" size="sm" icon={CopyIcon} onClick={handleCopyShareUrl}>
-                  {t("copyLink")}
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </Dialog>
-      </Dialog.Root>
+      <ItemShareDialog item={shareItem} onClose={() => setShareItem(null)} />
+      <TransferDialog
+        item={transferItem}
+        onClose={() => setTransferItem(null)}
+        onTransferred={() => fetchFiles(currentFolderId, searchQuery)}
+      />
 
       {/* Modale de progression d'upload */}
       <Dialog.Root open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
@@ -1044,7 +1016,7 @@ export function FileBrowser() {
                 <span className="flex-1 truncate">{item.name}</span>
                 <span className="text-kumo-subtle">
                   {item.status === "uploading"
-                    ? t("uploadStatusUploading")
+                    ? t("uploadStatusProgress", { percent: item.progress })
                     : item.status === "success"
                       ? t("uploadStatusSuccess")
                       : t("uploadStatusError")}

@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button, Dialog, Text } from "@cloudflare/kumo";
 import { XIcon, ShareIcon, DownloadIcon, StarIcon, TagIcon } from "@phosphor-icons/react";
-import type { MockItem } from "@/lib/mock-files";
-import { formatFileSize } from "@/lib/mock-files";
+import type { FileItem } from "@/lib/file-item";
+import { formatFileSize } from "@/lib/file-item";
 import { FilePreviewIcon, getFileTypeLabel, isPreviewable } from "./file-preview";
 import { FilePreviewContent } from "./file-preview-content";
 import { TagBadgeList } from "./tag-badge-list";
+import { UserAvatar } from "./user-avatar";
 
 export function FileDetailsPanel({
   item,
@@ -18,12 +19,12 @@ export function FileDetailsPanel({
   onToggleFavorite,
   onManageTags,
 }: {
-  item: MockItem;
+  item: FileItem;
   onClose: () => void;
   onAction: (action: string) => void;
-  onShare?: (item: MockItem) => void;
-  onToggleFavorite?: (item: MockItem) => void;
-  onManageTags?: (item: MockItem) => void;
+  onShare?: (item: FileItem) => void;
+  onToggleFavorite?: (item: FileItem) => void;
+  onManageTags?: (item: FileItem) => void;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const previewable = isPreviewable(item);
@@ -77,9 +78,12 @@ export function FileDetailsPanel({
           <Text as="dt" variant="secondary">{t("size")}</Text>
           <dd className="font-medium text-kumo-default">{formatFileSize(item.size)}</dd>
         </div>
-        <div className="flex justify-between">
+        <div className="flex justify-between gap-2">
           <Text as="dt" variant="secondary">{t("owner")}</Text>
-          <dd className="font-medium text-kumo-default">{item.owner}</dd>
+          <dd className="flex items-center gap-2 font-medium text-kumo-default">
+            <UserAvatar userId={item.ownerId} name={item.owner} />
+            {item.owner}
+          </dd>
         </div>
         <div className="flex justify-between">
           <Text as="dt" variant="secondary">{t("modified")}</Text>

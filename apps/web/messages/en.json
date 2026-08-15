@@ -9,6 +9,7 @@
     "space": "Space",
     "organize": "Organize",
     "shareLinks": "Share links",
+    "archive": "Archive",
     "trash": "Trash",
     "tags": "Tags",
     "storage": "Storage",
@@ -25,6 +26,7 @@
       "shared": "Shared with me",
       "favorites": "Favorites",
       "links": "Share links",
+      "archive": "Archive",
       "trash": "Trash",
       "tags": "Tags",
       "storage": "Storage analysis",
@@ -62,6 +64,10 @@
     "changeColor": "Change color",
     "downloadZip": "Download as ZIP",
     "extract": "Extract",
+    "archive": "Archive",
+    "transfer": "Transfer",
+    "pin": "Pin",
+    "unpin": "Unpin",
     "delete": "Delete"
   },
   "fileBrowser": {
@@ -94,6 +100,7 @@
     "copyLink": "Copy link",
     "uploadTitle": "Upload",
     "uploadStatusUploading": "Uploading…",
+    "uploadStatusProgress": "Uploading… {percent}%",
     "uploadStatusSuccess": "Done",
     "uploadStatusError": "Failed",
     "deleteConfirmTitle": "{count, plural, one {Delete # item?} other {Delete # items?}}",
@@ -109,6 +116,7 @@
       "itemRenamedTitle": "Item renamed",
       "itemRenamedDescription": "Renamed to \"{name}\" successfully.",
       "renameErrorDescription": "Could not rename this item.",
+      "renameConflictDescription": "An item with this name already exists in this folder.",
       "itemDeletedTitle": "Item deleted",
       "itemDeletedDescription": "\"{name}\" was deleted.",
       "itemsDeletedTitle": "Items deleted",
@@ -137,7 +145,10 @@
       "tagCreateErrorDescription": "Could not create the tag.",
       "tagDeletedTitle": "Tag deleted",
       "tagDeletedDescription": "\"{name}\" was deleted from the workspace.",
-      "tagDeleteErrorDescription": "Could not delete the tag."
+      "tagDeleteErrorDescription": "Could not delete the tag.",
+      "itemArchivedTitle": "Item archived",
+      "itemArchivedDescription": "\"{name}\" was moved to the archive.",
+      "archiveErrorDescription": "Could not archive this item."
     },
     "deleteTagConfirm": "Permanently delete the tag \"{name}\" from this workspace?"
   },
@@ -290,13 +301,19 @@
     "locationColumn": "Location",
     "modifiedColumn": "Modified",
     "sizeColumn": "Size",
+    "pinAria": "Pin \"{name}\"",
+    "unpinAria": "Unpin \"{name}\"",
     "toasts": {
       "removedTitle": "Removed from favorites",
       "removedDescription": "\"{name}\" was removed from your favorites.",
       "genericError": "Error",
       "removeErrorDescription": "Could not remove this item from favorites.",
       "itemDeletedTitle": "Item deleted",
-      "itemDeletedDescription": "\"{name}\" was moved to the trash."
+      "itemDeletedDescription": "\"{name}\" was moved to the trash.",
+      "pinnedTitle": "Favorite pinned",
+      "unpinnedTitle": "Favorite unpinned",
+      "pinnedDescription": "\"{name}\" will stay at the top of your favorites.",
+      "unpinnedDescription": "\"{name}\" is no longer pinned."
     }
   },
   "recentPage": {
@@ -373,12 +390,51 @@
   },
   "activityPage": {
     "title": "Activity logs",
-    "description": "History of actions, creations, deletions, and shares."
+    "description": "History of actions, creations, deletions, and shares.",
+    "emptyTitle": "No activity yet",
+    "emptyDescription": "File, folder, and sharing actions will show up here.",
+    "columns": {
+      "when": "When",
+      "actor": "Actor",
+      "action": "Action",
+      "target": "Target"
+    },
+    "actions": {
+      "file.upload": "File uploaded",
+      "file.rename": "File renamed",
+      "file.move": "File moved",
+      "file.trash": "File moved to trash",
+      "file.delete": "File deleted",
+      "file.download": "File downloaded",
+      "file.restore": "File restored",
+      "file.edit": "File edited",
+      "file.archive": "File archived",
+      "file.unarchive": "File restored from archive",
+      "file.transfer": "File transferred",
+      "folder.create": "Folder created",
+      "folder.rename": "Folder renamed",
+      "folder.move": "Folder moved",
+      "folder.trash": "Folder moved to trash",
+      "folder.delete": "Folder deleted",
+      "folder.restore": "Folder restored",
+      "folder.archive": "Folder archived",
+      "folder.unarchive": "Folder restored from archive",
+      "folder.transfer": "Folder transferred",
+      "share.create": "Share link created",
+      "share.revoke": "Share link revoked",
+      "share.download": "Downloaded via public link",
+      "share.internal": "Internal share created",
+      "share.internal-revoke": "Internal share revoked",
+      "member.invite": "Member added",
+      "member.remove": "Member removed"
+    }
   },
   "sharedPage": {
     "breadcrumb": "Shared with me",
-    "comingSoonTitle": "Sharing coming soon",
-    "comingSoonDescription": "File and folder sharing arrives in an upcoming update."
+    "description": "Files and folders that workspace members have shared with you.",
+    "emptyTitle": "Nothing has been shared with you yet",
+    "emptyDescription": "When a workspace member shares a file with you, it will show up here.",
+    "sharedByColumn": "Shared by"
   },
   "workspaceSwitcher": {
     "personalWorkspaceOf": "{name}'s workspace",
@@ -508,7 +564,8 @@
   "sharePage": {
     "sharedFolder": "Shared folder",
     "sharedFolderPreview": "Shared folder preview",
-    "genericFile": "File"
+    "genericFile": "File",
+    "sharedBy": "Shared by {name}"
   },
   "sharePasswordGate": {
     "title": "This link is protected",
@@ -577,6 +634,8 @@
       "inviteErrorFallback": "Could not send the invitation.",
       "invitationSentTitle": "Invitation sent",
       "invitationSentDescription": "An invitation email was sent to {email}.",
+      "memberAddedTitle": "Member added",
+      "memberAddedDescription": "{email} now has access to this workspace.",
       "genericError": "Error",
       "removeMemberErrorFallback": "Could not remove this member.",
       "memberRemovedTitle": "Member removed",
@@ -753,6 +812,66 @@
       "accountDeletedTitle": "Account deleted",
       "accountDeletedDescription": "Your account has been permanently deleted."
     }
+  },
+  "archivePage": {
+    "title": "Archive",
+    "description": "Archived items leave the file browser but can still be restored.",
+    "emptyTitle": "The archive is empty",
+    "emptyDescription": "Archive files or folders from the actions menu to store them here.",
+    "nameColumn": "Name",
+    "ownerColumn": "Owner",
+    "archivedColumn": "Archived on",
+    "restore": "Restore",
+    "delete": "Delete",
+    "toasts": {
+      "itemRestoredTitle": "Item restored",
+      "itemRestoredDescription": "\"{name}\" was removed from the archive.",
+      "permanentDeleteTitle": "Permanently deleted",
+      "permanentDeleteDescription": "\"{name}\" was permanently deleted."
+    }
+  },
+  "markdownEditor": {
+    "bold": "Bold",
+    "italic": "Italic",
+    "heading": "Heading",
+    "list": "List",
+    "link": "Link",
+    "code": "Code",
+    "save": "Save",
+    "saving": "Saving…",
+    "emptyPreview": "The preview will appear here.",
+    "toasts": {
+      "savedTitle": "File saved",
+      "savedDescription": "Your Markdown changes were written.",
+      "errorTitle": "Error",
+      "errorDescription": "Could not save this file."
+    }
+  },
+  "itemShareDialog": {
+    "membersTab": "Members",
+    "linkTab": "Public link",
+    "membersHelp": "Share this item with a member of the current workspace.",
+    "chooseMember": "Choose a member",
+    "share": "Share",
+    "noShares": "No internal shares yet.",
+    "revoke": "Revoke share",
+    "errorTitle": "Error",
+    "publicLinkError": "Could not create the public link.",
+    "memberShareError": "Could not share with this member.",
+    "sharedTitle": "Shared",
+    "sharedDescription": "The member will see this item in Shared with me."
+  },
+  "transferDialog": {
+    "title": "Transfer \"{name}\"",
+    "help": "Copies the item to another workspace you belong to. The original stays in place.",
+    "noDestination": "You don't have another workspace to transfer to.",
+    "chooseWorkspace": "Choose a workspace",
+    "transfer": "Transfer",
+    "transferring": "Transferring…",
+    "successTitle": "Transfer complete",
+    "successDescription": "\"{name}\" was copied to the selected workspace.",
+    "errorTitle": "Error",
+    "errorDescription": "Could not transfer this item."
   },
   "settings": {
     "language": "Language",

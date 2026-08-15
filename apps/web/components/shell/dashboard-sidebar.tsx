@@ -14,24 +14,21 @@ import {
   ShareIcon,
   StarIcon,
   TagIcon,
+  ArchiveIcon,
 } from "@phosphor-icons/react";
 import { WorkspaceSwitcher } from "./workspace-switcher";
+import { authClient } from "@/lib/auth-client";
 
 export function DashboardSidebar() {
   const pathname = usePathname();
   const t = useTranslations("sidebar");
+  const { data: session } = authClient.useSession();
+  const isAdmin = session?.user.role === "admin";
 
-  // Liens de partage et Corbeille sont branchés sur de vraies données ;
-  // le reste de "à venir" ne l'est pas encore (composant ComingSoon ou données statiques).
   const ORGANIZER_SUB_ITEMS = [
     { href: "/dashboard/links", label: t("shareLinks") },
+    { href: "/dashboard/archive", label: t("archive") },
     { href: "/dashboard/trash", label: t("trash") },
-  ];
-
-  const COMING_SOON_ITEMS = [
-    { href: "/dashboard/shared", label: t("sharedWithMe"), icon: ShareIcon },
-    { href: "/dashboard/activity", label: t("activity"), icon: ActivityIcon },
-    { href: "/dashboard/admin", label: t("admin"), icon: ShieldCheckIcon },
   ];
 
   return (
@@ -52,6 +49,9 @@ export function DashboardSidebar() {
             </Sidebar.MenuButton>
             <Sidebar.MenuButton icon={StarIcon} href="/dashboard/favorites" active={pathname === "/dashboard/favorites"}>
               {t("favorites")}
+            </Sidebar.MenuButton>
+            <Sidebar.MenuButton icon={ShareIcon} href="/dashboard/shared" active={pathname === "/dashboard/shared"}>
+              {t("sharedWithMe")}
             </Sidebar.MenuButton>
           </Sidebar.Menu>
         </Sidebar.Group>
@@ -99,29 +99,28 @@ export function DashboardSidebar() {
               {t("storage")}
             </Sidebar.MenuButton>
             <Sidebar.MenuButton
+              icon={ActivityIcon}
+              href="/dashboard/activity"
+              active={pathname === "/dashboard/activity"}
+            >
+              {t("activity")}
+            </Sidebar.MenuButton>
+            <Sidebar.MenuButton
               icon={GearIcon}
               href="/dashboard/settings"
               active={pathname === "/dashboard/settings"}
             >
               {t("settings")}
             </Sidebar.MenuButton>
-          </Sidebar.Menu>
-        </Sidebar.Group>
-
-        {/* Bientôt disponible — pages pas encore branchées sur de vraies données */}
-        <Sidebar.Group>
-          <Sidebar.GroupLabel>{t("comingSoon")}</Sidebar.GroupLabel>
-          <Sidebar.Menu>
-            {COMING_SOON_ITEMS.map((item) => (
+            {isAdmin ? (
               <Sidebar.MenuButton
-                key={item.href}
-                icon={item.icon}
-                href={item.href}
-                active={pathname === item.href}
+                icon={ShieldCheckIcon}
+                href="/dashboard/admin"
+                active={pathname === "/dashboard/admin"}
               >
-                {item.label}
+                {t("admin")}
               </Sidebar.MenuButton>
-            ))}
+            ) : null}
           </Sidebar.Menu>
         </Sidebar.Group>
       </Sidebar.Content>

@@ -1,46 +1,69 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button, Dialog, DropdownMenu, Input, Loader, useKumoToastManager } from "@cloudflare/kumo";
 import { FoldersIcon, UsersThreeIcon, PlusIcon, CheckIcon, CaretUpDownIcon, XIcon } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { AppLogo } from "./app-logo";
 
+type WorkspaceOption = {
+  id: string;
+  name: string;
+  type: "personal" | "team";
+  organizationId: string | null;
+  role: string;
+};
+
 export function WorkspaceSwitcher() {
+  const router = useRouter();
   const toasts = useKumoToastManager();
   const { data: session } = authClient.useSession();
   const { data: activeOrg } = authClient.useActiveOrganization();
-  const { data: orgs } = authClient.useListOrganizations();
   const t = useTranslations("workspaceSwitcher");
   const tToasts = useTranslations("workspaceSwitcher.toasts");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newOrgName, setNewOrgName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [workspaces, setWorkspaces] = useState<WorkspaceOption[]>([]);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
 
-  const personalWorkspaceName = session?.user?.name
-    ? t("personalWorkspaceOf", { name: session.user.name })
-    : t("personalWorkspace");
+  async function loadWorkspaces() {
+    const res = await fetch("/api/workspaces");
+    if (!res.ok) return;
+    const data = await res.json();
+    setWorkspaces(data.workspaces ?? []);
+    setActiveWorkspaceId(data.activeWorkspaceId ?? null);
+  }
 
-  // Nom du workspace affiché actuellement
-  const activeWorkspaceName = activeOrg?.name ?? personalWorkspaceName;
+  useEffect(() => {
+    loadWorkspaces();
+  }, [session?.user.id, activeOrg?.id]);
 
-  async function handleSelectOrg(orgId: string | null, orgName: string) {
-    const { error } = await authClient.organization.setActive({
-      organizationId: orgId,
+  const activeWorkspaceName =
+    workspaces.find((workspace) => workspace.id === activeWorkspaceId)?.name ??
+    activeOrg?.name ??
+    (session?.user?.name ? t("personalWorkspaceOf", { name: session.user.name }) : t("personalWorkspace"));
+
+  async function handleSelectWorkspace(workspace: WorkspaceOption) {
+    const res = await fetch("/api/workspaces", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId: workspace.id }),
     });
-    if (error) {
-      toasts.add({
-        title: tToasts("switchErrorTitle"),
-        description: error.message ?? tToasts("switchErrorFallback"),
-      });
+    if (!res.ok) {
+      toasts.add({ title: tToasts("switchErrorTitle"), description: tToasts("switchErrorFallback") });
       return;
     }
+    await authClient.organization.setActive({ organizationId: workspace.organizationId });
+    setActiveWorkspaceId(workspace.id);
     toasts.add({
       title: tToasts("activeWorkspaceChangedTitle"),
-      description: tToasts("activeWorkspaceChangedDescription", { name: orgName }),
+      description: tToasts("activeWorkspaceChangedDescription", { name: workspace.name }),
     });
+    router.refresh();
   }
 
   async function handleCreateOrg(e: React.FormEvent) {
@@ -70,6 +93,23 @@ export function WorkspaceSwitcher() {
 
     if (newOrg) {
       await authClient.organization.setActive({ organizationId: newOrg.id });
+      const listRes = await fetch("/api/workspaces");
+      if (listRes.ok) {
+        const data = await listRes.json();
+        const created = (data.workspaces ?? []).find(
+          (workspace: WorkspaceOption) => workspace.organizationId === newOrg.id,
+        );
+        if (created) {
+          await fetch("/api/workspaces", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ workspaceId: created.id }),
+          });
+          setActiveWorkspaceId(created.id);
+        }
+        setWorkspaces(data.workspaces ?? []);
+      }
+      router.refresh();
     }
 
     toasts.add({
@@ -98,25 +138,15 @@ export function WorkspaceSwitcher() {
             <DropdownMenu.Group>
               <DropdownMenu.Label>{t("workspacesLabel")}</DropdownMenu.Label>
 
-              {/* Option Espace personnel */}
-              <DropdownMenu.Item
-                icon={FoldersIcon}
-                onClick={() => handleSelectOrg(null, personalWorkspaceName)}
-              >
-                <span className="flex-1 truncate">{personalWorkspaceName}</span>
-                {!activeOrg && <CheckIcon size={14} className="ml-2 text-kumo-info" />}
-              </DropdownMenu.Item>
-
-              {/* Liste des Organisations Better Auth */}
-              {orgs?.map((org) => {
-                const isSelected = activeOrg?.id === org.id;
+              {workspaces.map((workspace) => {
+                const isSelected = workspace.id === activeWorkspaceId;
                 return (
                   <DropdownMenu.Item
-                    key={org.id}
-                    icon={UsersThreeIcon}
-                    onClick={() => handleSelectOrg(org.id, org.name)}
+                    key={workspace.id}
+                    icon={workspace.type === "team" ? UsersThreeIcon : FoldersIcon}
+                    onClick={() => handleSelectWorkspace(workspace)}
                   >
-                    <span className="flex-1 truncate">{org.name}</span>
+                    <span className="flex-1 truncate">{workspace.name}</span>
                     {isSelected && <CheckIcon size={14} className="ml-2 text-kumo-info" />}
                   </DropdownMenu.Item>
                 );

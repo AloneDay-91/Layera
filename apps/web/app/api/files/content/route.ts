@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
-import { db, workspace, file, eq, and, isNull } from "@filecloud/db";
-import { minioClient, S3_BUCKET } from "@filecloud/storage";
+import { db, file, eq } from "@filecloud/db";
+import { getAuthorizedWorkspace, requireSession } from "@/lib/services/permissions";
+import { writeFileContent } from "@/lib/services/files";
+import { canAccessFile } from "@/lib/services/item-shares";
+import { jsonError } from "@/lib/services/http";
+import { recordAudit } from "@/lib/services/audit";
+import { ServiceError } from "@/lib/services/errors";
+import { storedObjectResponse } from "@/lib/http-file";
+import { checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 
 // SVG and HTML are deliberately excluded — they can embed <script> and
 // execute it when navigated to directly (Content-Disposition: inline),
@@ -28,14 +33,12 @@ const INLINE_SAFE_MIME_TYPES = new Set([
 
 export async function GET(request: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
+    const session = await requireSession();
+    const { allowed, retryAfter } = await checkRateLimit(`file-content:${session.user.id}`, {
+      windowSeconds: 60,
+      max: 120,
     });
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+    if (!allowed) return rateLimitedResponse(retryAfter!);
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
@@ -44,94 +47,61 @@ export async function GET(request: Request) {
     }
 
     const [fRecord] = await db.select().from(file).where(eq(file.id, id)).limit(1);
-
     if (!fRecord) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
-
-    const activeOrgId = session.session.activeOrganizationId;
-    let wsRecord;
-    if (activeOrgId) {
-      const found = await db
-        .select()
-        .from(workspace)
-        .where(eq(workspace.organizationId, activeOrgId))
-        .limit(1);
-      wsRecord = found[0];
-    } else {
-      const found = await db
-        .select()
-        .from(workspace)
-        .where(and(eq(workspace.ownerId, session.user.id), isNull(workspace.organizationId)))
-        .limit(1);
-      wsRecord = found[0];
+    if (!(await canAccessFile(session.user.id, fRecord))) {
+      throw new ServiceError(403, "Forbidden");
     }
-
-    if (!wsRecord || fRecord.workspaceId !== wsRecord.id) {
-      return NextResponse.json({ error: "File not found" }, { status: 404 });
+    const rangeHeader = request.headers.get("range");
+    if (!rangeHeader || rangeHeader.startsWith("bytes=0-") || rangeHeader.startsWith("bytes=-")) {
+      void recordAudit({
+        workspaceId: fRecord.workspaceId,
+        actorId: session.user.id,
+        action: "file.download",
+        targetType: "file",
+        targetId: fRecord.id,
+        metadata: { name: fRecord.name },
+      });
     }
 
     const isSafeInline = INLINE_SAFE_MIME_TYPES.has(fRecord.mimeType);
     const contentType = isSafeInline ? fRecord.mimeType : "application/octet-stream";
     const disposition = isSafeInline ? "inline" : "attachment";
-    const baseHeaders = {
-      "Content-Type": contentType,
-      "Content-Disposition": `${disposition}; filename="${encodeURIComponent(fRecord.name)}"`,
-      "Cache-Control": "private, max-age=300",
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'; sandbox",
-      "Accept-Ranges": "bytes",
-    };
 
     try {
-      const rangeHeader = request.headers.get("range");
-      const totalSize = fRecord.size;
-
-      if (rangeHeader && totalSize > 0) {
-        const match = /bytes=(\d*)-(\d*)/.exec(rangeHeader);
-        const rangeStart = match?.[1] ? parseInt(match[1], 10) : 0;
-        const rangeEnd = match?.[2] ? parseInt(match[2], 10) : totalSize - 1;
-
-        if (Number.isNaN(rangeStart) || Number.isNaN(rangeEnd) || rangeStart > rangeEnd || rangeStart >= totalSize) {
-          return new NextResponse(null, {
-            status: 416,
-            headers: { "Content-Range": `bytes */${totalSize}` },
-          });
-        }
-
-        const clampedEnd = Math.min(rangeEnd, totalSize - 1);
-        const chunkLength = clampedEnd - rangeStart + 1;
-
-        const stream = await minioClient.getPartialObject(S3_BUCKET, fRecord.storageKey, rangeStart, chunkLength);
-        const chunks: Buffer[] = [];
-        for await (const chunk of stream) {
-          chunks.push(Buffer.from(chunk));
-        }
-
-        return new NextResponse(Buffer.concat(chunks), {
-          status: 206,
-          headers: {
-            ...baseHeaders,
-            "Content-Range": `bytes ${rangeStart}-${clampedEnd}/${totalSize}`,
-            "Content-Length": chunkLength.toString(),
-          },
-        });
-      }
-
-      const stream = await minioClient.getObject(S3_BUCKET, fRecord.storageKey);
-      const chunks: Buffer[] = [];
-      for await (const chunk of stream) {
-        chunks.push(Buffer.from(chunk));
-      }
-      const fileBuffer = Buffer.concat(chunks);
-
-      return new NextResponse(fileBuffer, { headers: baseHeaders });
+      return await storedObjectResponse(fRecord.storageKey, {
+        contentType,
+        filename: fRecord.name,
+        disposition,
+        totalSize: fRecord.size,
+        rangeHeader,
+      });
     } catch (s3Error) {
       console.warn("MinIO stream warning:", s3Error);
       return NextResponse.json({ error: "Storage file unreadable" }, { status: 500 });
     }
   } catch (error) {
-    console.error("[GET /api/files/content Error]:", error);
-    return NextResponse.json({ error: "Failed to load file content" }, { status: 500 });
+    return jsonError(error, "Failed to load file content");
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const ctx = await getAuthorizedWorkspace();
+    const body = await request.json();
+    const id = typeof body.id === "string" ? body.id : null;
+    const content = typeof body.content === "string" ? body.content : null;
+    if (!id || content === null) {
+      return NextResponse.json({ error: "Missing id or content" }, { status: 400 });
+    }
+    const updated = await writeFileContent(ctx, id, content);
+    return NextResponse.json({
+      id: updated.id,
+      size: updated.size,
+      updatedAt: updated.updatedAt.toISOString(),
+    });
+  } catch (error) {
+    return jsonError(error, "Failed to save file");
   }
 }

@@ -13,7 +13,7 @@ import {
   FileTextIcon,
   FileIcon,
 } from "@phosphor-icons/react";
-import type { MockItem } from "@/lib/mock-files";
+import type { FileItem } from "@/lib/file-item";
 import { getLangFromFilename } from "@/lib/code-lang";
 import { getFolderColorClass } from "@/lib/folder-colors";
 
@@ -28,38 +28,38 @@ function hasCodeExtension(name: string): boolean {
   return CODE_EXTENSIONS.has(ext);
 }
 
-export function isPreviewableImage(item: MockItem): boolean {
+export function isPreviewableImage(item: FileItem): boolean {
   return item.type === "file" && (item.mimeType?.startsWith("image/") ?? false);
 }
 
-export function isPreviewablePdf(item: MockItem): boolean {
+export function isPreviewablePdf(item: FileItem): boolean {
   return item.type === "file" && item.mimeType === "application/pdf";
 }
 
-export function isPreviewableVideo(item: MockItem): boolean {
+export function isPreviewableVideo(item: FileItem): boolean {
   return item.type === "file" && (item.mimeType?.startsWith("video/") ?? false);
 }
 
-export function isPreviewableAudio(item: MockItem): boolean {
+export function isPreviewableAudio(item: FileItem): boolean {
   return item.type === "file" && (item.mimeType?.startsWith("audio/") ?? false);
 }
 
-export function isPreviewableText(item: MockItem): boolean {
+export function isPreviewableText(item: FileItem): boolean {
   if (item.type !== "file") return false;
   if (item.mimeType?.startsWith("text/")) return true;
   if (item.mimeType === "application/json") return true;
   return hasCodeExtension(item.name);
 }
 
-export function isPreviewableMarkdown(item: MockItem): boolean {
+export function isPreviewableMarkdown(item: FileItem): boolean {
   return item.type === "file" && (item.mimeType === "text/markdown" || item.name.toLowerCase().endsWith(".md"));
 }
 
-export function isZipFile(item: MockItem): boolean {
+export function isZipFile(item: FileItem): boolean {
   return item.type === "file" && (item.mimeType === "application/zip" || item.name.toLowerCase().endsWith(".zip"));
 }
 
-export function isPreviewable(item: MockItem): boolean {
+export function isPreviewable(item: FileItem): boolean {
   return (
     isPreviewableImage(item) ||
     isPreviewablePdf(item) ||
@@ -69,7 +69,7 @@ export function isPreviewable(item: MockItem): boolean {
   );
 }
 
-function getIconForItem(item: MockItem): Icon {
+function getIconForItem(item: FileItem): Icon {
   if (item.type === "folder") return FolderSimpleIcon;
   if (isPreviewablePdf(item)) return FilePdfIcon;
   if (isPreviewableImage(item)) return ImageIcon;
@@ -82,7 +82,7 @@ function getIconForItem(item: MockItem): Icon {
 
 type FileTypeTranslator = (key: string, values?: Record<string, string>) => string;
 
-export function getFileTypeLabel(item: MockItem, t: FileTypeTranslator): string {
+export function getFileTypeLabel(item: FileItem, t: FileTypeTranslator): string {
   if (item.type === "folder") return t("types.folder");
   if (!item.mimeType) return t("types.file");
 
@@ -99,7 +99,7 @@ export function getFileTypeLabel(item: MockItem, t: FileTypeTranslator): string 
   return ext && ext !== item.name ? t("types.fileExt", { ext: ext.toUpperCase() }) : t("types.fileGeneric");
 }
 
-function getIconColorForItem(item: MockItem): string {
+function getIconColorForItem(item: FileItem): string {
   if (item.type === "folder") return getFolderColorClass(item.color);
   if (isPreviewablePdf(item)) return "text-kumo-danger";
   if (isPreviewableImage(item)) return "text-kumo-info";
@@ -107,11 +107,11 @@ function getIconColorForItem(item: MockItem): string {
   return "text-kumo-subtle";
 }
 
-export function FilePreviewIcon({ item, size = 20 }: { item: MockItem; size?: number }) {
+export function FilePreviewIcon({ item, size = 20 }: { item: FileItem; size?: number }) {
   const [imgFailed, setImgFailed] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
 
-  if (isPreviewableImage(item) && !imgFailed) {
+  if (isPreviewableImage(item) && !imgFailed && (item.size == null || item.size <= 512 * 1024)) {
     return (
       <span className="relative inline-block shrink-0" style={{ width: size, height: size }}>
         {!imgLoaded && (

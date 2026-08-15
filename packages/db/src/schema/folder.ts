@@ -1,6 +1,7 @@
 import { pgTable, text, timestamp, uuid, unique } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { workspace } from "./workspace";
+import { user } from "./auth";
 
 export const folder = pgTable(
   "folder",
@@ -12,6 +13,7 @@ export const folder = pgTable(
     parentId: uuid("parent_id").references((): AnyPgColumn => folder.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     color: text("color"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

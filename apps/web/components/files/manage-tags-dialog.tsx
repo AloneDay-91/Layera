@@ -5,12 +5,12 @@ import { useTranslations } from "next-intl";
 import { Badge, Button, Checkbox, Dialog, Input, Loader, SkeletonLine, Text, cn } from "@cloudflare/kumo";
 import type { BadgeVariant } from "@cloudflare/kumo";
 import { PlusIcon, TrashIcon, XIcon } from "@phosphor-icons/react";
-import type { MockItem } from "@/lib/mock-files";
+import type { FileItem } from "@/lib/file-item";
 import { ClientOnly } from "@/components/shell/client-only";
 import { TAG_COLOR_OPTIONS, type TagColorValue, type WorkspaceTag } from "@/lib/tags";
 
 type ManageTagsDialogProps = {
-  item: MockItem | null;
+  item: FileItem | null;
   workspaceTags: WorkspaceTag[];
   loading?: boolean;
   onClose: () => void;

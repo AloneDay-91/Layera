@@ -9,6 +9,7 @@
     "space": "Espace",
     "organize": "Organiser",
     "shareLinks": "Liens de partage",
+    "archive": "Archive",
     "trash": "Corbeille",
     "tags": "Tags",
     "storage": "Stockage",
@@ -25,6 +26,7 @@
       "shared": "Partagés avec moi",
       "favorites": "Favoris",
       "links": "Liens de partage",
+      "archive": "Archive",
       "trash": "Corbeille",
       "tags": "Tags",
       "storage": "Analyse du stockage",
@@ -62,6 +64,10 @@
     "changeColor": "Changer la couleur",
     "downloadZip": "Télécharger en ZIP",
     "extract": "Extraire",
+    "archive": "Archiver",
+    "transfer": "Transférer",
+    "pin": "Épingler",
+    "unpin": "Désépingler",
     "delete": "Supprimer"
   },
   "fileBrowser": {
@@ -94,6 +100,7 @@
     "copyLink": "Copier le lien",
     "uploadTitle": "Téléversement",
     "uploadStatusUploading": "Envoi…",
+    "uploadStatusProgress": "Envoi… {percent} %",
     "uploadStatusSuccess": "Terminé",
     "uploadStatusError": "Échec",
     "deleteConfirmTitle": "{count, plural, one {Supprimer # élément ?} other {Supprimer # éléments ?}}",
@@ -109,6 +116,7 @@
       "itemRenamedTitle": "Élément renommé",
       "itemRenamedDescription": "Renommé en \"{name}\" avec succès.",
       "renameErrorDescription": "Impossible de renommer cet élément.",
+      "renameConflictDescription": "Un élément porte déjà ce nom dans ce dossier.",
       "itemDeletedTitle": "Élément supprimé",
       "itemDeletedDescription": "\"{name}\" a été supprimé.",
       "itemsDeletedTitle": "Éléments supprimés",
@@ -137,7 +145,10 @@
       "tagCreateErrorDescription": "Impossible de créer le tag.",
       "tagDeletedTitle": "Tag supprimé",
       "tagDeletedDescription": "\"{name}\" a été supprimé de l'espace.",
-      "tagDeleteErrorDescription": "Impossible de supprimer le tag."
+      "tagDeleteErrorDescription": "Impossible de supprimer le tag.",
+      "itemArchivedTitle": "Élément archivé",
+      "itemArchivedDescription": "\"{name}\" a été déplacé dans l'archive.",
+      "archiveErrorDescription": "Impossible d'archiver cet élément."
     },
     "deleteTagConfirm": "Supprimer définitivement le tag \"{name}\" de cet espace ?"
   },
@@ -290,13 +301,19 @@
     "locationColumn": "Emplacement",
     "modifiedColumn": "Modifié",
     "sizeColumn": "Taille",
+    "pinAria": "Épingler \"{name}\"",
+    "unpinAria": "Désépingler \"{name}\"",
     "toasts": {
       "removedTitle": "Retiré des favoris",
       "removedDescription": "\"{name}\" a été retiré de vos favoris.",
       "genericError": "Erreur",
       "removeErrorDescription": "Impossible de retirer cet élément des favoris.",
       "itemDeletedTitle": "Élément supprimé",
-      "itemDeletedDescription": "\"{name}\" a été déplacé dans la corbeille."
+      "itemDeletedDescription": "\"{name}\" a été déplacé dans la corbeille.",
+      "pinnedTitle": "Favori épinglé",
+      "unpinnedTitle": "Favori désépinglé",
+      "pinnedDescription": "\"{name}\" restera en tête de vos favoris.",
+      "unpinnedDescription": "\"{name}\" n'est plus épinglé."
     }
   },
   "recentPage": {
@@ -373,12 +390,51 @@
   },
   "activityPage": {
     "title": "Journaux d'activité",
-    "description": "Historique des actions, créations, suppressions et partages."
+    "description": "Historique des actions, créations, suppressions et partages.",
+    "emptyTitle": "Aucune activité",
+    "emptyDescription": "Les actions sur les fichiers, dossiers et partages apparaîtront ici.",
+    "columns": {
+      "when": "Date",
+      "actor": "Auteur",
+      "action": "Action",
+      "target": "Cible"
+    },
+    "actions": {
+      "file.upload": "Fichier envoyé",
+      "file.rename": "Fichier renommé",
+      "file.move": "Fichier déplacé",
+      "file.trash": "Fichier mis à la corbeille",
+      "file.delete": "Fichier supprimé",
+      "file.download": "Fichier téléchargé",
+      "file.restore": "Fichier restauré",
+      "file.edit": "Fichier modifié",
+      "file.archive": "Fichier archivé",
+      "file.unarchive": "Fichier restauré de l'archive",
+      "file.transfer": "Fichier transféré",
+      "folder.create": "Dossier créé",
+      "folder.rename": "Dossier renommé",
+      "folder.move": "Dossier déplacé",
+      "folder.trash": "Dossier mis à la corbeille",
+      "folder.delete": "Dossier supprimé",
+      "folder.restore": "Dossier restauré",
+      "folder.archive": "Dossier archivé",
+      "folder.unarchive": "Dossier restauré de l'archive",
+      "folder.transfer": "Dossier transféré",
+      "share.create": "Lien de partage créé",
+      "share.revoke": "Lien de partage révoqué",
+      "share.download": "Téléchargement via un lien public",
+      "share.internal": "Partage interne créé",
+      "share.internal-revoke": "Partage interne révoqué",
+      "member.invite": "Membre ajouté",
+      "member.remove": "Membre retiré"
+    }
   },
   "sharedPage": {
     "breadcrumb": "Partagés avec moi",
-    "comingSoonTitle": "Partage bientôt disponible",
-    "comingSoonDescription": "Le partage de fichiers et de dossiers arrive dans une prochaine mise à jour."
+    "description": "Fichiers et dossiers que des membres de vos espaces ont partagés avec vous.",
+    "emptyTitle": "Rien n'a encore été partagé avec vous",
+    "emptyDescription": "Lorsqu'un membre de votre workspace partage un fichier, il apparaîtra ici.",
+    "sharedByColumn": "Partagé par"
   },
   "workspaceSwitcher": {
     "personalWorkspaceOf": "Espace de {name}",
@@ -508,7 +564,8 @@
   "sharePage": {
     "sharedFolder": "Dossier partagé",
     "sharedFolderPreview": "Aperçu du dossier partagé",
-    "genericFile": "Fichier"
+    "genericFile": "Fichier",
+    "sharedBy": "Partagé par {name}"
   },
   "sharePasswordGate": {
     "title": "Ce lien est protégé",
@@ -577,6 +634,8 @@
       "inviteErrorFallback": "Impossible d'envoyer l'invitation.",
       "invitationSentTitle": "Invitation envoyée",
       "invitationSentDescription": "Un e-mail d'invitation a été transmis à {email}.",
+      "memberAddedTitle": "Membre ajouté",
+      "memberAddedDescription": "{email} a maintenant accès à cet espace.",
       "genericError": "Erreur",
       "removeMemberErrorFallback": "Impossible de retirer ce membre.",
       "memberRemovedTitle": "Membre retiré",
@@ -753,6 +812,66 @@
       "accountDeletedTitle": "Compte supprimé",
       "accountDeletedDescription": "Votre compte a été supprimé définitivement."
     }
+  },
+  "archivePage": {
+    "title": "Archive",
+    "description": "Les éléments archivés quittent le navigateur de fichiers mais restent restaurables.",
+    "emptyTitle": "L'archive est vide",
+    "emptyDescription": "Archivez des fichiers ou des dossiers depuis le menu d'actions pour les ranger ici.",
+    "nameColumn": "Nom",
+    "ownerColumn": "Propriétaire",
+    "archivedColumn": "Archivé le",
+    "restore": "Restaurer",
+    "delete": "Supprimer",
+    "toasts": {
+      "itemRestoredTitle": "Élément restauré",
+      "itemRestoredDescription": "\"{name}\" a été retiré de l'archive.",
+      "permanentDeleteTitle": "Suppression définitive",
+      "permanentDeleteDescription": "\"{name}\" a été supprimé définitivement."
+    }
+  },
+  "markdownEditor": {
+    "bold": "Gras",
+    "italic": "Italique",
+    "heading": "Titre",
+    "list": "Liste",
+    "link": "Lien",
+    "code": "Code",
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "emptyPreview": "L'aperçu apparaîtra ici.",
+    "toasts": {
+      "savedTitle": "Fichier enregistré",
+      "savedDescription": "Les modifications Markdown ont été écrites.",
+      "errorTitle": "Erreur",
+      "errorDescription": "Impossible d'enregistrer ce fichier."
+    }
+  },
+  "itemShareDialog": {
+    "membersTab": "Membres",
+    "linkTab": "Lien public",
+    "membersHelp": "Partagez cet élément avec un membre de l'espace actuel.",
+    "chooseMember": "Choisir un membre",
+    "share": "Partager",
+    "noShares": "Aucun partage interne pour le moment.",
+    "revoke": "Révoquer le partage",
+    "errorTitle": "Erreur",
+    "publicLinkError": "Impossible de créer le lien public.",
+    "memberShareError": "Impossible de partager avec ce membre.",
+    "sharedTitle": "Partage créé",
+    "sharedDescription": "Le membre verra cet élément dans Partagés avec moi."
+  },
+  "transferDialog": {
+    "title": "Transférer \"{name}\"",
+    "help": "Copie l'élément vers un autre espace dont vous êtes membre. L'original reste en place.",
+    "noDestination": "Vous n'avez pas d'autre espace vers lequel transférer.",
+    "chooseWorkspace": "Choisir un espace",
+    "transfer": "Transférer",
+    "transferring": "Transfert…",
+    "successTitle": "Transfert terminé",
+    "successDescription": "\"{name}\" a été copié vers l'espace choisi.",
+    "errorTitle": "Erreur",
+    "errorDescription": "Impossible de transférer cet élément."
   },
   "settings": {
     "language": "Langue",

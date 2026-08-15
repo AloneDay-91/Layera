@@ -27,6 +27,7 @@ export default function TrashPage() {
   const [items, setItems] = useState<TrashedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [canManage, setCanManage] = useState(false);
   const t = useTranslations("trashPage");
   const tToasts = useTranslations("trashPage.toasts");
   const tBreadcrumbs = useTranslations("fileBreadcrumbs");
@@ -49,6 +50,10 @@ export default function TrashPage() {
 
   useEffect(() => {
     fetchTrash();
+    fetch("/api/workspace/members")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setCanManage(Boolean(data?.canManage)))
+      .catch(() => setCanManage(false));
   }, [activeOrg?.id]);
 
   async function handleRestore(item: TrashedItem) {
@@ -129,7 +134,7 @@ export default function TrashPage() {
         title={t("title")}
         description={t("description")}
       >
-        {items.length > 0 && (
+        {canManage && items.length > 0 && (
           <Button
             variant="destructive"
             size="sm"
@@ -202,6 +207,7 @@ export default function TrashPage() {
                       >
                         {actionId === item.id ? <Loader size="sm" /> : t("restore")}
                       </Button>
+                      {canManage ? (
                       <Button
                         variant="destructive"
                         size="sm"
@@ -211,6 +217,7 @@ export default function TrashPage() {
                       >
                         {t("delete")}
                       </Button>
+                      ) : null}
                     </div>
                   </Table.Cell>
                 </Table.Row>

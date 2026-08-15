@@ -1,64 +1,28 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import JSZip from "jszip";
-import { auth } from "@/lib/auth";
-import { db, workspace, folder, file, eq, and, isNull } from "@filecloud/db";
-import { minioClient, S3_BUCKET } from "@filecloud/storage";
+import { db, folder, file, eq, and } from "@filecloud/db";
+import { ensureBucket, objectStorageKey, putStoredObject, minioClient, S3_BUCKET } from "@filecloud/storage";
 import { getMimeTypeFromFilename } from "@/lib/mime";
 import { checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
+import { getAuthorizedWorkspace } from "@/lib/services/permissions";
+import { jsonError } from "@/lib/services/http";
+import { uniqueFolderName, uniqueFileName } from "@/lib/services/names";
+import { sanitizeZipDirPath, sanitizeZipEntryPath } from "@/lib/zip-path";
 
-const MAX_ZIP_ENTRIES = 2000;
-const MAX_TOTAL_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
+const MAX_ZIP_ENTRIES = 500;
+const MAX_COMPRESSED_BYTES = 512 * 1024 * 1024;
+const MAX_TOTAL_UNCOMPRESSED_BYTES = 512 * 1024 * 1024;
 
-async function getActiveWorkspace(session: NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>) {
-  const activeOrgId = session.session.activeOrganizationId;
-  if (activeOrgId) {
-    const found = await db.select().from(workspace).where(eq(workspace.organizationId, activeOrgId)).limit(1);
-    return found[0];
-  }
-  const found = await db
-    .select()
-    .from(workspace)
-    .where(and(eq(workspace.ownerId, session.user.id), isNull(workspace.organizationId)))
-    .limit(1);
-  return found[0];
-}
-
-async function dedupeFolderName(workspaceId: string, parentId: string, baseName: string) {
-  const siblings = await db
-    .select({ name: folder.name })
-    .from(folder)
-    .where(and(eq(folder.workspaceId, workspaceId), eq(folder.parentId, parentId)));
-  const taken = new Set(siblings.map((s) => s.name));
-  if (!taken.has(baseName)) return baseName;
-  let n = 2;
-  while (taken.has(`${baseName} (${n})`)) n++;
-  return `${baseName} (${n})`;
-}
-
-async function dedupeFileName(workspaceId: string, folderId: string, baseName: string) {
-  const siblings = await db
-    .select({ name: file.name })
-    .from(file)
-    .where(and(eq(file.workspaceId, workspaceId), eq(file.folderId, folderId)));
-  const taken = new Set(siblings.map((s) => s.name));
-  if (!taken.has(baseName)) return baseName;
-  const dot = baseName.lastIndexOf(".");
-  const stem = dot > 0 ? baseName.slice(0, dot) : baseName;
-  const ext = dot > 0 ? baseName.slice(dot) : "";
-  let n = 2;
-  while (taken.has(`${stem} (${n})${ext}`)) n++;
-  return `${stem} (${n})${ext}`;
+function declaredUncompressedSize(entry: JSZip.JSZipObject): number {
+  const data = (entry as { _data?: { uncompressedSize?: number } })._data;
+  return typeof data?.uncompressedSize === "number" ? data.uncompressedSize : 0;
 }
 
 export async function POST(request: Request) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const ctx = await getAuthorizedWorkspace();
 
-    const { allowed, retryAfter } = await checkRateLimit(`unzip:${session.user.id}`, {
+    const { allowed, retryAfter } = await checkRateLimit(`unzip:${ctx.actor.id}`, {
       windowSeconds: 300,
       max: 10,
     });
@@ -69,11 +33,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
-    const wsRecord = await getActiveWorkspace(session);
-    if (!wsRecord) {
-      return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
-    }
-    const workspaceId = wsRecord.id;
+    const workspaceId = ctx.workspace.id;
 
     const [zipFile] = await db
       .select()
@@ -86,6 +46,9 @@ export async function POST(request: Request) {
     }
     if (zipFile.mimeType !== "application/zip" && !zipFile.name.toLowerCase().endsWith(".zip")) {
       return NextResponse.json({ error: "Not a zip file" }, { status: 400 });
+    }
+    if (zipFile.size > MAX_COMPRESSED_BYTES) {
+      return NextResponse.json({ error: "Archive is too large to extract" }, { status: 413 });
     }
 
     const stream = await minioClient.getObject(S3_BUCKET, zipFile.storageKey);
@@ -101,14 +64,31 @@ export async function POST(request: Request) {
       );
     }
 
-    const baseFolderName = await dedupeFolderName(
+    let declaredTotal = 0;
+    for (const entry of entries) {
+      if (entry.dir) {
+        if (sanitizeZipDirPath(entry.name) === null) {
+          return NextResponse.json({ error: "Archive contains an unsafe path" }, { status: 400 });
+        }
+        continue;
+      }
+      if (!sanitizeZipEntryPath(entry.name)) {
+        return NextResponse.json({ error: "Archive contains an unsafe path" }, { status: 400 });
+      }
+      declaredTotal += declaredUncompressedSize(entry);
+      if (declaredTotal > MAX_TOTAL_UNCOMPRESSED_BYTES) {
+        return NextResponse.json({ error: "Archive is too large once extracted" }, { status: 413 });
+      }
+    }
+
+    const baseFolderName = await uniqueFolderName(
       workspaceId,
       zipFile.folderId,
       zipFile.name.replace(/\.zip$/i, "") || "archive",
     );
     const [destFolder] = await db
       .insert(folder)
-      .values({ workspaceId, parentId: zipFile.folderId, name: baseFolderName })
+      .values({ workspaceId, parentId: zipFile.folderId, name: baseFolderName, createdBy: ctx.actor.id })
       .returning();
     if (!destFolder) {
       return NextResponse.json({ error: "Failed to create destination folder" }, { status: 500 });
@@ -125,52 +105,45 @@ export async function POST(request: Request) {
       const parentPath = segments.slice(0, -1).join("/");
       const parentId = await ensureFolder(parentPath);
 
-      const finalName = await dedupeFolderName(workspaceId, parentId, name);
+      const finalName = await uniqueFolderName(workspaceId, parentId, name);
       const [created] = await db
         .insert(folder)
-        .values({ workspaceId, parentId, name: finalName })
+        .values({ workspaceId, parentId, name: finalName, createdBy: ctx.actor.id })
         .returning();
       folderIdByPath.set(dirPath, created!.id);
       return created!.id;
     }
 
-    const bucketExists = await minioClient.bucketExists(S3_BUCKET).catch(() => false);
-    if (!bucketExists) {
-      await minioClient.makeBucket(S3_BUCKET, "").catch(() => {});
-    }
+    await ensureBucket();
 
     let totalUncompressedBytes = 0;
-    const startedAt = Date.now();
-    let fileIndex = 0;
     let extractedCount = 0;
 
     for (const entry of entries) {
-      const normalizedPath = entry.name.replace(/\/+$/, "");
-
       if (entry.dir) {
-        await ensureFolder(normalizedPath);
+        const dirPath = sanitizeZipDirPath(entry.name);
+        if (dirPath === null) {
+          return NextResponse.json({ error: "Archive contains an unsafe path" }, { status: 400 });
+        }
+        if (dirPath) await ensureFolder(dirPath);
         continue;
       }
 
-      const lastSlash = normalizedPath.lastIndexOf("/");
-      const dirPath = lastSlash >= 0 ? normalizedPath.slice(0, lastSlash) : "";
-      const rawName = lastSlash >= 0 ? normalizedPath.slice(lastSlash + 1) : normalizedPath;
-      if (!rawName) continue;
+      const parsed = sanitizeZipEntryPath(entry.name);
+      if (!parsed) continue;
 
       const content = await entry.async("nodebuffer");
       totalUncompressedBytes += content.length;
       if (totalUncompressedBytes > MAX_TOTAL_UNCOMPRESSED_BYTES) {
-        return NextResponse.json({ error: "Archive is too large once extracted" }, { status: 400 });
+        return NextResponse.json({ error: "Archive is too large once extracted" }, { status: 413 });
       }
 
-      const parentId = await ensureFolder(dirPath);
-      const finalName = await dedupeFileName(workspaceId, parentId, rawName);
+      const parentId = await ensureFolder(parsed.dirPath);
+      const finalName = await uniqueFileName(workspaceId, parentId, parsed.fileName);
       const mimeType = getMimeTypeFromFilename(finalName);
-      const storageKey = `files/${workspaceId}/${startedAt}-${fileIndex++}-${finalName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const storageKey = objectStorageKey(workspaceId, crypto.randomUUID());
 
-      await minioClient.putObject(S3_BUCKET, storageKey, content, content.length, {
-        "Content-Type": mimeType,
-      });
+      await putStoredObject(storageKey, content, content.length, mimeType);
       await db.insert(file).values({
         workspaceId,
         folderId: parentId,
@@ -178,6 +151,7 @@ export async function POST(request: Request) {
         mimeType,
         size: content.length,
         storageKey,
+        createdBy: ctx.actor.id,
       });
       extractedCount++;
     }
@@ -188,7 +162,6 @@ export async function POST(request: Request) {
       extractedCount,
     });
   } catch (error) {
-    console.error("[POST /api/files/unzip Error]:", error);
-    return NextResponse.json({ error: "Failed to extract archive" }, { status: 500 });
+    return jsonError(error, "Failed to extract archive");
   }
 }

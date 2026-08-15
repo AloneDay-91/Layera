@@ -1,22 +1,30 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import JSZip from "jszip";
-import { auth } from "@/lib/auth";
-import { db, workspace, folder, file, trashItem, eq, and, isNull, inArray } from "@filecloud/db";
+import { db, folder, file, trashItem, eq, and, inArray } from "@filecloud/db";
 import { minioClient, S3_BUCKET } from "@filecloud/storage";
+import { getAuthorizedWorkspace } from "@/lib/services/permissions";
+import { jsonError } from "@/lib/services/http";
+import { checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
+import { contentDisposition } from "@/lib/http-file";
+import { ServiceError } from "@/lib/services/errors";
 
-async function getActiveWorkspace(session: NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>) {
-  const activeOrgId = session.session.activeOrganizationId;
-  if (activeOrgId) {
-    const found = await db.select().from(workspace).where(eq(workspace.organizationId, activeOrgId)).limit(1);
-    return found[0];
+const MAX_ZIP_FILES = 500;
+const MAX_ZIP_BYTES = 512 * 1024 * 1024;
+
+class ZipBudget {
+  files = 0;
+  bytes = 0;
+
+  add(size: number) {
+    this.files += 1;
+    this.bytes += size;
+    if (this.files > MAX_ZIP_FILES) {
+      throw new ServiceError(413, "Too many files to compress");
+    }
+    if (this.bytes > MAX_ZIP_BYTES) {
+      throw new ServiceError(413, "Archive would be too large");
+    }
   }
-  const found = await db
-    .select()
-    .from(workspace)
-    .where(and(eq(workspace.ownerId, session.user.id), isNull(workspace.organizationId)))
-    .limit(1);
-  return found[0];
 }
 
 // Recursively adds a folder's files (and empty subfolders) under `basePath`
@@ -27,6 +35,7 @@ async function addFolderToZip(
   basePath: string,
   workspaceId: string,
   trashedIds: Set<string>,
+  budget: ZipBudget,
 ) {
   const [subfolders, files] = await Promise.all([
     db.select().from(folder).where(and(eq(folder.parentId, folderId), eq(folder.workspaceId, workspaceId))),
@@ -37,11 +46,12 @@ async function addFolderToZip(
 
   for (const sub of subfolders) {
     if (trashedIds.has(sub.id)) continue;
-    await addFolderToZip(zip, sub.id, `${basePath}${sub.name}/`, workspaceId, trashedIds);
+    await addFolderToZip(zip, sub.id, `${basePath}${sub.name}/`, workspaceId, trashedIds, budget);
   }
 
   for (const f of files) {
     if (trashedIds.has(f.id)) continue;
+    budget.add(f.size);
     try {
       const stream = await minioClient.getObject(S3_BUCKET, f.storageKey);
       const chunks: Buffer[] = [];
@@ -55,10 +65,12 @@ async function addFolderToZip(
 
 export async function GET(request: Request) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const ctx = await getAuthorizedWorkspace();
+    const { allowed, retryAfter } = await checkRateLimit(`zip:${ctx.actor.id}`, {
+      windowSeconds: 300,
+      max: 10,
+    });
+    if (!allowed) return rateLimitedResponse(retryAfter!);
 
     const { searchParams } = new URL(request.url);
     const itemsParam = searchParams.get("items");
@@ -78,10 +90,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "No valid items" }, { status: 400 });
     }
 
-    const wsRecord = await getActiveWorkspace(session);
-    if (!wsRecord) {
-      return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
-    }
+    const wsRecord = ctx.workspace;
 
     const trashedRows = await db
       .select({ itemId: trashItem.itemId })
@@ -109,12 +118,14 @@ export async function GET(request: Request) {
     }
 
     const zip = new JSZip();
+    const budget = new ZipBudget();
 
     for (const f of activeFolders) {
-      await addFolderToZip(zip, f.id, `${f.name}/`, wsRecord.id, trashedIds);
+      await addFolderToZip(zip, f.id, `${f.name}/`, wsRecord.id, trashedIds, budget);
     }
 
     for (const f of activeFiles) {
+      budget.add(f.size);
       try {
         const stream = await minioClient.getObject(S3_BUCKET, f.storageKey);
         const chunks: Buffer[] = [];
@@ -135,12 +146,11 @@ export async function GET(request: Request) {
     return new NextResponse(new Uint8Array(zipBuffer), {
       headers: {
         "Content-Type": "application/zip",
-        "Content-Disposition": `attachment; filename="${encodeURIComponent(zipName)}"`,
+        "Content-Disposition": contentDisposition("attachment", zipName),
         "Content-Length": zipBuffer.length.toString(),
       },
     });
   } catch (error) {
-    console.error("[GET /api/files/zip Error]:", error);
-    return NextResponse.json({ error: "Failed to create zip" }, { status: 500 });
+    return jsonError(error, "Failed to create zip");
   }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { db, workspace, user, organization, member, file, eq, inArray } from "@filecloud/db";
+import { db, workspace, user, organization, member, file, eq, inArray, sql } from "@filecloud/db";
 import { getAdminSession } from "@/lib/require-admin";
+import { deleteWorkspaceStoredFiles } from "@/lib/services/storage-cleanup";
 
 export async function GET() {
   const session = await getAdminSession();
@@ -30,9 +31,16 @@ export async function GET() {
     const workspaceIds = workspaces.map((w) => w.id);
     const storageByWorkspace = new Map<string, number>();
     if (workspaceIds.length > 0) {
-      const files = await db.select({ workspaceId: file.workspaceId, size: file.size }).from(file).where(inArray(file.workspaceId, workspaceIds));
-      for (const f of files) {
-        storageByWorkspace.set(f.workspaceId, (storageByWorkspace.get(f.workspaceId) ?? 0) + f.size);
+      const sums = await db
+        .select({
+          workspaceId: file.workspaceId,
+          used: sql<number>`coalesce(sum(${file.size}), 0)`,
+        })
+        .from(file)
+        .where(inArray(file.workspaceId, workspaceIds))
+        .groupBy(file.workspaceId);
+      for (const row of sums) {
+        storageByWorkspace.set(row.workspaceId, Number(row.used ?? 0));
       }
     }
 
@@ -72,6 +80,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
+    await deleteWorkspaceStoredFiles(id);
     await db.delete(workspace).where(eq(workspace.id, id));
     return NextResponse.json({ success: true });
   } catch (error) {

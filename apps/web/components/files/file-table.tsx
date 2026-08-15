@@ -5,28 +5,31 @@ import { useLocale, useTranslations } from "next-intl";
 import { Badge, DropdownMenu, LayerCard, Table, cn } from "@cloudflare/kumo";
 import type { BadgeVariant } from "@cloudflare/kumo";
 import { CaretDownIcon, StarIcon, XCircleIcon } from "@phosphor-icons/react";
-import type { MockItem } from "@/lib/mock-files";
-import { formatFileSize } from "@/lib/mock-files";
+import type { FileItem } from "@/lib/file-item";
+import { formatFileSize } from "@/lib/file-item";
 import type { WorkspaceTag } from "@/lib/tags";
 import { FilePreviewIcon, getFileTypeLabel } from "./file-preview";
 import { FileRowMenu } from "./file-row-menu";
 import { TagBadgeList } from "./tag-badge-list";
+import { UserAvatar } from "./user-avatar";
 
 export type TypeFilterValue = "all" | "folder" | "file";
 
 type FileTableProps = {
-  items: MockItem[];
+  items: FileItem[];
   selectedItemId: string | null;
   onOpenFolder: (folderId: string) => void;
   onSelectItem: (itemId: string | null) => void;
-  onRenameItem?: (item: MockItem) => void;
-  onShareItem?: (item: MockItem) => void;
-  onDeleteItem?: (item: MockItem) => void;
-  onToggleFavorite?: (item: MockItem) => void;
-  onManageTags?: (item: MockItem) => void;
-  onChangeColor?: (item: MockItem) => void;
-  onDownloadZip?: (item: MockItem) => void;
-  onExtractZip?: (item: MockItem) => void;
+  onRenameItem?: (item: FileItem) => void;
+  onShareItem?: (item: FileItem) => void;
+  onDeleteItem?: (item: FileItem) => void;
+  onToggleFavorite?: (item: FileItem) => void;
+  onManageTags?: (item: FileItem) => void;
+  onChangeColor?: (item: FileItem) => void;
+  onDownloadZip?: (item: FileItem) => void;
+  onExtractZip?: (item: FileItem) => void;
+  onArchive?: (item: FileItem) => void;
+  onTransfer?: (item: FileItem) => void;
   onMoveItem?: (draggedItem: { id: string; type: "file" | "folder"; name: string }, targetFolderId: string) => void;
   selectedIds?: Set<string>;
   onToggleSelectItem?: (id: string) => void;
@@ -82,6 +85,8 @@ export function FileTable({
   onChangeColor,
   onDownloadZip,
   onExtractZip,
+  onArchive,
+  onTransfer,
   onMoveItem,
   selectedIds,
   onToggleSelectItem,
@@ -101,7 +106,7 @@ export function FileTable({
   const showSelection = Boolean(onToggleSelectItem);
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
-  function handleActivate(item: MockItem) {
+  function handleActivate(item: FileItem) {
     if (item.type === "folder") {
       onOpenFolder(item.id);
     } else {
@@ -109,7 +114,7 @@ export function FileTable({
     }
   }
 
-  function handleDragStart(e: React.DragEvent, item: MockItem) {
+  function handleDragStart(e: React.DragEvent, item: FileItem) {
     e.dataTransfer.setData(
       "application/json",
       JSON.stringify({ id: item.id, type: item.type, name: item.name }),
@@ -262,7 +267,12 @@ export function FileTable({
                     </div>
                   </Table.Cell>
                   <Table.Cell className="text-kumo-subtle">{getFileTypeLabel(item, tFileType)}</Table.Cell>
-                  <Table.Cell>{item.owner}</Table.Cell>
+                  <Table.Cell>
+                    <span className="flex items-center gap-2">
+                      <UserAvatar userId={item.ownerId} name={item.owner} />
+                      {item.owner}
+                    </span>
+                  </Table.Cell>
                   <Table.Cell>{new Date(item.updatedAt).toLocaleDateString(locale)}</Table.Cell>
                   <Table.Cell className="text-right">{formatFileSize(item.size)}</Table.Cell>
                   <Table.Cell>
@@ -276,6 +286,8 @@ export function FileTable({
                       onChangeColor={onChangeColor}
                       onDownloadZip={onDownloadZip}
                       onExtractZip={onExtractZip}
+                      onArchive={onArchive}
+                      onTransfer={onTransfer}
                     />
                   </Table.Cell>
                 </Table.Row>

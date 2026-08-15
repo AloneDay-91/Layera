@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { minioClient, S3_BUCKET } from "@filecloud/storage";
+import {
+  ensureBucket,
+  getStoredObjectStream,
+  nodeStreamToWeb,
+  putStoredObject,
+  removeStoredObject,
+  statStoredObject,
+} from "@filecloud/storage";
+import { contentDisposition } from "@/lib/http-file";
 
 // SVG is deliberately excluded — it can embed <script> and executes it when
 // navigated to directly (Content-Disposition: inline), unlike raster formats.
@@ -14,11 +22,6 @@ function avatarStorageKey(userId: string) {
 
 export async function GET(request: Request) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
     if (!userId) {
@@ -26,28 +29,26 @@ export async function GET(request: Request) {
     }
 
     try {
-      const stat = await minioClient.statObject(S3_BUCKET, avatarStorageKey(userId));
+      const storageKey = avatarStorageKey(userId);
+      const stat = await statStoredObject(storageKey);
       const contentType = stat.metaData?.["content-type"] ?? "application/octet-stream";
       if (!ALLOWED_AVATAR_MIME_TYPES.has(contentType)) {
         return NextResponse.json({ error: "Avatar not found" }, { status: 404 });
       }
 
-      const stream = await minioClient.getObject(S3_BUCKET, avatarStorageKey(userId));
-      const chunks: Buffer[] = [];
-      for await (const chunk of stream) {
-        chunks.push(Buffer.from(chunk));
+      const stream = await getStoredObjectStream(storageKey);
+      const responseHeaders: Record<string, string> = {
+        "Content-Type": contentType,
+        "Content-Disposition": contentDisposition("inline", "avatar"),
+        "Cache-Control": "private, max-age=3600",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+      };
+      if (typeof stat.size === "number" && stat.size > 0) {
+        responseHeaders["Content-Length"] = String(stat.size);
       }
-      const buffer = Buffer.concat(chunks);
 
-      return new NextResponse(buffer, {
-        headers: {
-          "Content-Type": contentType,
-          "Content-Disposition": "inline",
-          "Cache-Control": "private, max-age=3600",
-          "X-Content-Type-Options": "nosniff",
-          "Content-Security-Policy": "default-src 'none'; sandbox",
-        },
-      });
+      return new NextResponse(nodeStreamToWeb(stream), { headers: responseHeaders });
     } catch {
       return NextResponse.json({ error: "Avatar not found" }, { status: 404 });
     }
@@ -81,13 +82,8 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(arrayBuffer);
     const storageKey = avatarStorageKey(session.user.id);
 
-    const bucketExists = await minioClient.bucketExists(S3_BUCKET).catch(() => false);
-    if (!bucketExists) {
-      await minioClient.makeBucket(S3_BUCKET, "").catch(() => {});
-    }
-    await minioClient.putObject(S3_BUCKET, storageKey, buffer, buffer.length, {
-      "Content-Type": uploadedFile.type,
-    });
+    await ensureBucket();
+    await putStoredObject(storageKey, buffer, buffer.length, uploadedFile.type);
 
     const imageUrl = `/api/profile/avatar?userId=${session.user.id}&t=${Date.now()}`;
     return NextResponse.json({ success: true, image: imageUrl });
@@ -104,7 +100,7 @@ export async function DELETE() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await minioClient.removeObject(S3_BUCKET, avatarStorageKey(session.user.id)).catch(() => {});
+    await removeStoredObject(avatarStorageKey(session.user.id));
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,48 +1,25 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
-import { db, workspace, folder, file, favorite, trashItem, eq, and, isNull, inArray } from "@filecloud/db";
-
-async function getActiveWorkspace(session: NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>) {
-  const activeOrgId = session.session.activeOrganizationId;
-  if (activeOrgId) {
-    const found = await db.select().from(workspace).where(eq(workspace.organizationId, activeOrgId)).limit(1);
-    return found[0];
-  }
-  const found = await db
-    .select()
-    .from(workspace)
-    .where(and(eq(workspace.ownerId, session.user.id), isNull(workspace.organizationId)))
-    .limit(1);
-  return found[0];
-}
+import { db, folder, file, favorite, eq, and, inArray } from "@filecloud/db";
+import { getAuthorizedWorkspace } from "@/lib/services/permissions";
+import { jsonError } from "@/lib/services/http";
+import { hiddenItemIds } from "@/lib/services/hidden";
+import { usersByIds } from "@/lib/services/users";
 
 export async function GET() {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const wsRecord = await getActiveWorkspace(session);
-    if (!wsRecord) {
-      return NextResponse.json({ items: [] });
-    }
+    const ctx = await getAuthorizedWorkspace();
+    const wsRecord = ctx.workspace;
 
     const favoriteRows = await db
       .select()
       .from(favorite)
-      .where(and(eq(favorite.workspaceId, wsRecord.id), eq(favorite.userId, session.user.id)));
+      .where(and(eq(favorite.workspaceId, wsRecord.id), eq(favorite.userId, ctx.actor.id)));
 
     if (favoriteRows.length === 0) {
       return NextResponse.json({ items: [] });
     }
 
-    const trashedRows = await db
-      .select({ itemId: trashItem.itemId })
-      .from(trashItem)
-      .where(eq(trashItem.workspaceId, wsRecord.id));
-    const trashedIds = new Set(trashedRows.map((t) => t.itemId));
+    const hiddenIds = await hiddenItemIds(wsRecord.id);
 
     const fileIds = favoriteRows.filter((f) => f.itemType === "file").map((f) => f.itemId);
     const folderIds = favoriteRows.filter((f) => f.itemType === "folder").map((f) => f.itemId);
@@ -58,10 +35,13 @@ export async function GET() {
     ]);
 
     const folderNameById = new Map(allFolders.map((f) => [f.id, f.name === "root" ? "Mes fichiers" : f.name]));
-    const favoritedAtByItemId = new Map(favoriteRows.map((f) => [f.itemId, f.createdAt.toISOString()]));
+    const favoriteMeta = new Map(
+      favoriteRows.map((f) => [f.itemId, { favoritedAt: f.createdAt.toISOString(), pinned: f.pinned }]),
+    );
+    const owners = await usersByIds([...favFiles.map((f) => f.createdBy), ...favFolders.map((f) => f.createdBy)]);
 
     const fileItems = favFiles
-      .filter((f) => !trashedIds.has(f.id))
+      .filter((f) => !hiddenIds.has(f.id))
       .map((f) => ({
         id: f.id,
         parentId: f.folderId,
@@ -70,14 +50,16 @@ export async function GET() {
         mimeType: f.mimeType,
         size: f.size,
         updatedAt: f.updatedAt.toISOString(),
-        owner: session.user.name,
+        owner: (f.createdBy && owners.get(f.createdBy)?.name) || ctx.actor.name,
+        ownerId: f.createdBy ?? ctx.actor.id,
         location: folderNameById.get(f.folderId) ?? "Mes fichiers",
         isFavorite: true,
-        favoritedAt: favoritedAtByItemId.get(f.id) ?? f.updatedAt.toISOString(),
+        isPinned: favoriteMeta.get(f.id)?.pinned ?? false,
+        favoritedAt: favoriteMeta.get(f.id)?.favoritedAt ?? f.updatedAt.toISOString(),
       }));
 
     const folderItems = favFolders
-      .filter((f) => !trashedIds.has(f.id))
+      .filter((f) => !hiddenIds.has(f.id))
       .map((f) => ({
         id: f.id,
         parentId: f.parentId,
@@ -86,36 +68,33 @@ export async function GET() {
         mimeType: null,
         size: null,
         updatedAt: f.updatedAt.toISOString(),
-        owner: session.user.name,
+        owner: (f.createdBy && owners.get(f.createdBy)?.name) || ctx.actor.name,
+        ownerId: f.createdBy ?? ctx.actor.id,
         location: f.parentId ? (folderNameById.get(f.parentId) ?? "Mes fichiers") : "Mes fichiers",
         isFavorite: true,
-        favoritedAt: favoritedAtByItemId.get(f.id) ?? f.updatedAt.toISOString(),
+        isPinned: favoriteMeta.get(f.id)?.pinned ?? false,
+        favoritedAt: favoriteMeta.get(f.id)?.favoritedAt ?? f.updatedAt.toISOString(),
       }));
 
-    const items = [...folderItems, ...fileItems].sort((a, b) => b.favoritedAt.localeCompare(a.favoritedAt));
+    const items = [...folderItems, ...fileItems].sort((a, b) => {
+      if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+      return b.favoritedAt.localeCompare(a.favoritedAt);
+    });
 
     return NextResponse.json({ items });
   } catch (error) {
-    console.error("[GET /api/favorites Error]:", error);
-    return NextResponse.json({ error: "Failed to fetch favorites" }, { status: 500 });
+    return jsonError(error, "Failed to fetch favorites");
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const ctx = await getAuthorizedWorkspace();
+    const wsRecord = ctx.workspace;
 
     const { id, type } = await request.json();
     if (!id || (type !== "file" && type !== "folder")) {
       return NextResponse.json({ error: "Missing or invalid id/type" }, { status: 400 });
-    }
-
-    const wsRecord = await getActiveWorkspace(session);
-    if (!wsRecord) {
-      return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
     }
 
     const belongsToWorkspace =
@@ -130,7 +109,7 @@ export async function POST(request: Request) {
     const existing = await db
       .select()
       .from(favorite)
-      .where(and(eq(favorite.userId, session.user.id), eq(favorite.itemId, id)))
+      .where(and(eq(favorite.userId, ctx.actor.id), eq(favorite.itemId, id)))
       .limit(1);
 
     if (existing[0]) {
@@ -140,13 +119,39 @@ export async function POST(request: Request) {
 
     await db.insert(favorite).values({
       workspaceId: wsRecord.id,
-      userId: session.user.id,
+      userId: ctx.actor.id,
       itemType: type,
       itemId: id,
     });
     return NextResponse.json({ favorited: true });
   } catch (error) {
-    console.error("[POST /api/favorites Error]:", error);
-    return NextResponse.json({ error: "Failed to toggle favorite" }, { status: 500 });
+    return jsonError(error, "Failed to toggle favorite");
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const ctx = await getAuthorizedWorkspace();
+    const { id, pinned } = await request.json();
+    if (!id || typeof pinned !== "boolean") {
+      return NextResponse.json({ error: "Missing id or pinned" }, { status: 400 });
+    }
+
+    const [existing] = await db
+      .select()
+      .from(favorite)
+      .where(and(eq(favorite.userId, ctx.actor.id), eq(favorite.itemId, id), eq(favorite.workspaceId, ctx.workspace.id)))
+      .limit(1);
+    if (!existing) {
+      return NextResponse.json({ error: "Favorite not found" }, { status: 404 });
+    }
+
+    await db
+      .update(favorite)
+      .set({ pinned, pinnedAt: pinned ? new Date() : null })
+      .where(eq(favorite.id, existing.id));
+    return NextResponse.json({ pinned });
+  } catch (error) {
+    return jsonError(error, "Failed to pin favorite");
   }
 }

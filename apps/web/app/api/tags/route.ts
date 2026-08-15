@@ -1,34 +1,13 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
-import { db, workspace, tag, itemTag, TAG_COLORS, eq, and, isNull } from "@filecloud/db";
+import { db, tag, itemTag, TAG_COLORS, eq, and } from "@filecloud/db";
 import type { TagColor } from "@filecloud/db";
-
-async function getActiveWorkspace(session: NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>) {
-  const activeOrgId = session.session.activeOrganizationId;
-  if (activeOrgId) {
-    const found = await db.select().from(workspace).where(eq(workspace.organizationId, activeOrgId)).limit(1);
-    return found[0];
-  }
-  const found = await db
-    .select()
-    .from(workspace)
-    .where(and(eq(workspace.ownerId, session.user.id), isNull(workspace.organizationId)))
-    .limit(1);
-  return found[0];
-}
+import { getAuthorizedWorkspace } from "@/lib/services/permissions";
+import { jsonError } from "@/lib/services/http";
 
 export async function GET() {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const wsRecord = await getActiveWorkspace(session);
-    if (!wsRecord) {
-      return NextResponse.json({ tags: [] });
-    }
+    const ctx = await getAuthorizedWorkspace();
+    const wsRecord = ctx.workspace;
 
     const tags = await db.select().from(tag).where(eq(tag.workspaceId, wsRecord.id)).orderBy(tag.name);
 
@@ -45,29 +24,20 @@ export async function GET() {
       tags: tags.map((t) => ({ ...t, itemCount: countByTagId.get(t.id) ?? 0 })),
     });
   } catch (error) {
-    console.error("[GET /api/tags Error]:", error);
-    return NextResponse.json({ error: "Failed to fetch tags" }, { status: 500 });
+    return jsonError(error, "Failed to fetch tags");
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+    const ctx = await getAuthorizedWorkspace();
     const { name, color } = await request.json();
     const trimmedName = typeof name === "string" ? name.trim() : "";
     if (!trimmedName) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
     const tagColor = TAG_COLORS.includes(color) ? color : "neutral";
-
-    const wsRecord = await getActiveWorkspace(session);
-    if (!wsRecord) {
-      return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
-    }
+    const wsRecord = ctx.workspace;
 
     const existing = await db
       .select()
@@ -85,27 +55,19 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ tag: created });
   } catch (error) {
-    console.error("[POST /api/tags Error]:", error);
-    return NextResponse.json({ error: "Failed to create tag" }, { status: 500 });
+    return jsonError(error, "Failed to create tag");
   }
 }
 
 export async function PATCH(request: Request) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+    const ctx = await getAuthorizedWorkspace();
     const { id, name, color } = await request.json();
     if (!id) {
       return NextResponse.json({ error: "Missing tag id" }, { status: 400 });
     }
 
-    const wsRecord = await getActiveWorkspace(session);
-    if (!wsRecord) {
-      return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
-    }
+    const wsRecord = ctx.workspace;
 
     const existing = await db
       .select()
@@ -123,33 +85,24 @@ export async function PATCH(request: Request) {
     const [updated] = await db.update(tag).set(updates).where(eq(tag.id, id)).returning();
     return NextResponse.json({ tag: updated });
   } catch (error) {
-    console.error("[PATCH /api/tags Error]:", error);
-    return NextResponse.json({ error: "Failed to update tag" }, { status: 500 });
+    return jsonError(error, "Failed to update tag");
   }
 }
 
 export async function DELETE(request: Request) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+    const ctx = await getAuthorizedWorkspace();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     if (!id) {
       return NextResponse.json({ error: "Missing tag id" }, { status: 400 });
     }
 
-    const wsRecord = await getActiveWorkspace(session);
-    if (!wsRecord) {
-      return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
-    }
+    const wsRecord = ctx.workspace;
 
     await db.delete(tag).where(and(eq(tag.id, id), eq(tag.workspaceId, wsRecord.id)));
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[DELETE /api/tags Error]:", error);
-    return NextResponse.json({ error: "Failed to delete tag" }, { status: 500 });
+    return jsonError(error, "Failed to delete tag");
   }
 }
