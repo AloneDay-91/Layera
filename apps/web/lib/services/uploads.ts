@@ -6,6 +6,8 @@ import {
   objectStorageKey,
   presignPutObject,
   putStoredObject,
+  readStoredObjectPrefix,
+  removeStoredObject,
   statStoredObject,
   usesPublicPresign,
 } from "@filecloud/storage";
@@ -14,9 +16,15 @@ import type { AuthorizedContext } from "./permissions";
 import { resolveFolderInWorkspace } from "./files";
 import { uniqueFileName } from "./names";
 import { recordAudit } from "./audit";
+import { MAX_UPLOAD_BYTES, STORAGE_QUOTA_BYTES, workspaceUsedBytes } from "./quota";
+import { mimeMatchesDeclaration } from "@/lib/mime-sniff";
 
 const PRESIGN_EXPIRY_SECONDS = 15 * 60;
-const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES ?? 5 * 1024 * 1024 * 1024);
+
+async function abortUpload(uploadId: string, storageKey: string) {
+  await db.update(upload).set({ status: "aborted" }).where(eq(upload.id, uploadId));
+  await removeStoredObject(storageKey);
+}
 
 export async function presignUpload(
   ctx: AuthorizedContext,
@@ -27,6 +35,11 @@ export async function presignUpload(
   if (!Number.isFinite(input.size) || input.size < 0) throw new ServiceError(400, "Invalid size");
   if (input.size > MAX_UPLOAD_BYTES) {
     throw new ServiceError(413, "File is too large");
+  }
+
+  const used = await workspaceUsedBytes(ctx.workspace.id);
+  if (used + input.size > STORAGE_QUOTA_BYTES) {
+    throw new ServiceError(413, "Workspace storage quota exceeded");
   }
 
   const folder = await resolveFolderInWorkspace(ctx.workspace.id, input.folderId);
@@ -77,7 +90,7 @@ async function getOwnedPendingUpload(ctx: AuthorizedContext, uploadId: string) {
   if (!row) throw new ServiceError(404, "Upload not found");
   if (row.status !== "pending") throw new ServiceError(409, "Upload is no longer pending");
   if (row.expiresAt < new Date()) {
-    await db.update(upload).set({ status: "aborted" }).where(eq(upload.id, row.id));
+    await abortUpload(row.id, row.storageKey);
     throw new ServiceError(410, "Upload expired");
   }
   return row;
@@ -100,9 +113,29 @@ export async function completeUpload(ctx: AuthorizedContext, uploadId: string) {
   }
 
   const storedSize = typeof stat.size === "number" ? stat.size : row.size;
-  if (row.size > 0 && storedSize !== row.size) {
-    await db.update(upload).set({ status: "aborted" }).where(eq(upload.id, row.id));
+  if (storedSize !== row.size || storedSize > MAX_UPLOAD_BYTES) {
+    await abortUpload(row.id, row.storageKey);
     throw new ServiceError(400, "Uploaded size does not match");
+  }
+
+  const used = await workspaceUsedBytes(ctx.workspace.id);
+  if (used + storedSize > STORAGE_QUOTA_BYTES) {
+    await abortUpload(row.id, row.storageKey);
+    throw new ServiceError(413, "Workspace storage quota exceeded");
+  }
+
+  if (storedSize > 0) {
+    try {
+      const prefix = await readStoredObjectPrefix(row.storageKey, 16);
+      if (!mimeMatchesDeclaration(row.mimeType, prefix)) {
+        await abortUpload(row.id, row.storageKey);
+        throw new ServiceError(400, "File content does not match the declared type");
+      }
+    } catch (error) {
+      if (error instanceof ServiceError) throw error;
+      await abortUpload(row.id, row.storageKey);
+      throw new ServiceError(400, "Unable to verify uploaded file");
+    }
   }
 
   const name = await uniqueFileName(ctx.workspace.id, row.folderId, row.fileName);
@@ -136,7 +169,6 @@ export async function completeUpload(ctx: AuthorizedContext, uploadId: string) {
     name: created.name,
     size: created.size,
     mimeType: created.mimeType,
-    storageKey: created.storageKey,
     updatedAt: created.updatedAt.toISOString(),
   };
 }
