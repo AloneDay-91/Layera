@@ -12,4 +12,10 @@ const pool = new Pool({ connectionString: databaseUrl });
 export const db = drizzle(pool, { schema });
 export * from "./schema";
 export { provisionPersonalWorkspace, provisionOrganizationWorkspace } from "./provisioning";
-export { eq, and, isNull, ilike, inArray, notInArray, gte, lte, sql, desc } from "drizzle-orm";
+export {
+  requireWorkspaceAccess,
+  requireWorkspaceMember,
+  WorkspaceAccessError,
+} from "./access";
+export type { AuthorizedWorkspace, WorkspaceRow } from "./access";
+export { eq, and, isNull, ilike, inArray, notInArray, gte, lte, sql, desc, ne } from "drizzle-orm";

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
-import { db, workspace, folder, file, trashItem, eq, and, isNull } from "@filecloud/db";
+import { db, folder, file, trashItem, eq } from "@filecloud/db";
+import { getAuthorizedWorkspace } from "@/lib/services/permissions";
+import { jsonError } from "@/lib/services/http";
 
 // Soft, display-only quota — there is no enforcement or per-workspace
 // configuration yet, this only drives the storage meter's percentage.
@@ -26,43 +26,8 @@ function categorize(mimeType: string): Category {
 
 export async function GET() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const activeOrgId = session.session.activeOrganizationId;
-    let wsRecord;
-    if (activeOrgId) {
-      const found = await db
-        .select()
-        .from(workspace)
-        .where(eq(workspace.organizationId, activeOrgId))
-        .limit(1);
-      wsRecord = found[0];
-    } else {
-      const found = await db
-        .select()
-        .from(workspace)
-        .where(and(eq(workspace.ownerId, session.user.id), isNull(workspace.organizationId)))
-        .limit(1);
-      wsRecord = found[0];
-    }
-
-    if (!wsRecord) {
-      return NextResponse.json({
-        usedBytes: 0,
-        quotaBytes: STORAGE_QUOTA_BYTES,
-        fileCount: 0,
-        folderCount: 0,
-        trashBytes: 0,
-        trashCount: 0,
-        categories: { images: 0, documents: 0, videos: 0, other: 0 },
-      });
-    }
+    const ctx = await getAuthorizedWorkspace();
+    const wsRecord = ctx.workspace;
 
     const trashedRows = await db
       .select({ itemId: trashItem.itemId })
@@ -99,7 +64,6 @@ export async function GET() {
       categories,
     });
   } catch (error) {
-    console.error("[GET /api/storage/stats Error]:", error);
-    return NextResponse.json({ error: "Failed to fetch storage stats" }, { status: 500 });
+    return jsonError(error, "Failed to fetch storage stats");
   }
 }

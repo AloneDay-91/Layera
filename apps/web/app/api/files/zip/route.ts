@@ -1,23 +1,9 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import JSZip from "jszip";
-import { auth } from "@/lib/auth";
-import { db, workspace, folder, file, trashItem, eq, and, isNull, inArray } from "@filecloud/db";
+import { db, folder, file, trashItem, eq, and, inArray } from "@filecloud/db";
 import { minioClient, S3_BUCKET } from "@filecloud/storage";
-
-async function getActiveWorkspace(session: NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>) {
-  const activeOrgId = session.session.activeOrganizationId;
-  if (activeOrgId) {
-    const found = await db.select().from(workspace).where(eq(workspace.organizationId, activeOrgId)).limit(1);
-    return found[0];
-  }
-  const found = await db
-    .select()
-    .from(workspace)
-    .where(and(eq(workspace.ownerId, session.user.id), isNull(workspace.organizationId)))
-    .limit(1);
-  return found[0];
-}
+import { getAuthorizedWorkspace } from "@/lib/services/permissions";
+import { jsonError } from "@/lib/services/http";
 
 // Recursively adds a folder's files (and empty subfolders) under `basePath`
 // in the zip, skipping anything currently in the trash.
@@ -55,10 +41,7 @@ async function addFolderToZip(
 
 export async function GET(request: Request) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const ctx = await getAuthorizedWorkspace();
 
     const { searchParams } = new URL(request.url);
     const itemsParam = searchParams.get("items");
@@ -78,10 +61,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "No valid items" }, { status: 400 });
     }
 
-    const wsRecord = await getActiveWorkspace(session);
-    if (!wsRecord) {
-      return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
-    }
+    const wsRecord = ctx.workspace;
 
     const trashedRows = await db
       .select({ itemId: trashItem.itemId })
@@ -140,7 +120,6 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    console.error("[GET /api/files/zip Error]:", error);
-    return NextResponse.json({ error: "Failed to create zip" }, { status: 500 });
+    return jsonError(error, "Failed to create zip");
   }
 }

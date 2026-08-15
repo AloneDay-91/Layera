@@ -1,28 +1,14 @@
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import JSZip from "jszip";
-import { auth } from "@/lib/auth";
-import { db, workspace, folder, file, eq, and, isNull } from "@filecloud/db";
+import { db, folder, file, eq, and } from "@filecloud/db";
 import { minioClient, S3_BUCKET } from "@filecloud/storage";
 import { getMimeTypeFromFilename } from "@/lib/mime";
 import { checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
+import { getAuthorizedWorkspace } from "@/lib/services/permissions";
+import { jsonError } from "@/lib/services/http";
 
 const MAX_ZIP_ENTRIES = 2000;
 const MAX_TOTAL_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
-
-async function getActiveWorkspace(session: NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>) {
-  const activeOrgId = session.session.activeOrganizationId;
-  if (activeOrgId) {
-    const found = await db.select().from(workspace).where(eq(workspace.organizationId, activeOrgId)).limit(1);
-    return found[0];
-  }
-  const found = await db
-    .select()
-    .from(workspace)
-    .where(and(eq(workspace.ownerId, session.user.id), isNull(workspace.organizationId)))
-    .limit(1);
-  return found[0];
-}
 
 async function dedupeFolderName(workspaceId: string, parentId: string, baseName: string) {
   const siblings = await db
@@ -53,12 +39,9 @@ async function dedupeFileName(workspaceId: string, folderId: string, baseName: s
 
 export async function POST(request: Request) {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const ctx = await getAuthorizedWorkspace();
 
-    const { allowed, retryAfter } = await checkRateLimit(`unzip:${session.user.id}`, {
+    const { allowed, retryAfter } = await checkRateLimit(`unzip:${ctx.actor.id}`, {
       windowSeconds: 300,
       max: 10,
     });
@@ -69,11 +52,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
-    const wsRecord = await getActiveWorkspace(session);
-    if (!wsRecord) {
-      return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
-    }
-    const workspaceId = wsRecord.id;
+    const workspaceId = ctx.workspace.id;
 
     const [zipFile] = await db
       .select()
@@ -188,7 +167,6 @@ export async function POST(request: Request) {
       extractedCount,
     });
   } catch (error) {
-    console.error("[POST /api/files/unzip Error]:", error);
-    return NextResponse.json({ error: "Failed to extract archive" }, { status: 500 });
+    return jsonError(error, "Failed to extract archive");
   }
 }
