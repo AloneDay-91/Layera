@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { Input, Meter, Sidebar, Text } from "@cloudflare/kumo";
 import { AccountSwitcher } from "./account-switcher";
 import { authClient } from "@/lib/auth-client";
-import { formatFileSize } from "@/lib/mock-files";
+import { formatFileSize } from "@/lib/file-item";
 import { onStorageUpdated } from "@/lib/storage-events";
 
 type StorageSummary = { usedBytes: number; quotaBytes: number };

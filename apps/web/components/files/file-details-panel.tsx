@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button, Dialog, Text } from "@cloudflare/kumo";
 import { XIcon, ShareIcon, DownloadIcon, StarIcon, TagIcon } from "@phosphor-icons/react";
-import type { MockItem } from "@/lib/mock-files";
-import { formatFileSize } from "@/lib/mock-files";
+import type { FileItem } from "@/lib/file-item";
+import { formatFileSize } from "@/lib/file-item";
 import { FilePreviewIcon, getFileTypeLabel, isPreviewable } from "./file-preview";
 import { FilePreviewContent } from "./file-preview-content";
 import { TagBadgeList } from "./tag-badge-list";
@@ -18,12 +18,12 @@ export function FileDetailsPanel({
   onToggleFavorite,
   onManageTags,
 }: {
-  item: MockItem;
+  item: FileItem;
   onClose: () => void;
   onAction: (action: string) => void;
-  onShare?: (item: MockItem) => void;
-  onToggleFavorite?: (item: MockItem) => void;
-  onManageTags?: (item: MockItem) => void;
+  onShare?: (item: FileItem) => void;
+  onToggleFavorite?: (item: FileItem) => void;
+  onManageTags?: (item: FileItem) => void;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const previewable = isPreviewable(item);

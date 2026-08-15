@@ -18,7 +18,7 @@ import {
 } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { ClientOnly } from "@/components/shell/client-only";
-import { MockItem } from "@/lib/mock-files";
+import { FileItem } from "@/lib/file-item";
 import { notifyStorageUpdated } from "@/lib/storage-events";
 import { uploadFileDirect } from "@/lib/upload-file";
 import type { TagColorValue, WorkspaceTag } from "@/lib/tags";
@@ -64,7 +64,7 @@ export function FileBrowser() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [breadcrumbsPath, setBreadcrumbsPath] = useState<Array<{ id: string | null; name: string }>>([]);
-  const [items, setItems] = useState<MockItem[]>([]);
+  const [items, setItems] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   // État modale création dossier
@@ -73,12 +73,12 @@ export function FileBrowser() {
   const [creatingFolder, setCreatingFolder] = useState(false);
 
   // État modale renommage
-  const [renameItem, setRenameItem] = useState<MockItem | null>(null);
+  const [renameItem, setRenameItem] = useState<FileItem | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renaming, setRenaming] = useState(false);
 
   // État modale partage
-  const [shareItem, setShareItem] = useState<MockItem | null>(null);
+  const [shareItem, setShareItem] = useState<FileItem | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
 
@@ -91,10 +91,10 @@ export function FileBrowser() {
   // État modale de gestion des tags
   const [workspaceTags, setWorkspaceTags] = useState<WorkspaceTag[]>([]);
   const [loadingTags, setLoadingTags] = useState(true);
-  const [manageTagsItem, setManageTagsItem] = useState<MockItem | null>(null);
+  const [manageTagsItem, setManageTagsItem] = useState<FileItem | null>(null);
 
   // État modale de couleur de dossier
-  const [colorItem, setColorItem] = useState<MockItem | null>(null);
+  const [colorItem, setColorItem] = useState<FileItem | null>(null);
 
   // État de sélection multiple et suppression groupée
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -394,7 +394,7 @@ export function FileBrowser() {
     }
   }
 
-  async function handleDeleteItem(item: MockItem) {
+  async function handleDeleteItem(item: FileItem) {
     try {
       const res = await fetch(`/api/files?id=${item.id}&type=${item.type}`, {
         method: "DELETE",
@@ -472,7 +472,7 @@ export function FileBrowser() {
     }
   }
 
-  async function handleShareItem(item: MockItem) {
+  async function handleShareItem(item: FileItem) {
     setShareItem(item);
     setShareUrl(null);
     setSharing(true);
@@ -506,7 +506,7 @@ export function FileBrowser() {
     toasts.add({ title: tToasts("linkCopiedTitle"), description: tToasts("linkCopiedDescription") });
   }
 
-  async function handleToggleFavorite(item: MockItem) {
+  async function handleToggleFavorite(item: FileItem) {
     const nextFavorite = !item.isFavorite;
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, isFavorite: nextFavorite } : i)));
     try {
@@ -536,7 +536,7 @@ export function FileBrowser() {
     });
   }
 
-  async function handleChangeFolderColor(item: MockItem, color: FolderColorValue) {
+  async function handleChangeFolderColor(item: FileItem, color: FolderColorValue) {
     const previousColor = item.color;
     const nextColor = color === "default" ? null : color;
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, color: nextColor } : i)));
@@ -564,7 +564,7 @@ export function FileBrowser() {
     link.remove();
   }
 
-  function handleDownloadZip(item: MockItem) {
+  function handleDownloadZip(item: FileItem) {
     triggerDownload(`/api/files/zip?items=${item.id}:${item.type}`);
   }
 
@@ -575,7 +575,7 @@ export function FileBrowser() {
     triggerDownload(`/api/files/zip?items=${encodeURIComponent(query)}`);
   }
 
-  async function handleExtractZip(item: MockItem) {
+  async function handleExtractZip(item: FileItem) {
     toasts.add({ title: tToasts("extractingTitle"), description: tToasts("extractingDescription", { name: item.name }) });
     try {
       const res = await fetch("/api/files/unzip", {

@@ -16,7 +16,7 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
 import { ClientOnly } from "@/components/shell/client-only";
-import { formatFileSize } from "@/lib/mock-files";
+import { formatFileSize } from "@/lib/file-item";
 
 type StorageStats = {
   usedBytes: number;

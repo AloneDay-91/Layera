@@ -6,7 +6,7 @@ import { Loader, Text, cn } from "@cloudflare/kumo";
 import { CodeHighlighted } from "@cloudflare/kumo/code";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
-import type { MockItem } from "@/lib/mock-files";
+import type { FileItem } from "@/lib/file-item";
 import {
   isPreviewableAudio,
   isPreviewableImage,
@@ -17,7 +17,7 @@ import {
   getLangFromFilename,
 } from "./file-preview";
 
-function TextPreview({ item, markdown }: { item: MockItem; markdown: boolean }) {
+function TextPreview({ item, markdown }: { item: FileItem; markdown: boolean }) {
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const t = useTranslations("filePreview");
@@ -147,7 +147,7 @@ function VideoPreview({ src }: { src: string }) {
   );
 }
 
-export function FilePreviewContent({ item }: { item: MockItem }) {
+export function FilePreviewContent({ item }: { item: FileItem }) {
   const t = useTranslations("filePreview");
   const contentUrl = `/api/files/content?id=${item.id}`;
 

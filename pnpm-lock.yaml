@@ -28,6 +28,9 @@ importers:
       '@filecloud/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+      '@filecloud/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@phosphor-icons/react':
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.1.0(react@19.1.0))(react@19.1.0)

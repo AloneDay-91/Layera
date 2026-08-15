@@ -1,6 +1,6 @@
 import { Badge } from "@cloudflare/kumo";
 import type { BadgeVariant } from "@cloudflare/kumo";
-import type { ItemTag } from "@/lib/mock-files";
+import type { ItemTag } from "@/lib/file-item";
 
 export function TagBadgeList({ tags, max }: { tags?: ItemTag[]; max?: number }) {
   if (!tags || tags.length === 0) return null;

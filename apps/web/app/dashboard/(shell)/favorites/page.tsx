@@ -10,9 +10,9 @@ import { ClientOnly } from "@/components/shell/client-only";
 import { FilePreviewIcon } from "@/components/files/file-preview";
 import { FileRowMenu } from "@/components/files/file-row-menu";
 import { FileDetailsPanel } from "@/components/files/file-details-panel";
-import { formatFileSize, type MockItem } from "@/lib/mock-files";
+import { formatFileSize, type FileItem } from "@/lib/file-item";
 
-type FavoriteItem = MockItem & { location: string };
+type FavoriteItem = FileItem & { location: string };
 
 export default function FavoritesPage() {
   const toasts = useKumoToastManager();
@@ -21,7 +21,7 @@ export default function FavoritesPage() {
   const [loading, setLoading] = useState(true);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
-  const [shareItem, setShareItem] = useState<MockItem | null>(null);
+  const [shareItem, setShareItem] = useState<FileItem | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
 
@@ -57,7 +57,7 @@ export default function FavoritesPage() {
     [items, selectedItemId],
   );
 
-  async function handleToggleFavorite(item: MockItem) {
+  async function handleToggleFavorite(item: FileItem) {
     setItems((prev) => prev.filter((i) => i.id !== item.id));
     if (selectedItemId === item.id) setSelectedItemId(null);
     try {
@@ -75,7 +75,7 @@ export default function FavoritesPage() {
     }
   }
 
-  async function handleDeleteItem(item: MockItem) {
+  async function handleDeleteItem(item: FileItem) {
     try {
       const res = await fetch(`/api/files?id=${item.id}&type=${item.type}`, { method: "DELETE" });
       if (res.ok) {
@@ -88,7 +88,7 @@ export default function FavoritesPage() {
     }
   }
 
-  async function handleShareItem(item: MockItem) {
+  async function handleShareItem(item: FileItem) {
     setShareItem(item);
     setShareUrl(null);
     setSharing(true);

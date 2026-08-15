@@ -3,19 +3,19 @@
 import { useTranslations } from "next-intl";
 import { DropdownMenu, Button } from "@cloudflare/kumo";
 import { DotsThreeIcon, FileZipIcon, PackageIcon, PaintBucketIcon, PencilSimpleIcon, ShareIcon, StarIcon, TagIcon, TrashIcon } from "@phosphor-icons/react";
-import type { MockItem } from "@/lib/mock-files";
+import type { FileItem } from "@/lib/file-item";
 import { isZipFile } from "./file-preview";
 
 type FileRowMenuProps = {
-  item: MockItem;
-  onRename?: (item: MockItem) => void;
-  onShare?: (item: MockItem) => void;
-  onDelete?: (item: MockItem) => void;
-  onToggleFavorite?: (item: MockItem) => void;
-  onManageTags?: (item: MockItem) => void;
-  onChangeColor?: (item: MockItem) => void;
-  onDownloadZip?: (item: MockItem) => void;
-  onExtractZip?: (item: MockItem) => void;
+  item: FileItem;
+  onRename?: (item: FileItem) => void;
+  onShare?: (item: FileItem) => void;
+  onDelete?: (item: FileItem) => void;
+  onToggleFavorite?: (item: FileItem) => void;
+  onManageTags?: (item: FileItem) => void;
+  onChangeColor?: (item: FileItem) => void;
+  onDownloadZip?: (item: FileItem) => void;
+  onExtractZip?: (item: FileItem) => void;
 };
 
 export function FileRowMenu({

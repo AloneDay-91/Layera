@@ -3,13 +3,13 @@
 import { useTranslations } from "next-intl";
 import { Button, Dialog, Text, cn } from "@cloudflare/kumo";
 import { CheckIcon, FolderSimpleIcon, XIcon } from "@phosphor-icons/react";
-import type { MockItem } from "@/lib/mock-files";
+import type { FileItem } from "@/lib/file-item";
 import { FOLDER_COLOR_OPTIONS, type FolderColorValue } from "@/lib/folder-colors";
 
 type FolderColorDialogProps = {
-  item: MockItem | null;
+  item: FileItem | null;
   onClose: () => void;
-  onSelectColor: (item: MockItem, color: FolderColorValue) => void;
+  onSelectColor: (item: FileItem, color: FolderColorValue) => void;
 };
 
 export function FolderColorDialog({ item, onClose, onSelectColor }: FolderColorDialogProps) {
