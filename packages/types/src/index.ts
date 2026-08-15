@@ -23,7 +23,10 @@ export type FileItem = {
   size: number | null;
   updatedAt: string;
   owner: string;
+  ownerId?: string | null;
   isFavorite?: boolean;
+  isPinned?: boolean;
   tags?: ItemTag[];
   color?: string | null;
+  sharedBy?: { id: string; name: string } | null;
 };

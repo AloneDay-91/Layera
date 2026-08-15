@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, unique, boolean } from "drizzle-orm/pg-core";
 import { workspace } from "./workspace";
 import { user } from "./auth";
 
@@ -14,6 +14,8 @@ export const favorite = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     itemType: text("item_type").$type<"file" | "folder">().notNull(),
     itemId: uuid("item_id").notNull(),
+    pinned: boolean("pinned").notNull().default(false),
+    pinnedAt: timestamp("pinned_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => [
