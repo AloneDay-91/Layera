@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Loader, Text, cn } from "@cloudflare/kumo";
 import { CodeHighlighted } from "@cloudflare/kumo/code";
-import { marked } from "marked";
-import DOMPurify from "dompurify";
 import type { FileItem } from "@/lib/file-item";
 import {
   isPreviewableAudio,
@@ -16,6 +14,7 @@ import {
   isPreviewableVideo,
   getLangFromFilename,
 } from "./file-preview";
+import { MarkdownEditor } from "./markdown-editor";
 
 function TextPreview({ item, markdown }: { item: FileItem; markdown: boolean }) {
   const [content, setContent] = useState<string | null>(null);
@@ -55,13 +54,7 @@ function TextPreview({ item, markdown }: { item: FileItem; markdown: boolean }) 
   }
 
   if (markdown) {
-    const html = DOMPurify.sanitize(marked.parse(content, { async: false }));
-    return (
-      <div
-        className="prose prose-sm max-w-none text-kumo-default max-h-[70vh] overflow-y-auto"
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-    );
+    return <MarkdownEditor itemId={item.id} initialContent={content} />;
   }
 
   return (
