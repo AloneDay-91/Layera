@@ -400,33 +400,41 @@
       "target": "Cible"
     },
     "actions": {
-      "file.upload": "Fichier envoyé",
-      "file.rename": "Fichier renommé",
-      "file.move": "Fichier déplacé",
-      "file.trash": "Fichier mis à la corbeille",
-      "file.delete": "Fichier supprimé",
-      "file.download": "Fichier téléchargé",
-      "file.restore": "Fichier restauré",
-      "file.edit": "Fichier modifié",
-      "file.archive": "Fichier archivé",
-      "file.unarchive": "Fichier restauré de l'archive",
-      "file.transfer": "Fichier transféré",
-      "folder.create": "Dossier créé",
-      "folder.rename": "Dossier renommé",
-      "folder.move": "Dossier déplacé",
-      "folder.trash": "Dossier mis à la corbeille",
-      "folder.delete": "Dossier supprimé",
-      "folder.restore": "Dossier restauré",
-      "folder.archive": "Dossier archivé",
-      "folder.unarchive": "Dossier restauré de l'archive",
-      "folder.transfer": "Dossier transféré",
-      "share.create": "Lien de partage créé",
-      "share.revoke": "Lien de partage révoqué",
-      "share.download": "Téléchargement via un lien public",
-      "share.internal": "Partage interne créé",
-      "share.internal-revoke": "Partage interne révoqué",
-      "member.invite": "Membre ajouté",
-      "member.remove": "Membre retiré"
+      "file": {
+        "upload": "Fichier envoyé",
+        "rename": "Fichier renommé",
+        "move": "Fichier déplacé",
+        "trash": "Fichier mis à la corbeille",
+        "delete": "Fichier supprimé",
+        "download": "Fichier téléchargé",
+        "restore": "Fichier restauré",
+        "edit": "Fichier modifié",
+        "archive": "Fichier archivé",
+        "unarchive": "Fichier restauré de l'archive",
+        "transfer": "Fichier transféré"
+      },
+      "folder": {
+        "create": "Dossier créé",
+        "rename": "Dossier renommé",
+        "move": "Dossier déplacé",
+        "trash": "Dossier mis à la corbeille",
+        "delete": "Dossier supprimé",
+        "restore": "Dossier restauré",
+        "archive": "Dossier archivé",
+        "unarchive": "Dossier restauré de l'archive",
+        "transfer": "Dossier transféré"
+      },
+      "share": {
+        "create": "Lien de partage créé",
+        "revoke": "Lien de partage révoqué",
+        "download": "Téléchargement via un lien public",
+        "internal": "Partage interne créé",
+        "internal-revoke": "Partage interne révoqué"
+      },
+      "member": {
+        "invite": "Membre ajouté",
+        "remove": "Membre retiré"
+      }
     }
   },
   "sharedPage": {
