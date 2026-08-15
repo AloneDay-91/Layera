@@ -1,0 +1,128 @@
+import { db, folder, file, archiveItem, trashItem, favorite, eq, and } from "@filecloud/db";
+import { ServiceError } from "./errors";
+import type { AuthorizedContext } from "./permissions";
+import { getFileInWorkspace, getFolderInWorkspace } from "./files";
+import { recordAudit } from "./audit";
+import { usersByIds } from "./users";
+
+export async function listArchivedItems(ctx: AuthorizedContext) {
+  const rows = await db.select().from(archiveItem).where(eq(archiveItem.workspaceId, ctx.workspace.id));
+  const owners = await usersByIds(rows.map((row) => row.archivedBy));
+  const result = [];
+
+  for (const row of rows) {
+    if (row.itemType === "file") {
+      const [fRecord] = await db.select().from(file).where(eq(file.id, row.itemId)).limit(1);
+      if (fRecord && fRecord.workspaceId === ctx.workspace.id) {
+        result.push({
+          id: fRecord.id,
+          archiveId: row.id,
+          type: "file" as const,
+          name: fRecord.name,
+          size: fRecord.size,
+          mimeType: fRecord.mimeType,
+          archivedAt: row.archivedAt.toISOString(),
+          owner: owners.get(row.archivedBy)?.name ?? ctx.actor.name,
+          ownerId: row.archivedBy,
+        });
+      }
+    } else {
+      const [fldRecord] = await db.select().from(folder).where(eq(folder.id, row.itemId)).limit(1);
+      if (fldRecord && fldRecord.workspaceId === ctx.workspace.id) {
+        result.push({
+          id: fldRecord.id,
+          archiveId: row.id,
+          type: "folder" as const,
+          name: fldRecord.name,
+          size: null,
+          mimeType: null,
+          archivedAt: row.archivedAt.toISOString(),
+          owner: owners.get(row.archivedBy)?.name ?? ctx.actor.name,
+          ownerId: row.archivedBy,
+        });
+      }
+    }
+  }
+
+  return result.sort((a, b) => b.archivedAt.localeCompare(a.archivedAt));
+}
+
+export async function archiveItemInWorkspace(
+  ctx: AuthorizedContext,
+  input: { id: string; type: "file" | "folder" },
+) {
+  if (input.type === "file") {
+    await getFileInWorkspace(ctx.workspace.id, input.id);
+  } else {
+    await getFolderInWorkspace(ctx.workspace.id, input.id);
+  }
+
+  const existing = await db
+    .select({ id: archiveItem.id })
+    .from(archiveItem)
+    .where(and(eq(archiveItem.workspaceId, ctx.workspace.id), eq(archiveItem.itemId, input.id)))
+    .limit(1);
+  if (existing[0]) return;
+
+  await db.delete(trashItem).where(and(eq(trashItem.itemId, input.id), eq(trashItem.workspaceId, ctx.workspace.id)));
+
+  await db.insert(archiveItem).values({
+    workspaceId: ctx.workspace.id,
+    itemType: input.type,
+    itemId: input.id,
+    archivedBy: ctx.actor.id,
+  });
+  await recordAudit({
+    workspaceId: ctx.workspace.id,
+    actorId: ctx.actor.id,
+    action: input.type === "file" ? "file.archive" : "folder.archive",
+    targetType: input.type,
+    targetId: input.id,
+  });
+}
+
+export async function restoreArchivedItem(ctx: AuthorizedContext, input: { id: string; type: "file" | "folder" }) {
+  const [row] = await db
+    .select()
+    .from(archiveItem)
+    .where(and(eq(archiveItem.itemId, input.id), eq(archiveItem.workspaceId, ctx.workspace.id)))
+    .limit(1);
+  if (!row) throw new ServiceError(404, "Item not found");
+  await db.delete(archiveItem).where(eq(archiveItem.id, row.id));
+  await recordAudit({
+    workspaceId: ctx.workspace.id,
+    actorId: ctx.actor.id,
+    action: input.type === "file" ? "file.unarchive" : "folder.unarchive",
+    targetType: input.type,
+    targetId: input.id,
+  });
+}
+
+export async function permanentlyDeleteArchivedItem(
+  ctx: AuthorizedContext,
+  input: { id: string; type: "file" | "folder" },
+) {
+  const [row] = await db
+    .select()
+    .from(archiveItem)
+    .where(and(eq(archiveItem.itemId, input.id), eq(archiveItem.workspaceId, ctx.workspace.id)))
+    .limit(1);
+  if (!row) throw new ServiceError(404, "Item not found");
+
+  if (input.type === "file") {
+    await getFileInWorkspace(ctx.workspace.id, input.id);
+    await db.delete(file).where(and(eq(file.id, input.id), eq(file.workspaceId, ctx.workspace.id)));
+  } else {
+    await getFolderInWorkspace(ctx.workspace.id, input.id);
+    await db.delete(folder).where(and(eq(folder.id, input.id), eq(folder.workspaceId, ctx.workspace.id)));
+  }
+  await db.delete(favorite).where(and(eq(favorite.itemId, input.id), eq(favorite.workspaceId, ctx.workspace.id)));
+  await db.delete(archiveItem).where(eq(archiveItem.id, row.id));
+  await recordAudit({
+    workspaceId: ctx.workspace.id,
+    actorId: ctx.actor.id,
+    action: input.type === "file" ? "file.delete" : "folder.delete",
+    targetType: input.type,
+    targetId: input.id,
+  });
+}
