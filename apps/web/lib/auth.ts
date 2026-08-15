@@ -31,6 +31,11 @@ async function syncAdminRoleForUser(userId: string) {
   }
 }
 
+const githubClientId = process.env.GITHUB_CLIENT_ID;
+const githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -40,6 +45,8 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    // Self-hosted MVP has no mailer yet; turn this on when sendVerificationOTP
+    // actually delivers mail, otherwise sign-up locks users out.
     requireEmailVerification: false,
   },
   user: {
@@ -63,14 +70,12 @@ export const auth = betterAuth({
     },
   },
   socialProviders: {
-    github: {
-      clientId: process.env.GITHUB_CLIENT_ID ?? "mock-github-client-id",
-      clientSecret: process.env.GITHUB_CLIENT_SECRET ?? "mock-github-client-secret",
-    },
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID ?? "mock-google-client-id",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "mock-google-client-secret",
-    },
+    ...(githubClientId && githubClientSecret
+      ? { github: { clientId: githubClientId, clientSecret: githubClientSecret } }
+      : {}),
+    ...(googleClientId && googleClientSecret
+      ? { google: { clientId: googleClientId, clientSecret: googleClientSecret } }
+      : {}),
   },
   plugins: [
     admin(),
@@ -82,7 +87,10 @@ export const auth = betterAuth({
     }),
     emailOTP({
       async sendVerificationOTP({ email, otp, type }) {
-        // Log OTP code for local development / S3 notification integration
+        if (process.env.NODE_ENV === "production") {
+          console.warn(`[auth] OTP requested for ${type} but no mailer is configured`);
+          return;
+        }
         console.log(`[Better Auth OTP - ${type}] Sending OTP to ${email}: Code ${otp}`);
       },
     }),
