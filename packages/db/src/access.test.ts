@@ -113,6 +113,8 @@ describe("workspace access", () => {
 
     const [secret] = await db.select().from(file).where(eq(file.workspaceId, wsA.workspaceId));
     expect(secret?.name).toBe("secret.txt");
+    expect(secret?.storageKey).not.toContain("secret.txt");
+    expect(secret?.storageKey.startsWith(`workspaces/${wsA.workspaceId}/`)).toBe(true);
 
     await expect(requireWorkspaceMember(ownerB, wsA.workspaceId)).rejects.toSatisfy(
       (error: unknown) => error instanceof WorkspaceAccessError && error.status === 403,

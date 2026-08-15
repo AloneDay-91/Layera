@@ -46,9 +46,7 @@ export const minioPresignClient = publicEndpoint
 
 export const usesPublicPresign = publicEndpoint !== null;
 
-export function objectStorageKey(workspaceId: string, objectId: string) {
-  return `workspaces/${workspaceId}/${objectId}`;
-}
+export { isWorkspaceObjectKey, objectStorageKey, thumbnailStorageKey } from "./keys";
 
 export async function ensureBucket() {
   const exists = await minioClient.bucketExists(S3_BUCKET).catch(() => false);
@@ -61,6 +59,14 @@ export async function presignPutObject(storageKey: string, expirySeconds: number
   return minioPresignClient.presignedUrl("PUT", S3_BUCKET, storageKey, expirySeconds, {
     "Content-Type": contentType,
   });
+}
+
+export async function presignGetObject(
+  storageKey: string,
+  expirySeconds: number,
+  responseHeaders?: Record<string, string>,
+) {
+  return minioPresignClient.presignedGetObject(S3_BUCKET, storageKey, expirySeconds, responseHeaders);
 }
 
 export async function statStoredObject(storageKey: string) {

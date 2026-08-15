@@ -4,10 +4,10 @@ import { removeStoredObjects, removeStoredPrefix } from "@filecloud/storage";
 export async function collectFolderStorageKeys(workspaceId: string, folderId: string): Promise<string[]> {
   const keys: string[] = [];
   const childFiles = await db
-    .select({ storageKey: file.storageKey })
+    .select({ storageKey: file.storageKey, thumbnailKey: file.thumbnailKey })
     .from(file)
     .where(and(eq(file.workspaceId, workspaceId), eq(file.folderId, folderId)));
-  keys.push(...childFiles.map((row) => row.storageKey));
+  keys.push(...childFiles.flatMap((row) => (row.thumbnailKey ? [row.storageKey, row.thumbnailKey] : [row.storageKey])));
 
   const childFolders = await db
     .select({ id: folder.id })
@@ -25,11 +25,12 @@ export async function collectItemStorageKeys(
 ): Promise<string[]> {
   if (input.type === "file") {
     const [row] = await db
-      .select({ storageKey: file.storageKey })
+      .select({ storageKey: file.storageKey, thumbnailKey: file.thumbnailKey })
       .from(file)
       .where(and(eq(file.id, input.id), eq(file.workspaceId, workspaceId)))
       .limit(1);
-    return row ? [row.storageKey] : [];
+    if (!row) return [];
+    return row.thumbnailKey ? [row.storageKey, row.thumbnailKey] : [row.storageKey];
   }
   return collectFolderStorageKeys(workspaceId, input.id);
 }

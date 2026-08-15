@@ -49,6 +49,7 @@ export type ListedItem = {
   isFavorite: boolean;
   tags: { id: string; name: string; color: string }[];
   color?: string | null;
+  hasThumbnail?: boolean;
 };
 
 function escapeIlike(value: string) {
@@ -204,8 +205,9 @@ export async function listFolderContents(
       owner: owner?.name ?? ctx.actor.name,
       ownerId: f.createdBy ?? ctx.actor.id,
       isFavorite: favoriteIds.has(f.id),
-      tags: tagsByItemId.get(f.id) ?? [],
-    };
+        tags: tagsByItemId.get(f.id) ?? [],
+        hasThumbnail: Boolean(f.thumbnailKey),
+      };
   });
 
   const breadcrumbs: Array<{ id: string; name: string }> = [];

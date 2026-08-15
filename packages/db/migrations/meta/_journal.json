@@ -85,6 +85,13 @@
       "when": 1786809000000,
       "tag": "0011_query_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786815000000,
+      "tag": "0012_jobs_thumbnails",
+      "breakpoints": true
     }
   ]
 }

@@ -41,6 +41,7 @@ export async function GET(request: Request) {
     if (!allowed) return rateLimitedResponse(retryAfter!);
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
+    const variant = searchParams.get("variant") === "thumb" ? "thumb" : "original";
 
     if (!id) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
       throw new ServiceError(403, "Forbidden");
     }
     const rangeHeader = request.headers.get("range");
-    if (!rangeHeader || rangeHeader.startsWith("bytes=0-") || rangeHeader.startsWith("bytes=-")) {
+    if (variant === "original" && (!rangeHeader || rangeHeader.startsWith("bytes=0-") || rangeHeader.startsWith("bytes=-"))) {
       void recordAudit({
         workspaceId: fRecord.workspaceId,
         actorId: session.user.id,
@@ -65,17 +66,27 @@ export async function GET(request: Request) {
       });
     }
 
+    const isThumb = variant === "thumb";
+    const thumbnailKey = fRecord.thumbnailKey;
+    if (isThumb && !thumbnailKey) {
+      return NextResponse.json({ error: "Thumbnail not available" }, { status: 404 });
+    }
+
     const isSafeInline = INLINE_SAFE_MIME_TYPES.has(fRecord.mimeType);
-    const contentType = isSafeInline ? fRecord.mimeType : "application/octet-stream";
-    const disposition = isSafeInline ? "inline" : "attachment";
+    const contentType = isThumb ? "image/webp" : isSafeInline ? fRecord.mimeType : "application/octet-stream";
+    const disposition = isThumb || isSafeInline ? "inline" : "attachment";
+    const storageKey = isThumb ? thumbnailKey : fRecord.storageKey;
+    if (!storageKey) {
+      return NextResponse.json({ error: "Storage file unreadable" }, { status: 500 });
+    }
 
     try {
-      return await storedObjectResponse(fRecord.storageKey, {
+      return await storedObjectResponse(storageKey, {
         contentType,
-        filename: fRecord.name,
+        filename: isThumb ? `${fRecord.name}.thumb.webp` : fRecord.name,
         disposition,
-        totalSize: fRecord.size,
-        rangeHeader,
+        totalSize: isThumb ? 0 : fRecord.size,
+        rangeHeader: isThumb ? null : rangeHeader,
       });
     } catch (s3Error) {
       console.warn("MinIO stream warning:", s3Error);

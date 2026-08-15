@@ -29,4 +29,5 @@ export type FileItem = {
   tags?: ItemTag[];
   color?: string | null;
   sharedBy?: { id: string; name: string } | null;
+  hasThumbnail?: boolean;
 };

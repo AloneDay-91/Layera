@@ -47,6 +47,20 @@ services:
       - /repo/packages/types/node_modules
       - /repo/packages/storage/node_modules
 
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://filecloud:filecloud@postgres:5432/filecloud
+      S3_ENDPOINT: minio
+      S3_PORT: "9000"
+    depends_on:
+      - postgres
+      - minio
+
 volumes:
   postgres_data:
   minio_data:

@@ -17,6 +17,7 @@ export const file = pgTable(
     mimeType: text("mime_type").notNull(),
     size: bigint("size", { mode: "number" }).notNull(),
     storageKey: text("storage_key").notNull().unique(),
+    thumbnailKey: text("thumbnail_key"),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),

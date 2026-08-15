@@ -4,11 +4,20 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },
+  "dependencies": {
+    "@filecloud/db": "workspace:*",
+    "@filecloud/storage": "workspace:*",
+    "sharp": "^0.34.0",
+    "tsx": "^4.19.0"
+  },
   "devDependencies": {
     "@filecloud/config": "workspace:*",
+    "@types/node": "^20",
     "eslint": "^9.18.0",
     "typescript": "^5.7.0"
   }

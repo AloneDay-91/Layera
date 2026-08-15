@@ -23,4 +23,5 @@ export {
   WorkspaceAccessError,
 } from "./access";
 export type { AuthorizedWorkspace, WorkspaceRow } from "./access";
+export type { JobType, JobStatus } from "./schema/job";
 export { eq, and, isNull, ilike, inArray, notInArray, gte, lte, sql, desc, ne } from "drizzle-orm";

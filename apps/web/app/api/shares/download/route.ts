@@ -4,7 +4,9 @@ import { db, shareLink, file, eq } from "@filecloud/db";
 import { shareUnlockCookieName, verifyShareUnlock } from "@/lib/share-unlock";
 import { checkRateLimit, getClientIp, rateLimitedResponse } from "@/lib/rate-limit";
 import { recordAudit } from "@/lib/services/audit";
-import { storedObjectResponse } from "@/lib/http-file";
+import { storedObjectResponse, contentDisposition } from "@/lib/http-file";
+import { presignGetObject, usesPublicPresign } from "@filecloud/storage";
+import { SIGNED_GET_EXPIRY_SECONDS } from "@/lib/services/signed-read";
 
 export async function GET(request: Request) {
   try {
@@ -55,6 +57,13 @@ export async function GET(request: Request) {
         targetId: fRecord.id,
         metadata: { name: fRecord.name, public: true },
       });
+
+      if (usesPublicPresign) {
+        const url = await presignGetObject(fRecord.storageKey, SIGNED_GET_EXPIRY_SECONDS, {
+          "response-content-disposition": contentDisposition("attachment", fRecord.name),
+        });
+        return NextResponse.redirect(url, 302);
+      }
 
       return await storedObjectResponse(fRecord.storageKey, {
         contentType: fRecord.mimeType || "application/octet-stream",

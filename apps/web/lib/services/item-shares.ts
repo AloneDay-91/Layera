@@ -164,6 +164,7 @@ export async function listSharedWithMe(actorId: string) {
         ownerId: row.sharedBy,
         sharedBy: sharedBy ? { id: sharedBy.id, name: sharedBy.name } : null,
         workspaceId: row.workspaceId,
+        hasThumbnail: Boolean(fRecord.thumbnailKey),
       });
     } else {
       const fldRecord = folderById.get(row.itemId);

@@ -1,5 +1,24 @@
 Oui — voici un plan pragmatique, organisé pour obtenir vite un MVP utilisable sans partir trop tôt dans des fonctionnalités “Nextcloud”. On vise d’abord un flux complet : compte → espace personnel → dossier → upload MinIO → affichage → partage.
 
+## État du MVP (août 2026)
+
+Le cadrage ci-dessous est **implémenté et testable**. Les sprints 1–8 sont livrés :
+
+| Sprint | Objectif | État |
+| ------ | -------- | ---- |
+| 1 | Monorepo, Kumo, Docker, Postgres, MinIO | Livré |
+| 2 | Drizzle, Better Auth, workspace personnel | Livré |
+| 3 | Shell dashboard | Livré |
+| 4 | CRUD fichiers/dossiers + corbeille | Livré |
+| 5 | Upload MinIO signé + download | Livré (`presign` → PUT, fallback `/api/uploads/[id]`) |
+| 6 | Previews, recherche, partage public | Livré (GET signé 2 min si `S3_PUBLIC_ENDPOINT`) |
+| 7 | Sécurité, tests, backup, déploiement | Livré (sniff MIME, denylist, audit, isolation, README restore) |
+| 8 | Worker, thumbnails, quotas, équipes | Livré (`job` table, worker Compose, quotas, orgs) |
+
+Hors cadrage, volontairement non faits : sync desktop, édition collaborative, chiffrement de bout en bout, plugins, historique de versions, antivirus.
+
+Le reste de ce fichier est le plan d’origine, conservé comme spécification.
+
 ## Cadrage du MVP
 
 Définis le produit comme un **gestionnaire de fichiers self-hosted orienté développeurs et petites équipes**, pas comme un clone complet de Nextcloud. Ton différenciateur sera l’interface Kumo soignée et fluide, avec stockage S3/MinIO performant.[1]

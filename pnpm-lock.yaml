@@ -97,10 +97,26 @@ importers:
         version: 3.2.7(@types/node@20.19.43)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)
 
   apps/worker:
+    dependencies:
+      '@filecloud/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@filecloud/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
+      sharp:
+        specifier: '>=0.35.0'
+        version: 0.35.3(@types/node@20.19.43)
+      tsx:
+        specifier: ^4.19.0
+        version: 4.23.12
     devDependencies:
       '@filecloud/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
       eslint:
         specifier: ^9.18.0
         version: 9.39.5(jiti@2.7.0)
@@ -169,6 +185,9 @@ importers:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@20.19.43)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)
 
   packages/types:
     devDependencies:
@@ -3837,8 +3856,7 @@ snapshots:
 
   '@humanwhocodes/retry@0.4.3': {}
 
-  '@img/colour@1.1.0':
-    optional: true
+  '@img/colour@1.1.0': {}
 
   '@img/sharp-darwin-arm64@0.35.3':
     optionalDependencies:
@@ -6406,7 +6424,6 @@ snapshots:
       '@img/sharp-win32-ia32': 0.35.3
       '@img/sharp-win32-x64': 0.35.3
       '@types/node': 20.19.43
-    optional: true
 
   shebang-command@2.0.0:
     dependencies:

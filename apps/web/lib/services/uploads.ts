@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { Readable } from "node:stream";
-import { db, upload, file, eq, and } from "@filecloud/db";
+import { db, upload, file, job, eq, and } from "@filecloud/db";
 import {
   ensureBucket,
   objectStorageKey,
@@ -20,6 +20,15 @@ import { MAX_UPLOAD_BYTES, STORAGE_QUOTA_BYTES, workspaceUsedBytes } from "./quo
 import { mimeMatchesDeclaration } from "@/lib/mime-sniff";
 
 const PRESIGN_EXPIRY_SECONDS = 15 * 60;
+const THUMBNAIL_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+const BLOCKED_UPLOAD_MIME_TYPES = new Set([
+  "text/html",
+  "application/xhtml+xml",
+  "image/svg+xml",
+  "text/javascript",
+  "application/javascript",
+  "application/x-msdownload",
+]);
 
 async function abortUpload(uploadId: string, storageKey: string) {
   await db.update(upload).set({ status: "aborted" }).where(eq(upload.id, uploadId));
@@ -44,6 +53,9 @@ export async function presignUpload(
 
   const folder = await resolveFolderInWorkspace(ctx.workspace.id, input.folderId);
   const mimeType = input.mimeType?.trim() || "application/octet-stream";
+  if (BLOCKED_UPLOAD_MIME_TYPES.has(mimeType)) {
+    throw new ServiceError(415, "This file type is not allowed");
+  }
   const objectId = randomUUID();
   const storageKey = objectStorageKey(ctx.workspace.id, objectId);
   const expiresAt = new Date(Date.now() + PRESIGN_EXPIRY_SECONDS * 1000);
@@ -154,6 +166,13 @@ export async function completeUpload(ctx: AuthorizedContext, uploadId: string) {
   if (!created) throw new ServiceError(500, "Failed to create file");
 
   await db.update(upload).set({ status: "completed" }).where(eq(upload.id, row.id));
+
+  if (THUMBNAIL_MIME_TYPES.has(created.mimeType)) {
+    await db.insert(job).values({
+      type: "thumbnail",
+      payload: { fileId: created.id },
+    });
+  }
 
   await recordAudit({
     workspaceId: ctx.workspace.id,

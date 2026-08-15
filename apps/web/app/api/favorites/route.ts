@@ -56,6 +56,7 @@ export async function GET() {
         isFavorite: true,
         isPinned: favoriteMeta.get(f.id)?.pinned ?? false,
         favoritedAt: favoriteMeta.get(f.id)?.favoritedAt ?? f.updatedAt.toISOString(),
+        hasThumbnail: Boolean(f.thumbnailKey),
       }));
 
     const folderItems = favFolders

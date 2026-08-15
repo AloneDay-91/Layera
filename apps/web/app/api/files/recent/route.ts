@@ -40,6 +40,7 @@ export async function GET() {
       owner: (f.createdBy && owners.get(f.createdBy)?.name) || ctx.actor.name,
       ownerId: f.createdBy ?? ctx.actor.id,
       location: folderNameById.get(f.folderId) ?? "Mes fichiers",
+      hasThumbnail: Boolean(f.thumbnailKey),
     }));
 
     return NextResponse.json({ items });

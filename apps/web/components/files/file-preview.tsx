@@ -111,7 +111,10 @@ export function FilePreviewIcon({ item, size = 20 }: { item: FileItem; size?: nu
   const [imgFailed, setImgFailed] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
 
-  if (isPreviewableImage(item) && !imgFailed && (item.size == null || item.size <= 512 * 1024)) {
+  if (isPreviewableImage(item) && !imgFailed && (item.hasThumbnail || item.size == null || item.size <= 512 * 1024)) {
+    const src = item.hasThumbnail
+      ? `/api/files/content?id=${item.id}&variant=thumb`
+      : `/api/files/content?id=${item.id}`;
     return (
       <span className="relative inline-block shrink-0" style={{ width: size, height: size }}>
         {!imgLoaded && (
@@ -122,7 +125,7 @@ export function FilePreviewIcon({ item, size = 20 }: { item: FileItem; size?: nu
         )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`/api/files/content?id=${item.id}`}
+          src={src}
           alt={item.name}
           width={size}
           height={size}

@@ -16,6 +16,31 @@ import {
 } from "./file-preview";
 import { MarkdownEditor } from "./markdown-editor";
 
+function useSignedFileUrl(fileId: string) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setUrl(null);
+    fetch(`/api/files/signed-url?id=${fileId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to sign");
+        return res.json() as Promise<{ url?: string }>;
+      })
+      .then((data) => {
+        if (!cancelled && typeof data.url === "string") setUrl(data.url);
+      })
+      .catch(() => {
+        if (!cancelled) setUrl(`/api/files/content?id=${fileId}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fileId]);
+
+  return url;
+}
+
 function TextPreview({ item, markdown }: { item: FileItem; markdown: boolean }) {
   const [content, setContent] = useState<string | null>(null);
   const [error, setError] = useState(false);
@@ -142,23 +167,27 @@ function VideoPreview({ src }: { src: string }) {
 
 export function FilePreviewContent({ item }: { item: FileItem }) {
   const t = useTranslations("filePreview");
-  const contentUrl = `/api/files/content?id=${item.id}`;
+  const signedUrl = useSignedFileUrl(item.id);
 
-  if (isPreviewableImage(item)) {
-    return <ImagePreview src={contentUrl} alt={item.name} />;
-  }
-
-  if (isPreviewablePdf(item)) {
-    return <PdfPreview src={contentUrl} title={item.name} />;
-  }
-
-  if (isPreviewableVideo(item)) {
-    return <VideoPreview src={contentUrl} />;
-  }
-
-  if (isPreviewableAudio(item)) {
+  if (isPreviewableImage(item) || isPreviewablePdf(item) || isPreviewableVideo(item) || isPreviewableAudio(item)) {
+    if (!signedUrl) {
+      return (
+        <div className="flex items-center justify-center gap-2 py-8">
+          <Loader size="sm" /> {t("loadingPreview")}
+        </div>
+      );
+    }
+    if (isPreviewableImage(item)) {
+      return <ImagePreview src={signedUrl} alt={item.name} />;
+    }
+    if (isPreviewablePdf(item)) {
+      return <PdfPreview src={signedUrl} title={item.name} />;
+    }
+    if (isPreviewableVideo(item)) {
+      return <VideoPreview src={signedUrl} />;
+    }
     return (
-      <audio controls src={contentUrl} className="w-full">
+      <audio controls src={signedUrl} className="w-full">
         {t("audioNotSupported")}
       </audio>
     );
