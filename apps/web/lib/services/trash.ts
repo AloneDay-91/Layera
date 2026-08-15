@@ -11,6 +11,7 @@ import { ServiceError } from "./errors";
 import type { AuthorizedContext } from "./permissions";
 import { getFileInWorkspace, getFolderInWorkspace } from "./files";
 import { recordAudit } from "./audit";
+import { collectItemStorageKeys, deleteStoredFiles } from "./storage-cleanup";
 
 export async function listTrashedItems(ctx: AuthorizedContext) {
   const trashedRows = await db.select().from(trashItem).where(eq(trashItem.workspaceId, ctx.workspace.id));
@@ -72,6 +73,14 @@ export async function restoreTrashedItem(ctx: AuthorizedContext, input: { id: st
 
 export async function emptyTrash(ctx: AuthorizedContext) {
   const trashedRows = await db.select().from(trashItem).where(eq(trashItem.workspaceId, ctx.workspace.id));
+  const storageKeys: string[] = [];
+  for (const tRow of trashedRows) {
+    storageKeys.push(
+      ...(await collectItemStorageKeys(ctx.workspace.id, { id: tRow.itemId, type: tRow.itemType })),
+    );
+  }
+  await deleteStoredFiles(storageKeys);
+
   for (const tRow of trashedRows) {
     if (tRow.itemType === "file") {
       await db.delete(file).where(and(eq(file.id, tRow.itemId), eq(file.workspaceId, ctx.workspace.id)));
@@ -100,6 +109,9 @@ export async function permanentlyDeleteTrashedItem(
     .where(and(eq(trashItem.itemId, input.id), eq(trashItem.workspaceId, ctx.workspace.id)))
     .limit(1);
   if (!row) throw new ServiceError(404, "Item not found");
+
+  const storageKeys = await collectItemStorageKeys(ctx.workspace.id, input);
+  await deleteStoredFiles(storageKeys);
 
   if (input.type === "file") {
     await getFileInWorkspace(ctx.workspace.id, input.id);

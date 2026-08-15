@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { db, file, eq } from "@filecloud/db";
-import { minioClient, S3_BUCKET } from "@filecloud/storage";
 import { getAuthorizedWorkspace, requireSession } from "@/lib/services/permissions";
 import { writeFileContent } from "@/lib/services/files";
 import { canAccessFile } from "@/lib/services/item-shares";
 import { jsonError } from "@/lib/services/http";
 import { recordAudit } from "@/lib/services/audit";
 import { ServiceError } from "@/lib/services/errors";
+import { storedObjectResponse } from "@/lib/http-file";
 
 // SVG and HTML are deliberately excluded — they can embed <script> and
 // execute it when navigated to directly (Content-Disposition: inline),
@@ -62,58 +62,15 @@ export async function GET(request: Request) {
     const isSafeInline = INLINE_SAFE_MIME_TYPES.has(fRecord.mimeType);
     const contentType = isSafeInline ? fRecord.mimeType : "application/octet-stream";
     const disposition = isSafeInline ? "inline" : "attachment";
-    const baseHeaders = {
-      "Content-Type": contentType,
-      "Content-Disposition": `${disposition}; filename="${encodeURIComponent(fRecord.name)}"`,
-      "Cache-Control": "private, max-age=300",
-      "X-Content-Type-Options": "nosniff",
-      "Content-Security-Policy": "default-src 'none'; sandbox",
-      "Accept-Ranges": "bytes",
-    };
 
     try {
-      const rangeHeader = request.headers.get("range");
-      const totalSize = fRecord.size;
-
-      if (rangeHeader && totalSize > 0) {
-        const match = /bytes=(\d*)-(\d*)/.exec(rangeHeader);
-        const rangeStart = match?.[1] ? parseInt(match[1], 10) : 0;
-        const rangeEnd = match?.[2] ? parseInt(match[2], 10) : totalSize - 1;
-
-        if (Number.isNaN(rangeStart) || Number.isNaN(rangeEnd) || rangeStart > rangeEnd || rangeStart >= totalSize) {
-          return new NextResponse(null, {
-            status: 416,
-            headers: { "Content-Range": `bytes */${totalSize}` },
-          });
-        }
-
-        const clampedEnd = Math.min(rangeEnd, totalSize - 1);
-        const chunkLength = clampedEnd - rangeStart + 1;
-
-        const stream = await minioClient.getPartialObject(S3_BUCKET, fRecord.storageKey, rangeStart, chunkLength);
-        const chunks: Buffer[] = [];
-        for await (const chunk of stream) {
-          chunks.push(Buffer.from(chunk));
-        }
-
-        return new NextResponse(Buffer.concat(chunks), {
-          status: 206,
-          headers: {
-            ...baseHeaders,
-            "Content-Range": `bytes ${rangeStart}-${clampedEnd}/${totalSize}`,
-            "Content-Length": chunkLength.toString(),
-          },
-        });
-      }
-
-      const stream = await minioClient.getObject(S3_BUCKET, fRecord.storageKey);
-      const chunks: Buffer[] = [];
-      for await (const chunk of stream) {
-        chunks.push(Buffer.from(chunk));
-      }
-      const fileBuffer = Buffer.concat(chunks);
-
-      return new NextResponse(fileBuffer, { headers: baseHeaders });
+      return await storedObjectResponse(fRecord.storageKey, {
+        contentType,
+        filename: fRecord.name,
+        disposition,
+        totalSize: fRecord.size,
+        rangeHeader,
+      });
     } catch (s3Error) {
       console.warn("MinIO stream warning:", s3Error);
       return NextResponse.json({ error: "Storage file unreadable" }, { status: 500 });

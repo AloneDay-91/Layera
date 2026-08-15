@@ -4,6 +4,7 @@ import type { AuthorizedContext } from "./permissions";
 import { getFileInWorkspace, getFolderInWorkspace } from "./files";
 import { recordAudit } from "./audit";
 import { usersByIds } from "./users";
+import { collectItemStorageKeys, deleteStoredFiles } from "./storage-cleanup";
 
 export async function listArchivedItems(ctx: AuthorizedContext) {
   const rows = await db.select().from(archiveItem).where(eq(archiveItem.workspaceId, ctx.workspace.id));
@@ -108,6 +109,9 @@ export async function permanentlyDeleteArchivedItem(
     .where(and(eq(archiveItem.itemId, input.id), eq(archiveItem.workspaceId, ctx.workspace.id)))
     .limit(1);
   if (!row) throw new ServiceError(404, "Item not found");
+
+  const storageKeys = await collectItemStorageKeys(ctx.workspace.id, input);
+  await deleteStoredFiles(storageKeys);
 
   if (input.type === "file") {
     await getFileInWorkspace(ctx.workspace.id, input.id);

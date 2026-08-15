@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, workspace, user, organization, member, file, eq, inArray } from "@filecloud/db";
 import { getAdminSession } from "@/lib/require-admin";
+import { deleteWorkspaceStoredFiles } from "@/lib/services/storage-cleanup";
 
 export async function GET() {
   const session = await getAdminSession();
@@ -72,6 +73,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
+    await deleteWorkspaceStoredFiles(id);
     await db.delete(workspace).where(eq(workspace.id, id));
     return NextResponse.json({ success: true });
   } catch (error) {

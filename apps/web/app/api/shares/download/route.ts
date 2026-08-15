@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { db, shareLink, file, eq } from "@filecloud/db";
-import { minioClient, S3_BUCKET } from "@filecloud/storage";
 import { shareUnlockCookieName, verifyShareUnlock } from "@/lib/share-unlock";
 import { checkRateLimit, getClientIp, rateLimitedResponse } from "@/lib/rate-limit";
 import { recordAudit } from "@/lib/services/audit";
+import { storedObjectResponse } from "@/lib/http-file";
 
 export async function GET(request: Request) {
   try {
@@ -21,11 +21,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Missing token" }, { status: 400 });
     }
 
-    const [sRecord] = await db
-      .select()
-      .from(shareLink)
-      .where(eq(shareLink.token, token))
-      .limit(1);
+    const [sRecord] = await db.select().from(shareLink).where(eq(shareLink.token, token)).limit(1);
 
     if (
       !sRecord ||
@@ -44,24 +40,13 @@ export async function GET(request: Request) {
       }
     }
 
-    const [fRecord] = await db
-      .select()
-      .from(file)
-      .where(eq(file.id, sRecord.fileId))
-      .limit(1);
+    const [fRecord] = await db.select().from(file).where(eq(file.id, sRecord.fileId)).limit(1);
 
     if (!fRecord) {
       return NextResponse.json({ error: "File not found" }, { status: 404 });
     }
 
     try {
-      const stream = await minioClient.getObject(S3_BUCKET, fRecord.storageKey);
-      const chunks: Buffer[] = [];
-      for await (const chunk of stream) {
-        chunks.push(Buffer.from(chunk));
-      }
-      const fileBuffer = Buffer.concat(chunks);
-
       void recordAudit({
         workspaceId: sRecord.workspaceId,
         actorId: sRecord.createdBy,
@@ -71,11 +56,11 @@ export async function GET(request: Request) {
         metadata: { name: fRecord.name, public: true },
       });
 
-      return new NextResponse(fileBuffer, {
-        headers: {
-          "Content-Type": fRecord.mimeType || "application/octet-stream",
-          "Content-Disposition": `attachment; filename="${encodeURIComponent(fRecord.name)}"`,
-        },
+      return await storedObjectResponse(fRecord.storageKey, {
+        contentType: fRecord.mimeType || "application/octet-stream",
+        filename: fRecord.name,
+        disposition: "attachment",
+        totalSize: fRecord.size,
       });
     } catch (s3Error) {
       console.warn("MinIO stream warning:", s3Error);

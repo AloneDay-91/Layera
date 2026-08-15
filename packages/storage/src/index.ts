@@ -9,4 +9,12 @@ export {
   statStoredObject,
   putStoredObject,
   copyStoredObject,
+  getStoredObjectStream,
+  getStoredObjectRange,
+  nodeStreamToWeb,
+  readStoredObjectPrefix,
+  removeStoredObject,
+  removeStoredObjects,
+  listStoredObjectKeys,
+  removeStoredPrefix,
 } from "./client";

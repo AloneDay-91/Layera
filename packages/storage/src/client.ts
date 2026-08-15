@@ -81,3 +81,59 @@ export async function putStoredObject(
 export async function copyStoredObject(sourceKey: string, destKey: string) {
   await minioClient.copyObject(S3_BUCKET, destKey, `/${S3_BUCKET}/${sourceKey}`);
 }
+
+export async function getStoredObjectStream(storageKey: string): Promise<Readable> {
+  return minioClient.getObject(S3_BUCKET, storageKey);
+}
+
+export async function getStoredObjectRange(
+  storageKey: string,
+  offset: number,
+  length: number,
+): Promise<Readable> {
+  return minioClient.getPartialObject(S3_BUCKET, storageKey, offset, length);
+}
+
+export function nodeStreamToWeb(stream: Readable): ReadableStream<Uint8Array> {
+  return Readable.toWeb(stream) as ReadableStream<Uint8Array>;
+}
+
+export async function readStoredObjectPrefix(storageKey: string, length: number): Promise<Buffer> {
+  const stream = await minioClient.getPartialObject(S3_BUCKET, storageKey, 0, length);
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
+export async function removeStoredObject(storageKey: string) {
+  await minioClient.removeObject(S3_BUCKET, storageKey).catch(() => undefined);
+}
+
+export async function removeStoredObjects(storageKeys: string[]) {
+  const unique = [...new Set(storageKeys.filter(Boolean))];
+  const chunkSize = 1000;
+  for (let i = 0; i < unique.length; i += chunkSize) {
+    const chunk = unique.slice(i, i + chunkSize);
+    await minioClient.removeObjects(S3_BUCKET, chunk).catch(() => undefined);
+  }
+}
+
+export async function listStoredObjectKeys(prefix: string): Promise<string[]> {
+  const keys: string[] = [];
+  const stream = minioClient.listObjectsV2(S3_BUCKET, prefix, true);
+  await new Promise<void>((resolve, reject) => {
+    stream.on("data", (obj) => {
+      if (obj.name) keys.push(obj.name);
+    });
+    stream.on("error", reject);
+    stream.on("end", () => resolve());
+  });
+  return keys;
+}
+
+export async function removeStoredPrefix(prefix: string) {
+  const keys = await listStoredObjectKeys(prefix);
+  await removeStoredObjects(keys);
+}

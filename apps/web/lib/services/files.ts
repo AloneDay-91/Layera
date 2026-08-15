@@ -13,7 +13,10 @@ import {
   isNull,
   ilike,
   inArray,
+  requireWorkspaceMember,
 } from "@filecloud/db";
+import { copyStoredObject, ensureBucket, objectStorageKey, putStoredObject } from "@filecloud/storage";
+import { randomUUID } from "crypto";
 import { FOLDER_COLOR_OPTIONS } from "@/lib/folder-colors";
 import { ServiceError } from "./errors";
 import type { AuthorizedContext } from "./permissions";
@@ -26,6 +29,7 @@ import {
 } from "./names";
 import { hiddenItemIds } from "./hidden";
 import { usersByIds } from "./users";
+import { collectItemStorageKeys, deleteStoredFiles } from "./storage-cleanup";
 
 const FOLDER_COLOR_VALUES = new Set<string>(FOLDER_COLOR_OPTIONS.map((opt) => opt.value));
 
@@ -403,9 +407,16 @@ export async function permanentlyDeleteItem(
 ) {
   if (input.type === "file") {
     await getFileInWorkspace(ctx.workspace.id, input.id);
-    await db.delete(file).where(and(eq(file.id, input.id), eq(file.workspaceId, ctx.workspace.id)));
   } else {
     await getFolderInWorkspace(ctx.workspace.id, input.id);
+  }
+
+  const storageKeys = await collectItemStorageKeys(ctx.workspace.id, input);
+  await deleteStoredFiles(storageKeys);
+
+  if (input.type === "file") {
+    await db.delete(file).where(and(eq(file.id, input.id), eq(file.workspaceId, ctx.workspace.id)));
+  } else {
     await db.delete(folder).where(and(eq(folder.id, input.id), eq(folder.workspaceId, ctx.workspace.id)));
   }
   await db.delete(trashItem).where(and(eq(trashItem.itemId, input.id), eq(trashItem.workspaceId, ctx.workspace.id)));
@@ -427,8 +438,11 @@ export async function writeFileContent(ctx: AuthorizedContext, fileId: string, c
     current.mimeType === "text/markdown" || current.name.toLowerCase().endsWith(".md");
   if (!isMarkdown) throw new ServiceError(400, "Only markdown files can be edited");
 
-  const { putStoredObject } = await import("@filecloud/storage");
+  const MAX_MARKDOWN_BYTES = 2 * 1024 * 1024;
   const buffer = Buffer.from(content, "utf8");
+  if (buffer.length > MAX_MARKDOWN_BYTES) {
+    throw new ServiceError(413, "Markdown file is too large");
+  }
   await putStoredObject(current.storageKey, buffer, buffer.length, current.mimeType || "text/markdown");
 
   const [updated] = await db
@@ -457,7 +471,6 @@ export async function transferItem(
     throw new ServiceError(400, "Choose a different workspace");
   }
 
-  const { requireWorkspaceMember } = await import("@filecloud/db");
   const dest = await requireWorkspaceMember(ctx.actor.id, input.targetWorkspaceId);
   const destFolder = await resolveFolderInWorkspace(dest.workspace.id, input.targetFolderId);
 
@@ -473,8 +486,6 @@ async function transferFileToWorkspace(
   destWorkspaceId: string,
   destFolderId: string,
 ) {
-  const { copyStoredObject, objectStorageKey, ensureBucket } = await import("@filecloud/storage");
-  const { randomUUID } = await import("crypto");
   const source = await getFileInWorkspace(ctx.workspace.id, fileId);
   const name = await uniqueFileName(destWorkspaceId, destFolderId, source.name);
   const storageKey = objectStorageKey(destWorkspaceId, randomUUID());
