@@ -1,4 +1,4 @@
-import { db, file, folder, itemShare, workspaceMember, eq, and } from "@filecloud/db";
+import { db, file, folder, itemShare, workspaceMember, eq, and, inArray } from "@filecloud/db";
 import { ServiceError } from "./errors";
 import type { AuthorizedContext } from "./permissions";
 import { getFileInWorkspace, getFolderInWorkspace } from "./files";
@@ -125,15 +125,31 @@ export async function listSharedWithMe(actorId: string) {
   if (rows.length === 0) return [];
 
   const people = await usersByIds(rows.map((row) => row.sharedBy));
-  const items = [];
+  const workspaceIds = [...new Set(rows.map((row) => row.workspaceId))];
+  const hiddenByWorkspace = new Map<string, Set<string>>();
+  await Promise.all(
+    workspaceIds.map(async (workspaceId) => {
+      hiddenByWorkspace.set(workspaceId, await hiddenItemIds(workspaceId));
+    }),
+  );
 
+  const fileIds = rows.filter((row) => row.itemType === "file").map((row) => row.itemId);
+  const folderIds = rows.filter((row) => row.itemType === "folder").map((row) => row.itemId);
+  const [files, folders] = await Promise.all([
+    fileIds.length > 0 ? db.select().from(file).where(inArray(file.id, fileIds)) : Promise.resolve([]),
+    folderIds.length > 0 ? db.select().from(folder).where(inArray(folder.id, folderIds)) : Promise.resolve([]),
+  ]);
+  const fileById = new Map(files.map((row) => [row.id, row]));
+  const folderById = new Map(folders.map((row) => [row.id, row]));
+
+  const items = [];
   for (const row of rows) {
-    const hidden = await hiddenItemIds(row.workspaceId);
+    const hidden = hiddenByWorkspace.get(row.workspaceId) ?? new Set();
     if (hidden.has(row.itemId)) continue;
     const sharedBy = people.get(row.sharedBy);
 
     if (row.itemType === "file") {
-      const [fRecord] = await db.select().from(file).where(eq(file.id, row.itemId)).limit(1);
+      const fRecord = fileById.get(row.itemId);
       if (!fRecord) continue;
       items.push({
         id: fRecord.id,
@@ -150,7 +166,7 @@ export async function listSharedWithMe(actorId: string) {
         workspaceId: row.workspaceId,
       });
     } else {
-      const [fldRecord] = await db.select().from(folder).where(eq(folder.id, row.itemId)).limit(1);
+      const fldRecord = folderById.get(row.itemId);
       if (!fldRecord) continue;
       items.push({
         id: fldRecord.id,

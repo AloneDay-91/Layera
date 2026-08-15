@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, unique, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, unique, boolean, index } from "drizzle-orm/pg-core";
 import { workspace } from "./workspace";
 import { user } from "./auth";
 
@@ -20,5 +20,6 @@ export const favorite = pgTable(
   },
   (table) => [
     unique("favorite_user_item_unique").on(table.userId, table.itemId),
+    index("favorite_workspace_user_idx").on(table.workspaceId, table.userId),
   ],
 );

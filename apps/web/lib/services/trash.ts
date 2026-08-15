@@ -20,11 +20,19 @@ import { assertOwner } from "./permissions";
 export async function listTrashedItems(ctx: AuthorizedContext) {
   await purgeExpiredTrash(ctx.workspace.id);
   const trashedRows = await db.select().from(trashItem).where(eq(trashItem.workspaceId, ctx.workspace.id));
-  const resultItems = [];
+  const fileIds = trashedRows.filter((row) => row.itemType === "file").map((row) => row.itemId);
+  const folderIds = trashedRows.filter((row) => row.itemType === "folder").map((row) => row.itemId);
+  const [files, folders] = await Promise.all([
+    fileIds.length > 0 ? db.select().from(file).where(inArray(file.id, fileIds)) : Promise.resolve([]),
+    folderIds.length > 0 ? db.select().from(folder).where(inArray(folder.id, folderIds)) : Promise.resolve([]),
+  ]);
+  const fileById = new Map(files.map((row) => [row.id, row]));
+  const folderById = new Map(folders.map((row) => [row.id, row]));
 
+  const resultItems = [];
   for (const tRow of trashedRows) {
     if (tRow.itemType === "file") {
-      const [fRecord] = await db.select().from(file).where(eq(file.id, tRow.itemId)).limit(1);
+      const fRecord = fileById.get(tRow.itemId);
       if (fRecord && fRecord.workspaceId === ctx.workspace.id) {
         resultItems.push({
           id: fRecord.id,
@@ -39,7 +47,7 @@ export async function listTrashedItems(ctx: AuthorizedContext) {
         });
       }
     } else {
-      const [fldRecord] = await db.select().from(folder).where(eq(folder.id, tRow.itemId)).limit(1);
+      const fldRecord = folderById.get(tRow.itemId);
       if (fldRecord && fldRecord.workspaceId === ctx.workspace.id) {
         resultItems.push({
           id: fldRecord.id,

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, unique, index } from "drizzle-orm/pg-core";
 import { workspace } from "./workspace";
 import { user } from "./auth";
 
@@ -16,5 +16,8 @@ export const archiveItem = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     archivedAt: timestamp("archived_at").notNull().defaultNow(),
   },
-  (table) => [unique("archive_item_item_unique").on(table.itemId)],
+  (table) => [
+    unique("archive_item_item_unique").on(table.itemId),
+    index("archive_item_workspace_idx").on(table.workspaceId),
+  ],
 );

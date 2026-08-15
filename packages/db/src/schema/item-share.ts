@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, unique, index } from "drizzle-orm/pg-core";
 import { workspace } from "./workspace";
 import { user } from "./auth";
 
@@ -19,5 +19,9 @@ export const itemShare = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (table) => [unique("item_share_item_user_unique").on(table.itemId, table.sharedWithUserId)],
+  (table) => [
+    unique("item_share_item_user_unique").on(table.itemId, table.sharedWithUserId),
+    index("item_share_shared_with_idx").on(table.sharedWithUserId),
+    index("item_share_workspace_item_idx").on(table.workspaceId, table.itemId),
+  ],
 );

@@ -78,6 +78,13 @@
       "when": 1786806534811,
       "tag": "0010_futuristic_santa_claus",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786809000000,
+      "tag": "0011_query_indexes",
+      "breakpoints": true
     }
   ]
 }

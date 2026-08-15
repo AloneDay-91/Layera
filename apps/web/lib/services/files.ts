@@ -13,6 +13,7 @@ import {
   isNull,
   ilike,
   inArray,
+  notInArray,
   requireWorkspaceMember,
 } from "@filecloud/db";
 import { copyStoredObject, ensureBucket, objectStorageKey, putStoredObject } from "@filecloud/storage";
@@ -107,16 +108,19 @@ export async function listFolderContents(
   let dbFolders;
   let dbFiles;
 
+  const hiddenIds = [...(await hiddenItemIds(workspaceId))];
+  const LIST_CAP = 500;
+
   if (input.search) {
-    const pattern = `%${escapeIlike(input.search)}%`;
-    dbFolders = await db
-      .select()
-      .from(folder)
-      .where(and(eq(folder.workspaceId, workspaceId), ilike(folder.name, pattern)));
-    dbFiles = await db
-      .select()
-      .from(file)
-      .where(and(eq(file.workspaceId, workspaceId), ilike(file.name, pattern)));
+    const pattern = `%${escapeIlike(input.search.slice(0, 200))}%`;
+    const folderWhere = [eq(folder.workspaceId, workspaceId), ilike(folder.name, pattern)];
+    const fileWhere = [eq(file.workspaceId, workspaceId), ilike(file.name, pattern)];
+    if (hiddenIds.length > 0) {
+      folderWhere.push(notInArray(folder.id, hiddenIds));
+      fileWhere.push(notInArray(file.id, hiddenIds));
+    }
+    dbFolders = await db.select().from(folder).where(and(...folderWhere)).limit(LIST_CAP);
+    dbFiles = await db.select().from(file).where(and(...fileWhere)).limit(LIST_CAP);
   } else {
     if (!targetFolderId) {
       const root = await getRootFolder(workspaceId);
@@ -125,11 +129,20 @@ export async function listFolderContents(
       await getFolderInWorkspace(workspaceId, targetFolderId);
     }
 
-    const folderCondition = targetFolderId ? eq(folder.parentId, targetFolderId) : isNull(folder.parentId);
-    dbFolders = await db.select().from(folder).where(and(eq(folder.workspaceId, workspaceId), folderCondition));
-
-    const fileCondition = targetFolderId ? eq(file.folderId, targetFolderId) : isNull(file.folderId);
-    dbFiles = await db.select().from(file).where(and(eq(file.workspaceId, workspaceId), fileCondition));
+    const folderWhere = [
+      eq(folder.workspaceId, workspaceId),
+      targetFolderId ? eq(folder.parentId, targetFolderId) : isNull(folder.parentId),
+    ];
+    const fileWhere = [
+      eq(file.workspaceId, workspaceId),
+      targetFolderId ? eq(file.folderId, targetFolderId) : isNull(file.folderId),
+    ];
+    if (hiddenIds.length > 0) {
+      folderWhere.push(notInArray(folder.id, hiddenIds));
+      fileWhere.push(notInArray(file.id, hiddenIds));
+    }
+    dbFolders = await db.select().from(folder).where(and(...folderWhere)).limit(LIST_CAP);
+    dbFiles = await db.select().from(file).where(and(...fileWhere)).limit(LIST_CAP);
   }
 
   const favoriteRows = await db
@@ -209,13 +222,13 @@ export async function listFolderContents(
     currId = f.parentId;
   }
 
-  const hiddenIds = await hiddenItemIds(workspaceId);
+  const hiddenIdsSet = new Set(hiddenIds);
 
   return {
     workspaceId,
     currentFolderId: targetFolderId,
     breadcrumbs,
-    items: [...formattedFolders, ...formattedFiles].filter((item) => !hiddenIds.has(item.id)),
+    items: [...formattedFolders, ...formattedFiles].filter((item) => !hiddenIdsSet.has(item.id)),
   };
 }
 

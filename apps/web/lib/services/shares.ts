@@ -1,9 +1,8 @@
-import { db, shareLink, file, folder, eq, and, isNull } from "@filecloud/db";
+import { db, shareLink, file, folder, eq, and, isNull, inArray } from "@filecloud/db";
 import { randomBytes } from "crypto";
 import { hashSharePassword } from "@/lib/share-password";
 import { ServiceError } from "./errors";
-import type { AuthorizedContext } from "./permissions";
-import { assertOwner } from "./permissions";
+import { assertOwner, type AuthorizedContext } from "./permissions";
 import { getFileInWorkspace, getFolderInWorkspace } from "./files";
 import { recordAudit } from "./audit";
 
@@ -19,26 +18,22 @@ export async function listShareLinks(ctx: AuthorizedContext) {
       ),
     );
 
-  const result = [];
-  for (const s of shares) {
-    let itemName = "Élément";
-    let itemType: "file" | "folder" = "file";
+  const fileIds = shares.map((s) => s.fileId).filter((id): id is string => Boolean(id));
+  const folderIds = shares.map((s) => s.folderId).filter((id): id is string => Boolean(id));
+  const [files, folders] = await Promise.all([
+    fileIds.length > 0 ? db.select({ id: file.id, name: file.name }).from(file).where(inArray(file.id, fileIds)) : Promise.resolve([]),
+    folderIds.length > 0
+      ? db.select({ id: folder.id, name: folder.name }).from(folder).where(inArray(folder.id, folderIds))
+      : Promise.resolve([]),
+  ]);
+  const fileNameById = new Map(files.map((row) => [row.id, row.name]));
+  const folderNameById = new Map(folders.map((row) => [row.id, row.name]));
 
-    if (s.fileId) {
-      const [f] = await db.select().from(file).where(eq(file.id, s.fileId)).limit(1);
-      if (f) {
-        itemName = f.name;
-        itemType = "file";
-      }
-    } else if (s.folderId) {
-      const [fld] = await db.select().from(folder).where(eq(folder.id, s.folderId)).limit(1);
-      if (fld) {
-        itemName = fld.name;
-        itemType = "folder";
-      }
-    }
-
-    result.push({
+  return shares.map((s) => {
+    const itemType: "file" | "folder" = s.fileId ? "file" : "folder";
+    const itemName =
+      (s.fileId ? fileNameById.get(s.fileId) : s.folderId ? folderNameById.get(s.folderId) : undefined) ?? "Élément";
+    return {
       id: s.id,
       token: s.token,
       itemName,
@@ -46,10 +41,8 @@ export async function listShareLinks(ctx: AuthorizedContext) {
       createdAt: s.createdAt.toISOString(),
       expiresAt: s.expiresAt ? s.expiresAt.toISOString() : null,
       hasPassword: s.passwordHash !== null,
-    });
-  }
-
-  return result;
+    };
+  });
 }
 
 export async function createShareLink(
@@ -67,7 +60,7 @@ export async function createShareLink(
     throw new ServiceError(400, "Invalid expiresAt");
   }
 
-  const token = randomBytes(12).toString("hex");
+  const token = randomBytes(32).toString("hex");
   const values: {
     token: string;
     createdBy: string;

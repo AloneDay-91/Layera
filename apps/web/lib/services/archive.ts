@@ -11,11 +11,19 @@ import { assertOwner } from "./permissions";
 export async function listArchivedItems(ctx: AuthorizedContext) {
   const rows = await db.select().from(archiveItem).where(eq(archiveItem.workspaceId, ctx.workspace.id));
   const owners = await usersByIds(rows.map((row) => row.archivedBy));
+  const fileIds = rows.filter((row) => row.itemType === "file").map((row) => row.itemId);
+  const folderIds = rows.filter((row) => row.itemType === "folder").map((row) => row.itemId);
+  const [files, folders] = await Promise.all([
+    fileIds.length > 0 ? db.select().from(file).where(inArray(file.id, fileIds)) : Promise.resolve([]),
+    folderIds.length > 0 ? db.select().from(folder).where(inArray(folder.id, folderIds)) : Promise.resolve([]),
+  ]);
+  const fileById = new Map(files.map((row) => [row.id, row]));
+  const folderById = new Map(folders.map((row) => [row.id, row]));
   const result = [];
 
   for (const row of rows) {
     if (row.itemType === "file") {
-      const [fRecord] = await db.select().from(file).where(eq(file.id, row.itemId)).limit(1);
+      const fRecord = fileById.get(row.itemId);
       if (fRecord && fRecord.workspaceId === ctx.workspace.id) {
         result.push({
           id: fRecord.id,
@@ -30,7 +38,7 @@ export async function listArchivedItems(ctx: AuthorizedContext) {
         });
       }
     } else {
-      const [fldRecord] = await db.select().from(folder).where(eq(folder.id, row.itemId)).limit(1);
+      const fldRecord = folderById.get(row.itemId);
       if (fldRecord && fldRecord.workspaceId === ctx.workspace.id) {
         result.push({
           id: fldRecord.id,

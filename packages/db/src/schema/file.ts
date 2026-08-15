@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, bigint, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, bigint, unique, index } from "drizzle-orm/pg-core";
 import { workspace } from "./workspace";
 import { folder } from "./folder";
 import { user } from "./auth";
@@ -23,5 +23,6 @@ export const file = pgTable(
   },
   (table) => [
     unique("file_workspace_folder_name_unique").on(table.workspaceId, table.folderId, table.name),
+    index("file_workspace_updated_at_idx").on(table.workspaceId, table.updatedAt),
   ],
 );
