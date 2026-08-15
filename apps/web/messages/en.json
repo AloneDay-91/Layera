@@ -94,6 +94,7 @@
     "copyLink": "Copy link",
     "uploadTitle": "Upload",
     "uploadStatusUploading": "Uploading…",
+    "uploadStatusProgress": "Uploading… {percent}%",
     "uploadStatusSuccess": "Done",
     "uploadStatusError": "Failed",
     "deleteConfirmTitle": "{count, plural, one {Delete # item?} other {Delete # items?}}",

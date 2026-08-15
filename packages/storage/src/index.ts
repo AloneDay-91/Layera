@@ -1,1 +1,11 @@
-export { minioClient, S3_BUCKET } from "./client";
+export {
+  minioClient,
+  minioPresignClient,
+  S3_BUCKET,
+  usesPublicPresign,
+  objectStorageKey,
+  ensureBucket,
+  presignPutObject,
+  statStoredObject,
+  putStoredObject,
+} from "./client";

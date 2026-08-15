@@ -119,8 +119,6 @@ export async function POST(request: Request) {
     }
 
     let totalUncompressedBytes = 0;
-    const startedAt = Date.now();
-    let fileIndex = 0;
     let extractedCount = 0;
 
     for (const entry of entries) {
@@ -145,7 +143,7 @@ export async function POST(request: Request) {
       const parentId = await ensureFolder(dirPath);
       const finalName = await dedupeFileName(workspaceId, parentId, rawName);
       const mimeType = getMimeTypeFromFilename(finalName);
-      const storageKey = `files/${workspaceId}/${startedAt}-${fileIndex++}-${finalName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const storageKey = `workspaces/${workspaceId}/${crypto.randomUUID()}`;
 
       await minioClient.putObject(S3_BUCKET, storageKey, content, content.length, {
         "Content-Type": mimeType,

@@ -20,9 +20,9 @@ services:
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?S3_SECRET_KEY is required}
     volumes:
       - minio_data:/data
-    # No "ports:" mapping either — the app proxies all file reads/writes
-    # through its own API routes, so nothing needs to reach MinIO directly.
-    # For ad-hoc console access, use an SSH tunnel:
+    # No "ports:" mapping either. File uploads go through Next.js
+    # (`/api/uploads/[id]`) unless S3_PUBLIC_ENDPOINT is set and MinIO is
+    # reverse-proxied. For ad-hoc console access, use an SSH tunnel:
     #   ssh -L 9011:localhost:9001 <prod-host>
 
   web:

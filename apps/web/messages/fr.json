@@ -94,6 +94,7 @@
     "copyLink": "Copier le lien",
     "uploadTitle": "Téléversement",
     "uploadStatusUploading": "Envoi…",
+    "uploadStatusProgress": "Envoi… {percent} %",
     "uploadStatusSuccess": "Terminé",
     "uploadStatusError": "Échec",
     "deleteConfirmTitle": "{count, plural, one {Supprimer # élément ?} other {Supprimer # éléments ?}}",

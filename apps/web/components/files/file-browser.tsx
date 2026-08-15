@@ -20,6 +20,7 @@ import { authClient } from "@/lib/auth-client";
 import { ClientOnly } from "@/components/shell/client-only";
 import { MockItem } from "@/lib/mock-files";
 import { notifyStorageUpdated } from "@/lib/storage-events";
+import { uploadFileDirect } from "@/lib/upload-file";
 import type { TagColorValue, WorkspaceTag } from "@/lib/tags";
 import type { FolderColorValue } from "@/lib/folder-colors";
 import { FileBreadcrumbs } from "./file-breadcrumbs";
@@ -84,7 +85,7 @@ export function FileBrowser() {
   // État modale d'upload
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [uploadQueue, setUploadQueue] = useState<
-    Array<{ name: string; status: "uploading" | "success" | "error" }>
+    Array<{ name: string; status: "uploading" | "success" | "error"; progress: number }>
   >([]);
 
   // État modale de gestion des tags
@@ -443,22 +444,22 @@ export function FileBrowser() {
     if (files.length === 0) return;
 
     const fileArray = Array.from(files);
-    setUploadQueue(fileArray.map((f) => ({ name: f.name, status: "uploading" })));
+    setUploadQueue(fileArray.map((f) => ({ name: f.name, status: "uploading", progress: 0 })));
     setIsUploadDialogOpen(true);
 
     let successCount = 0;
 
     for (let i = 0; i < fileArray.length; i++) {
       const fileToUpload = fileArray[i]!;
-      const formData = new FormData();
-      formData.append("file", fileToUpload);
-      if (currentFolderId) formData.append("folderId", currentFolderId);
 
       try {
-        const res = await fetch("/api/upload", { method: "POST", body: formData });
-        const status = res.ok ? "success" : "error";
-        if (res.ok) successCount++;
-        setUploadQueue((prev) => prev.map((item, idx) => (idx === i ? { ...item, status } : item)));
+        await uploadFileDirect(fileToUpload, currentFolderId, (progress) => {
+          setUploadQueue((prev) => prev.map((item, idx) => (idx === i ? { ...item, progress } : item)));
+        });
+        successCount++;
+        setUploadQueue((prev) =>
+          prev.map((item, idx) => (idx === i ? { ...item, status: "success", progress: 100 } : item)),
+        );
       } catch (err) {
         console.error("Upload error:", err);
         setUploadQueue((prev) => prev.map((item, idx) => (idx === i ? { ...item, status: "error" } : item)));
@@ -1044,7 +1045,7 @@ export function FileBrowser() {
                 <span className="flex-1 truncate">{item.name}</span>
                 <span className="text-kumo-subtle">
                   {item.status === "uploading"
-                    ? t("uploadStatusUploading")
+                    ? t("uploadStatusProgress", { percent: item.progress })
                     : item.status === "success"
                       ? t("uploadStatusSuccess")
                       : t("uploadStatusError")}
