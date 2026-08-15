@@ -30,6 +30,7 @@ import {
 import { hiddenItemIds } from "./hidden";
 import { usersByIds } from "./users";
 import { collectItemStorageKeys, deleteStoredFiles } from "./storage-cleanup";
+import { assertFolderMoveAllowed, collectDescendantItems } from "./tree";
 
 const FOLDER_COLOR_VALUES = new Set<string>(FOLDER_COLOR_OPTIONS.map((opt) => opt.value));
 
@@ -195,7 +196,10 @@ export async function listFolderContents(
 
   const breadcrumbs: Array<{ id: string; name: string }> = [];
   let currId = targetFolderId;
+  const seen = new Set<string>();
   while (currId) {
+    if (seen.has(currId)) break;
+    seen.add(currId);
     const [f] = await db.select().from(folder).where(eq(folder.id, currId)).limit(1);
     if (!f || f.workspaceId !== workspaceId) break;
     if (f.name !== "root") {
@@ -262,7 +266,7 @@ export async function updateFolder(
         ? await getRootFolder(ctx.workspace.id)
         : await getFolderInWorkspace(ctx.workspace.id, input.targetFolderId);
     if (!target) throw new ServiceError(400, "Target folder not found");
-    if (target.id === input.id) throw new ServiceError(400, "Cannot move a folder into itself");
+    await assertFolderMoveAllowed(ctx.workspace.id, input.id, target.id);
     const desiredName = input.name !== undefined ? input.name.trim() : current.name;
     if (!desiredName) throw new ServiceError(400, "Name is required");
     updateData.parentId = target.id;
@@ -375,23 +379,33 @@ export async function trashItemInWorkspace(
     await getFolderInWorkspace(ctx.workspace.id, input.id);
   }
 
+  const toTrash: Array<{ id: string; type: "file" | "folder" }> = [input];
+  if (input.type === "folder") {
+    toTrash.push(...(await collectDescendantItems(ctx.workspace.id, input.id)));
+  }
+
   const existing = await db
-    .select({ id: trashItem.id })
+    .select({ itemId: trashItem.itemId })
     .from(trashItem)
-    .where(and(eq(trashItem.workspaceId, ctx.workspace.id), eq(trashItem.itemId, input.id)))
-    .limit(1);
-  if (existing[0]) return;
+    .where(eq(trashItem.workspaceId, ctx.workspace.id));
+  const alreadyTrashed = new Set(existing.map((row) => row.itemId));
 
   const purgeAt = new Date();
   purgeAt.setDate(purgeAt.getDate() + 30);
 
-  await db.insert(trashItem).values({
-    workspaceId: ctx.workspace.id,
-    itemType: input.type,
-    itemId: input.id,
-    deletedBy: ctx.actor.id,
-    purgeAt,
-  });
+  const rows = toTrash
+    .filter((item) => !alreadyTrashed.has(item.id))
+    .map((item) => ({
+      workspaceId: ctx.workspace.id,
+      itemType: item.type,
+      itemId: item.id,
+      deletedBy: ctx.actor.id,
+      purgeAt,
+    }));
+  if (rows.length > 0) {
+    await db.insert(trashItem).values(rows);
+  }
+
   await recordAudit({
     workspaceId: ctx.workspace.id,
     actorId: ctx.actor.id,

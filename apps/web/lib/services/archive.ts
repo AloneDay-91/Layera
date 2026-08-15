@@ -1,10 +1,11 @@
-import { db, folder, file, archiveItem, trashItem, favorite, eq, and } from "@filecloud/db";
+import { db, folder, file, archiveItem, trashItem, favorite, eq, and, inArray } from "@filecloud/db";
 import { ServiceError } from "./errors";
 import type { AuthorizedContext } from "./permissions";
 import { getFileInWorkspace, getFolderInWorkspace } from "./files";
 import { recordAudit } from "./audit";
 import { usersByIds } from "./users";
 import { collectItemStorageKeys, deleteStoredFiles } from "./storage-cleanup";
+import { collectDescendantItems } from "./tree";
 
 export async function listArchivedItems(ctx: AuthorizedContext) {
   const rows = await db.select().from(archiveItem).where(eq(archiveItem.workspaceId, ctx.workspace.id));
@@ -58,21 +59,29 @@ export async function archiveItemInWorkspace(
     await getFolderInWorkspace(ctx.workspace.id, input.id);
   }
 
+  const toArchive: Array<{ id: string; type: "file" | "folder" }> = [input];
+  if (input.type === "folder") {
+    toArchive.push(...(await collectDescendantItems(ctx.workspace.id, input.id)));
+  }
+
   const existing = await db
-    .select({ id: archiveItem.id })
+    .select({ itemId: archiveItem.itemId })
     .from(archiveItem)
-    .where(and(eq(archiveItem.workspaceId, ctx.workspace.id), eq(archiveItem.itemId, input.id)))
-    .limit(1);
-  if (existing[0]) return;
-
-  await db.delete(trashItem).where(and(eq(trashItem.itemId, input.id), eq(trashItem.workspaceId, ctx.workspace.id)));
-
-  await db.insert(archiveItem).values({
-    workspaceId: ctx.workspace.id,
-    itemType: input.type,
-    itemId: input.id,
-    archivedBy: ctx.actor.id,
-  });
+    .where(eq(archiveItem.workspaceId, ctx.workspace.id));
+  const alreadyArchived = new Set(existing.map((row) => row.itemId));
+  const fresh = toArchive.filter((item) => !alreadyArchived.has(item.id));
+  const ids = fresh.map((item) => item.id);
+  if (ids.length > 0) {
+    await db.delete(trashItem).where(and(eq(trashItem.workspaceId, ctx.workspace.id), inArray(trashItem.itemId, ids)));
+    await db.insert(archiveItem).values(
+      fresh.map((item) => ({
+        workspaceId: ctx.workspace.id,
+        itemType: item.type,
+        itemId: item.id,
+        archivedBy: ctx.actor.id,
+      })),
+    );
+  }
   await recordAudit({
     workspaceId: ctx.workspace.id,
     actorId: ctx.actor.id,
@@ -89,7 +98,11 @@ export async function restoreArchivedItem(ctx: AuthorizedContext, input: { id: s
     .where(and(eq(archiveItem.itemId, input.id), eq(archiveItem.workspaceId, ctx.workspace.id)))
     .limit(1);
   if (!row) throw new ServiceError(404, "Item not found");
-  await db.delete(archiveItem).where(eq(archiveItem.id, row.id));
+  const ids = [input.id];
+  if (input.type === "folder") {
+    ids.push(...(await collectDescendantItems(ctx.workspace.id, input.id)).map((item) => item.id));
+  }
+  await db.delete(archiveItem).where(and(eq(archiveItem.workspaceId, ctx.workspace.id), inArray(archiveItem.itemId, ids)));
   await recordAudit({
     workspaceId: ctx.workspace.id,
     actorId: ctx.actor.id,

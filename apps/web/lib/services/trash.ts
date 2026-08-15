@@ -6,14 +6,18 @@ import {
   favorite,
   eq,
   and,
+  lte,
+  inArray,
 } from "@filecloud/db";
 import { ServiceError } from "./errors";
 import type { AuthorizedContext } from "./permissions";
 import { getFileInWorkspace, getFolderInWorkspace } from "./files";
 import { recordAudit } from "./audit";
 import { collectItemStorageKeys, deleteStoredFiles } from "./storage-cleanup";
+import { collectDescendantItems } from "./tree";
 
 export async function listTrashedItems(ctx: AuthorizedContext) {
+  await purgeExpiredTrash(ctx.workspace.id);
   const trashedRows = await db.select().from(trashItem).where(eq(trashItem.workspaceId, ctx.workspace.id));
   const resultItems = [];
 
@@ -61,7 +65,12 @@ export async function restoreTrashedItem(ctx: AuthorizedContext, input: { id: st
     .where(and(eq(trashItem.itemId, input.id), eq(trashItem.workspaceId, ctx.workspace.id)))
     .limit(1);
   if (!row) throw new ServiceError(404, "Item not found");
-  await db.delete(trashItem).where(eq(trashItem.id, row.id));
+
+  const ids = [input.id];
+  if (input.type === "folder") {
+    ids.push(...(await collectDescendantItems(ctx.workspace.id, input.id)).map((item) => item.id));
+  }
+  await db.delete(trashItem).where(and(eq(trashItem.workspaceId, ctx.workspace.id), inArray(trashItem.itemId, ids)));
   await recordAudit({
     workspaceId: ctx.workspace.id,
     actorId: ctx.actor.id,
@@ -116,12 +125,16 @@ export async function permanentlyDeleteTrashedItem(
   if (input.type === "file") {
     await getFileInWorkspace(ctx.workspace.id, input.id);
     await db.delete(file).where(and(eq(file.id, input.id), eq(file.workspaceId, ctx.workspace.id)));
+    await db.delete(favorite).where(and(eq(favorite.itemId, input.id), eq(favorite.workspaceId, ctx.workspace.id)));
+    await db.delete(trashItem).where(eq(trashItem.id, row.id));
   } else {
     await getFolderInWorkspace(ctx.workspace.id, input.id);
+    const descendantIds = (await collectDescendantItems(ctx.workspace.id, input.id)).map((item) => item.id);
     await db.delete(folder).where(and(eq(folder.id, input.id), eq(folder.workspaceId, ctx.workspace.id)));
+    const relatedIds = [input.id, ...descendantIds];
+    await db.delete(favorite).where(and(eq(favorite.workspaceId, ctx.workspace.id), inArray(favorite.itemId, relatedIds)));
+    await db.delete(trashItem).where(and(eq(trashItem.workspaceId, ctx.workspace.id), inArray(trashItem.itemId, relatedIds)));
   }
-  await db.delete(favorite).where(and(eq(favorite.itemId, input.id), eq(favorite.workspaceId, ctx.workspace.id)));
-  await db.delete(trashItem).where(eq(trashItem.id, row.id));
   await recordAudit({
     workspaceId: ctx.workspace.id,
     actorId: ctx.actor.id,
@@ -129,4 +142,28 @@ export async function permanentlyDeleteTrashedItem(
     targetType: input.type,
     targetId: input.id,
   });
+}
+
+export async function purgeExpiredTrash(workspaceId?: string) {
+  const expired = await db
+    .select()
+    .from(trashItem)
+    .where(workspaceId ? and(eq(trashItem.workspaceId, workspaceId), lte(trashItem.purgeAt, new Date())) : lte(trashItem.purgeAt, new Date()));
+
+  for (const row of expired) {
+    const storageKeys = await collectItemStorageKeys(row.workspaceId, {
+      id: row.itemId,
+      type: row.itemType,
+    });
+    await deleteStoredFiles(storageKeys);
+    if (row.itemType === "file") {
+      await db.delete(file).where(and(eq(file.id, row.itemId), eq(file.workspaceId, row.workspaceId)));
+    } else {
+      await db.delete(folder).where(and(eq(folder.id, row.itemId), eq(folder.workspaceId, row.workspaceId)));
+    }
+    await db.delete(favorite).where(and(eq(favorite.itemId, row.itemId), eq(favorite.workspaceId, row.workspaceId)));
+    await db.delete(trashItem).where(eq(trashItem.id, row.id));
+  }
+
+  return expired.length;
 }
