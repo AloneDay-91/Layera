@@ -1,12 +1,15 @@
 name: Publish Docker image
 
-# Only runs once the CI workflow has finished successfully on main, so a
-# broken build/lint/typecheck/audit never gets published.
+# Image on main: after CI is green. Image + GitHub Release on vX.Y.Z tags
+# (the tagged commit already passed CI on main).
 on:
   workflow_run:
     workflows: ["CI"]
     types: [completed]
     branches: [main]
+  push:
+    tags:
+      - "v*.*.*"
 
 env:
   REGISTRY: ghcr.io
@@ -16,14 +19,15 @@ jobs:
   build-and-push:
     name: Build and push web image
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'push' || github.event.workflow_run.conclusion == 'success'
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
 
       - uses: docker/setup-buildx-action@v3
 
@@ -34,6 +38,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Resolve APP_VERSION
+        id: ver
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" == v* ]]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            TAG=$(git describe --tags --match 'v*.*.*' --abbrev=0 2>/dev/null || true)
+            if [[ -n "$TAG" ]]; then
+              echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+            else
+              echo "version=0.0.0-dev" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
       - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
@@ -42,6 +60,7 @@ jobs:
           tags: |
             type=raw,value=latest
             type=sha,format=short
+            type=raw,value=${{ github.ref_name }},enable=${{ github.ref_type == 'tag' }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -49,7 +68,15 @@ jobs:
           context: .
           file: apps/web/Dockerfile
           push: true
+          build-args: |
+            APP_VERSION=${{ steps.ver.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

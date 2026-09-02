@@ -26,9 +26,7 @@ services:
     #   ssh -L 9011:localhost:9001 <prod-host>
 
   web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
+    image: ghcr.io/aloneday-91/filecloud-v2:${LAYERA_VERSION:-latest}
     restart: unless-stopped
     env_file: .env.production
     environment:

@@ -104,6 +104,9 @@ Or run everything in Docker: `docker compose up --build`. The `web` service runs
 | `GITHUB_CLIENT_ID` / `_SECRET`   |    –     | Enables "Continue with GitHub"                                    |
 | `GOOGLE_CLIENT_ID` / `_SECRET`   |    –     | Enables "Continue with Google"                                    |
 | `ADMIN_EMAILS`                   |    –     | Comma-separated emails auto-promoted to the admin role on login   |
+| `GITHUB_REPO`                    |    –     | Override `AloneDay-91/filecloud-v2` for the update banner         |
+| `GITHUB_TOKEN`                   |    –     | Optional token for GitHub Releases API rate limits                |
+| `LAYERA_VERSION`                 |    –     | Prod compose image tag (`v1.2.0`); defaults to `latest`           |
 
 ## Testing
 
@@ -125,8 +128,9 @@ Every push/PR also runs `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm bu
 
 ## Production deployment
 
-`apps/web/Dockerfile` builds a standalone Next.js production image;
-`docker-compose.prod.yml` runs it alongside Postgres, MinIO, and the worker with a
+`apps/web/Dockerfile` builds a standalone Next.js production image
+published to `ghcr.io/aloneday-91/filecloud-v2`. `docker-compose.prod.yml`
+pulls that image for `web` and builds the worker locally, with a
 deliberately locked-down network:
 
 - **Postgres and MinIO publish no ports to the host at all** — only
@@ -140,8 +144,34 @@ deliberately locked-down network:
 
 ```bash
 cp .env.production.example .env.production   # fill in real secrets
+docker login ghcr.io                         # if the package is private
+docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d --build
 ```
+
+`--build` compiles the worker on the host. `web` comes from GHCR (`latest`,
+or pin `LAYERA_VERSION=v1.2.0` in the compose env).
+
+### Releases and in-app updates
+
+Tag a semver release after `main` is green. That publishes a GitHub Release
+and the image `ghcr.io/aloneday-91/filecloud-v2:vX.Y.Z` (and updates `latest`):
+
+```bash
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+Admins see a banner when a newer release exists. Update the running app:
+
+```bash
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Optional `GITHUB_TOKEN` in `.env.production` raises the GitHub API rate limit
+used by the banner. A push to `main` without a tag does not create a release
+and does not trigger the banner.
 
 ## Backups and restore
 
@@ -179,8 +209,10 @@ Three GitHub Actions workflows live under [`.github/workflows/`](.github/workflo
 
 - **`ci.yml`** — lint, typecheck, and build on every push/PR to `main`,
   plus a `pnpm audit --audit-level=high` gate.
-- **`docker-publish.yml`** — once CI is green on `main`, builds the
-  production image and pushes it to `ghcr.io/alonedday-91/filecloud-v2`.
+- **`docker-publish.yml`** — once CI is green on `main`, or on a `vX.Y.Z`
+  tag: builds the production image, stamps `APP_VERSION`, and pushes it to
+  `ghcr.io/aloneday-91/filecloud-v2`. Tags also create the GitHub Release
+  that feeds the admin update banner.
 - **`dependency-audit-fix.yml`** — weekly `pnpm audit --fix`, re-verified
   against lint/typecheck/build, opened as a PR for review (never pushed
   directly to `main`).

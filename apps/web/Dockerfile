@@ -27,7 +27,9 @@ RUN pnpm --filter @filecloud/web build
 # ---- runner: minimal production image ----
 FROM node:20-slim AS runner
 WORKDIR /repo
+ARG APP_VERSION=0.0.0-dev
 ENV NODE_ENV=production
+ENV APP_VERSION=$APP_VERSION
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 

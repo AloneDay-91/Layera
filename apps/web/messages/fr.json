@@ -897,5 +897,16 @@
     "languageDescription": "Choisissez la langue utilisée dans l'interface.",
     "languageEnglish": "Anglais",
     "languageFrench": "Français"
+  },
+  "updateBanner": {
+    "title": "Layera {latest} est disponible",
+    "description": "Cette instance tourne en {current}.",
+    "viewRelease": "Voir la release",
+    "copyCommand": "Copier la commande",
+    "copiedTitle": "Commande copiée",
+    "copiedDescription": "Colle-la sur l'hôte qui lance docker compose.",
+    "copyErrorTitle": "Impossible de copier",
+    "copyErrorDescription": "Copie la commande depuis les notes de version.",
+    "dismissAria": "Masquer jusqu'à la prochaine version"
   }
 }
