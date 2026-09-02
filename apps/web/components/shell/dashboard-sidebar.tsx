@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Sidebar } from "@cloudflare/kumo";
 import {
@@ -18,12 +17,14 @@ import {
 } from "@phosphor-icons/react";
 import { WorkspaceSwitcher } from "./workspace-switcher";
 import { authClient } from "@/lib/auth-client";
+import { useNavigation } from "./navigation-provider";
+import type { DashboardUser } from "./dashboard-user";
 
-export function DashboardSidebar() {
-  const pathname = usePathname();
+export function DashboardSidebar({ initialUser }: { initialUser: DashboardUser | null }) {
+  const { displayedPath } = useNavigation();
   const t = useTranslations("sidebar");
   const { data: session } = authClient.useSession();
-  const isAdmin = session?.user.role === "admin";
+  const isAdmin = (session?.user.role ?? initialUser?.role) === "admin";
 
   const ORGANIZER_SUB_ITEMS = [
     { href: "/dashboard/links", label: t("shareLinks") },
@@ -41,16 +42,16 @@ export function DashboardSidebar() {
         {/* Navigation Principale */}
         <Sidebar.Group>
           <Sidebar.Menu>
-            <Sidebar.MenuButton icon={HouseIcon} href="/dashboard" active={pathname === "/dashboard"}>
+            <Sidebar.MenuButton icon={HouseIcon} href="/dashboard" active={displayedPath === "/dashboard"}>
               {t("files")}
             </Sidebar.MenuButton>
-            <Sidebar.MenuButton icon={ClockIcon} href="/dashboard/recent" active={pathname === "/dashboard/recent"}>
+            <Sidebar.MenuButton icon={ClockIcon} href="/dashboard/recent" active={displayedPath === "/dashboard/recent"}>
               {t("recent")}
             </Sidebar.MenuButton>
-            <Sidebar.MenuButton icon={StarIcon} href="/dashboard/favorites" active={pathname === "/dashboard/favorites"}>
+            <Sidebar.MenuButton icon={StarIcon} href="/dashboard/favorites" active={displayedPath === "/dashboard/favorites"}>
               {t("favorites")}
             </Sidebar.MenuButton>
-            <Sidebar.MenuButton icon={ShareIcon} href="/dashboard/shared" active={pathname === "/dashboard/shared"}>
+            <Sidebar.MenuButton icon={ShareIcon} href="/dashboard/shared" active={displayedPath === "/dashboard/shared"}>
               {t("sharedWithMe")}
             </Sidebar.MenuButton>
           </Sidebar.Menu>
@@ -75,7 +76,7 @@ export function DashboardSidebar() {
                       <Sidebar.MenuSubButton
                         key={item.href}
                         href={item.href}
-                        active={pathname === item.href}
+                        active={displayedPath === item.href}
                       >
                         {item.label}
                       </Sidebar.MenuSubButton>
@@ -87,28 +88,28 @@ export function DashboardSidebar() {
             <Sidebar.MenuButton
               icon={TagIcon}
               href="/dashboard/tags"
-              active={pathname === "/dashboard/tags"}
+              active={displayedPath === "/dashboard/tags"}
             >
               {t("tags")}
             </Sidebar.MenuButton>
             <Sidebar.MenuButton
               icon={HardDriveIcon}
               href="/dashboard/storage"
-              active={pathname === "/dashboard/storage"}
+              active={displayedPath === "/dashboard/storage"}
             >
               {t("storage")}
             </Sidebar.MenuButton>
             <Sidebar.MenuButton
               icon={ActivityIcon}
               href="/dashboard/activity"
-              active={pathname === "/dashboard/activity"}
+              active={displayedPath === "/dashboard/activity"}
             >
               {t("activity")}
             </Sidebar.MenuButton>
             <Sidebar.MenuButton
               icon={GearIcon}
               href="/dashboard/settings"
-              active={pathname === "/dashboard/settings"}
+              active={displayedPath === "/dashboard/settings"}
             >
               {t("settings")}
             </Sidebar.MenuButton>
@@ -116,7 +117,7 @@ export function DashboardSidebar() {
               <Sidebar.MenuButton
                 icon={ShieldCheckIcon}
                 href="/dashboard/admin"
-                active={pathname === "/dashboard/admin"}
+                active={displayedPath === "/dashboard/admin"}
               >
                 {t("admin")}
               </Sidebar.MenuButton>

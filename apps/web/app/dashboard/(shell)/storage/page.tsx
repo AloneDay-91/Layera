@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Breadcrumbs, Grid, GridItem, LayerCard, Meter, SkeletonLine, Text } from "@cloudflare/kumo";
+import { Breadcrumbs, Grid, GridItem, LayerCard, Meter, Text } from "@cloudflare/kumo";
 import {
   HardDriveIcon,
   FileIcon,
@@ -15,7 +15,8 @@ import {
 } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
-import { ClientOnly } from "@/components/shell/client-only";
+import { DashboardPageSkeleton } from "@/components/shell/dashboard-page-skeleton";
+import { usePageReady } from "@/components/shell/navigation-provider";
 import { formatFileSize } from "@/lib/file-item";
 
 type StorageStats = {
@@ -39,6 +40,7 @@ export default function StoragePage() {
   const { data: activeOrg } = authClient.useActiveOrganization();
   const [stats, setStats] = useState<StorageStats | null>(null);
   const [loading, setLoading] = useState(true);
+  usePageReady(!loading);
   const t = useTranslations("storagePage");
   const tBreadcrumbs = useTranslations("fileBreadcrumbs");
 
@@ -76,30 +78,75 @@ export default function StoragePage() {
         description={t("description")}
       />
 
-      <div className="flex flex-1 flex-col gap-6 pt-6 max-w-3xl">
+      <div className="flex flex-1 flex-col gap-6 pt-6">
         {loading || !stats ? (
-          <ClientOnly fallback={<div className="min-h-40 animate-pulse rounded-lg border border-kumo-line bg-kumo-base" />}>
-            <div className="flex flex-col gap-3 rounded-lg border border-kumo-line bg-kumo-base p-4">
-              <SkeletonLine minWidth={40} maxWidth={40} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-              <SkeletonLine minWidth={100} maxWidth={100} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-3" />
-            </div>
-          </ClientOnly>
+          <DashboardPageSkeleton path="/dashboard/storage" contentOnly />
         ) : (
           <>
-            <LayerCard className="flex flex-col gap-4 p-5">
+            <Grid variant="4up" gap="base">
+              <GridItem>
+                <LayerCard>
+                  <LayerCard.Secondary className="flex items-center justify-between">
+                    <Text as="span" variant="secondary">{t("files")}</Text>
+                    <FileIcon size={16} className="text-kumo-info" />
+                  </LayerCard.Secondary>
+                  <LayerCard.Primary>
+                    <Text as="p" variant="heading2">{stats.fileCount}</Text>
+                  </LayerCard.Primary>
+                </LayerCard>
+              </GridItem>
+              <GridItem>
+                <LayerCard>
+                  <LayerCard.Secondary className="flex items-center justify-between">
+                    <Text as="span" variant="secondary">{t("folders")}</Text>
+                    <FolderIcon size={16} className="text-kumo-info" />
+                  </LayerCard.Secondary>
+                  <LayerCard.Primary>
+                    <Text as="p" variant="heading2">{stats.folderCount}</Text>
+                  </LayerCard.Primary>
+                </LayerCard>
+              </GridItem>
+              <GridItem>
+                <LayerCard>
+                  <LayerCard.Secondary className="flex items-center justify-between">
+                    <Text as="span" variant="secondary">{t("totalSpace")}</Text>
+                    <HardDriveIcon size={16} className="text-kumo-info" />
+                  </LayerCard.Secondary>
+                  <LayerCard.Primary className="grid gap-1.5">
+                    <Text as="p" variant="heading2">{formatFileSize(stats.usedBytes)}</Text>
+                    <Text variant="secondary">{formatFileSize(stats.quotaBytes)}</Text>
+                  </LayerCard.Primary>
+                </LayerCard>
+              </GridItem>
+              <GridItem>
+                <LayerCard>
+                  <LayerCard.Secondary className="flex items-center justify-between">
+                    <Text as="span" variant="secondary">{t("trash")}</Text>
+                    <TrashIcon size={16} className="text-kumo-danger" />
+                  </LayerCard.Secondary>
+                  <LayerCard.Primary className="grid gap-1.5">
+                    <Text as="p" variant="heading2">{formatFileSize(stats.trashBytes)}</Text>
+                    <Text variant="secondary">{t("itemCount", { count: stats.trashCount })}</Text>
+                  </LayerCard.Primary>
+                </LayerCard>
+              </GridItem>
+            </Grid>
+
+            <LayerCard className="flex flex-col gap-6 px-5 py-4">
               <Meter
                 label={t("usedStorage")}
                 value={usedPercent}
                 customValue={`${formatFileSize(stats.usedBytes)} / ${formatFileSize(stats.quotaBytes)}`}
               />
-
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-4">
                 {CATEGORY_META.map(({ key, labelKey, icon: Icon }) => {
                   const bytes = stats.categories[key];
                   const percent = stats.quotaBytes > 0 ? (bytes / stats.quotaBytes) * 100 : 0;
                   return (
-                    <div key={key} className="flex items-center gap-3">
-                      <Icon size={18} className="shrink-0 text-kumo-subtle" />
+                    <div key={key} className="flex items-start gap-2">
+                      <span className="h-lh flex items-center">
+                        <Icon size={16} className="text-kumo-subtle" />
+                      </span>
                       <div className="min-w-0 flex-1">
                         <Meter label={t(labelKey)} value={percent} customValue={formatFileSize(bytes)} showValue />
                       </div>
@@ -108,60 +155,6 @@ export default function StoragePage() {
                 })}
               </div>
             </LayerCard>
-
-            <Grid variant="4up" gap="base">
-              <GridItem>
-                <LayerCard className="flex flex-col gap-1 p-4">
-                  <div className="flex items-center justify-between text-kumo-subtle">
-                    <Text as="span" variant="secondary" bold>{t("files")}</Text>
-                    <FileIcon size={20} className="text-kumo-info" />
-                  </div>
-                  <Text as="p" variant="heading1" DANGEROUS_className="mt-1">
-                    {stats.fileCount}
-                  </Text>
-                </LayerCard>
-              </GridItem>
-
-              <GridItem>
-                <LayerCard className="flex flex-col gap-1 p-4">
-                  <div className="flex items-center justify-between text-kumo-subtle">
-                    <Text as="span" variant="secondary" bold>{t("folders")}</Text>
-                    <FolderIcon size={20} className="text-kumo-info" />
-                  </div>
-                  <Text as="p" variant="heading1" DANGEROUS_className="mt-1">
-                    {stats.folderCount}
-                  </Text>
-                </LayerCard>
-              </GridItem>
-
-              <GridItem>
-                <LayerCard className="flex flex-col gap-1 p-4">
-                  <div className="flex items-center justify-between text-kumo-subtle">
-                    <Text as="span" variant="secondary" bold>{t("totalSpace")}</Text>
-                    <HardDriveIcon size={20} className="text-kumo-info" />
-                  </div>
-                  <Text as="p" variant="heading1" DANGEROUS_className="mt-1">
-                    {formatFileSize(stats.usedBytes)}
-                  </Text>
-                  <Text as="span" variant="secondary" bold>
-                    {formatFileSize(stats.quotaBytes)}
-                  </Text>
-                </LayerCard>
-              </GridItem>
-
-              <GridItem>
-                <LayerCard className="flex flex-col gap-1 p-4">
-                  <div className="flex items-center justify-between text-kumo-subtle">
-                    <Text as="span" variant="secondary" bold>{t("trash")}</Text>
-                    <TrashIcon size={20} className="text-kumo-danger" />
-                  </div>
-                  <Text as="p" variant="heading1" DANGEROUS_className="mt-1">
-                    {formatFileSize(stats.trashBytes)}
-                  </Text>
-                  <Text as="span" variant="secondary" bold>{t("itemCount", { count: stats.trashCount })}</Text>
-                </LayerCard>
-              </GridItem>
-            </Grid>
           </>
         )}
       </div>

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { authClient } from "@/lib/auth-client";
+import { publicAuthClient } from "@/lib/public-auth-client";
 import { Button, Input, LayerCard, Link, Loader, Tabs, Text, useKumoToastManager } from "@cloudflare/kumo";
 import {
   GithubLogoIcon,
@@ -40,7 +40,7 @@ export default function LoginPage() {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    const { data, error: signInError } = await authClient.signIn.email({ email, password });
+    const { data, error: signInError } = await publicAuthClient.signIn.email({ email, password });
     setSubmitting(false);
     if (signInError) {
       setError(signInError.message ?? tErrors("signInFailed"));
@@ -59,7 +59,7 @@ export default function LoginPage() {
     e.preventDefault();
     setSendingOtp(true);
     setError(null);
-    const { error: otpError } = await authClient.emailOtp.sendVerificationOtp({
+    const { error: otpError } = await publicAuthClient.emailOtp.sendVerificationOtp({
       email: otpEmail,
       type: "sign-in",
     });
@@ -79,7 +79,7 @@ export default function LoginPage() {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    const { error: verifyError } = await authClient.signIn.emailOtp({
+    const { error: verifyError } = await publicAuthClient.signIn.emailOtp({
       email: otpEmail,
       otp: otpCode,
     });
@@ -97,7 +97,7 @@ export default function LoginPage() {
       title: tToasts("oauthRedirectTitle"),
       description: tToasts("oauthRedirectDescription", { provider: provider === "github" ? "GitHub" : "Google" }),
     });
-    await authClient.signIn.social({
+    await publicAuthClient.signIn.social({
       provider,
       callbackURL: "/dashboard",
     });

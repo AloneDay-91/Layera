@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Breadcrumbs, LayerCard, SkeletonLine, Table, Text, useKumoToastManager } from "@cloudflare/kumo";
+import { Breadcrumbs, Empty, LayerCard, Table, Text, useKumoToastManager } from "@cloudflare/kumo";
 import { PushPinIcon, StarIcon } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
-import { ClientOnly } from "@/components/shell/client-only";
+import { TableCardSkeleton } from "@/components/shell/table-card-skeleton";
+import { usePageReady } from "@/components/shell/navigation-provider";
 import { FilePreviewIcon } from "@/components/files/file-preview";
 import { FileRowMenu } from "@/components/files/file-row-menu";
 import { FileDetailsPanel } from "@/components/files/file-details-panel";
@@ -20,6 +21,7 @@ export default function FavoritesPage() {
   const { data: activeOrg } = authClient.useActiveOrganization();
   const [items, setItems] = useState<FavoriteItem[]>([]);
   const [loading, setLoading] = useState(true);
+  usePageReady(!loading);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   const [shareItem, setShareItem] = useState<FileItem | null>(null);
@@ -137,29 +139,26 @@ export default function FavoritesPage() {
       />
 
       <div className="flex flex-1 gap-6 pt-6">
-        <div className="flex flex-1 flex-col gap-6 max-w-5xl">
+        <div className="flex min-w-0 flex-1 flex-col gap-6">
           {loading ? (
-            <ClientOnly
-              fallback={
-                <div className="flex flex-col gap-3 p-4 bg-kumo-base border border-kumo-line rounded-lg animate-pulse min-h-55" />
-              }
-            >
-              <div className="flex flex-col gap-3 p-4 bg-kumo-base border border-kumo-line rounded-lg">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex items-center justify-between py-3 border-b border-kumo-line/40">
-                    <SkeletonLine minWidth={40} maxWidth={60} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-                    <SkeletonLine minWidth={20} maxWidth={20} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-                  </div>
-                ))}
-              </div>
-            </ClientOnly>
+            <TableCardSkeleton
+              columns={[
+                " ",
+                t("nameColumn"),
+                t("locationColumn"),
+                t("modifiedColumn"),
+                t("sizeColumn"),
+                " ",
+              ]}
+            />
           ) : items.length === 0 ? (
-            <LayerCard className="flex flex-col items-center justify-center p-12 text-center">
-              <StarIcon size={48} className="text-kumo-subtle mb-3" />
-              <Text as="p" variant="heading3" DANGEROUS_className="mb-1">
-                {t("emptyTitle")}
-              </Text>
-              <Text variant="secondary">{t("emptyDescription")}</Text>
+            <LayerCard className="p-0">
+              <Empty
+                size="sm"
+                icon={<StarIcon size={40} />}
+                title={t("emptyTitle")}
+                description={t("emptyDescription")}
+              />
             </LayerCard>
           ) : (
             <LayerCard className="p-0">

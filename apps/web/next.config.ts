@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
   // build correctly bundles the @filecloud/db and @filecloud/storage
   // workspace packages instead of just this app's own directory.
   outputFileTracingRoot: path.join(__dirname, "../../"),
+  experimental: {
+    // Dashboard pages are client-fetched; keep the RSC payload warm so sidebar
+    // clicks do not wait on a server round-trip for an empty layout.
+    staleTimes: {
+      dynamic: 30,
+      static: 180,
+    },
+  },
   async headers() {
     return [
       {

@@ -8,11 +8,11 @@ import {
   Button,
   DatePicker,
   Dialog,
+  Empty,
   Input,
   LayerCard,
   Loader,
   Popover,
-  SkeletonLine,
   Table,
   Text,
   useKumoToastManager,
@@ -20,7 +20,8 @@ import {
 import { LinkIcon, CopyIcon, XCircleIcon, PencilSimpleIcon, XIcon, LockIcon, ClockIcon, CalendarIcon } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
-import { ClientOnly } from "@/components/shell/client-only";
+import { TableCardSkeleton } from "@/components/shell/table-card-skeleton";
+import { usePageReady } from "@/components/shell/navigation-provider";
 
 type ShareLinkItem = {
   id: string;
@@ -44,6 +45,7 @@ export default function LinksPage() {
   const { data: activeOrg } = authClient.useActiveOrganization();
   const [shares, setShares] = useState<ShareLinkItem[]>([]);
   const [loading, setLoading] = useState(true);
+  usePageReady(!loading);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
   const [editShare, setEditShare] = useState<ShareLinkItem | null>(null);
@@ -176,32 +178,27 @@ export default function LinksPage() {
         description={t("description")}
       />
 
-      <div className="flex flex-1 flex-col gap-6 max-w-5xl pt-6">
+      <div className="flex flex-1 flex-col gap-6 pt-6">
 
       {loading ? (
-        <ClientOnly
-          fallback={
-            <div className="flex flex-col gap-3 p-4 bg-kumo-base border border-kumo-line rounded-lg animate-pulse min-h-55" />
-          }
-        >
-          <div className="flex flex-col gap-3 p-4 bg-kumo-base border border-kumo-line rounded-lg">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between py-3 border-b border-kumo-line/40">
-                <SkeletonLine minWidth={40} maxWidth={60} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-                <SkeletonLine minWidth={20} maxWidth={20} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-              </div>
-            ))}
-          </div>
-        </ClientOnly>
+        <TableCardSkeleton
+          columns={[
+            t("nameColumn"),
+            t("typeColumn"),
+            t("createdColumn"),
+            t("expiresColumn"),
+            t("protectionColumn"),
+            t("actionsColumn"),
+          ]}
+        />
       ) : shares.length === 0 ? (
-        <LayerCard className="flex flex-col items-center justify-center p-12 text-center">
-          <LinkIcon size={48} className="text-kumo-subtle mb-3" />
-          <Text as="p" variant="heading3" DANGEROUS_className="mb-1">
-            {t("emptyTitle")}
-          </Text>
-          <Text variant="secondary">
-            {t("emptyDescription")}
-          </Text>
+        <LayerCard className="p-0">
+          <Empty
+            size="sm"
+            icon={<LinkIcon size={40} />}
+            title={t("emptyTitle")}
+            description={t("emptyDescription")}
+          />
         </LayerCard>
       ) : (
         <LayerCard className="p-0">

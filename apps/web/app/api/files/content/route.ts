@@ -33,15 +33,18 @@ const INLINE_SAFE_MIME_TYPES = new Set([
 
 export async function GET(request: Request) {
   try {
-    const session = await requireSession();
-    const { allowed, retryAfter } = await checkRateLimit(`file-content:${session.user.id}`, {
-      windowSeconds: 60,
-      max: 120,
-    });
-    if (!allowed) return rateLimitedResponse(retryAfter!);
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     const variant = searchParams.get("variant") === "thumb" ? "thumb" : "original";
+
+    const session = await requireSession();
+    if (variant !== "thumb") {
+      const { allowed, retryAfter } = await checkRateLimit(`file-content:${session.user.id}`, {
+        windowSeconds: 60,
+        max: 120,
+      });
+      if (!allowed) return rateLimitedResponse(retryAfter!);
+    }
 
     if (!id) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });

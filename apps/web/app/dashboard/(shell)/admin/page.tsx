@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Badge, Breadcrumbs, Button, Input, LayerCard, Loader, SkeletonLine, Table, Text, useKumoToastManager } from "@cloudflare/kumo";
-import { UsersThreeIcon, BuildingsIcon, ShieldCheckIcon, ProhibitIcon, TrashIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
+import { Badge, Breadcrumbs, Button, DeleteResource, DropdownMenu, Empty, InputGroup, LayerCard, Table, Text, Toolbar, useKumoToastManager } from "@cloudflare/kumo";
+import { BuildingsIcon, DotsThreeIcon, ProhibitIcon, ShieldCheckIcon, TrashIcon, UsersThreeIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/kumo/page-header";
-import { ClientOnly } from "@/components/shell/client-only";
+import { TableCardSkeleton } from "@/components/shell/table-card-skeleton";
+import { usePageReady } from "@/components/shell/navigation-provider";
 import { authClient } from "@/lib/auth-client";
 import { formatFileSize } from "@/lib/file-item";
 
@@ -44,11 +45,13 @@ export default function AdminPage() {
   const [workspaces, setWorkspaces] = useState<AdminWorkspace[]>([]);
   const [workspacesLoading, setWorkspacesLoading] = useState(true);
   const [busyWorkspaceId, setBusyWorkspaceId] = useState<string | null>(null);
+  const [workspaceToDelete, setWorkspaceToDelete] = useState<AdminWorkspace | null>(null);
 
   const t = useTranslations("adminPage");
   const tToasts = useTranslations("adminPage.toasts");
   const tBreadcrumbs = useTranslations("fileBreadcrumbs");
   const locale = useLocale();
+  usePageReady(!usersLoading && !workspacesLoading);
 
   async function fetchUsers(searchValue?: string) {
     setUsersLoading(true);
@@ -144,14 +147,18 @@ export default function AdminPage() {
     }
   }
 
-  async function handleDeleteWorkspace(ws: AdminWorkspace) {
-    if (!confirm(t("deleteWorkspaceConfirm", { name: ws.name }))) return;
+  async function handleDeleteWorkspace() {
+    if (!workspaceToDelete) return;
 
-    setBusyWorkspaceId(ws.id);
+    setBusyWorkspaceId(workspaceToDelete.id);
     try {
-      const res = await fetch(`/api/admin/workspaces?id=${ws.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/workspaces?id=${workspaceToDelete.id}`, { method: "DELETE" });
       if (res.ok) {
-        toasts.add({ title: tToasts("workspaceDeletedTitle"), description: tToasts("workspaceDeletedDescription", { name: ws.name }) });
+        toasts.add({
+          title: tToasts("workspaceDeletedTitle"),
+          description: tToasts("workspaceDeletedDescription", { name: workspaceToDelete.name }),
+        });
+        setWorkspaceToDelete(null);
         fetchWorkspaces();
       } else {
         toasts.add({ title: tToasts("genericError"), description: tToasts("deleteWorkspaceError") });
@@ -184,28 +191,36 @@ export default function AdminPage() {
 
       <div className="flex flex-1 flex-col gap-6 pt-6">
         {activeTab === "users" && (
-          <div className="flex flex-col gap-4">
-            <form onSubmit={handleSearchSubmit} className="flex max-w-sm gap-2">
-              <Input
-                size="sm"
-                placeholder={t("searchPlaceholder")}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="flex-1"
-              />
-              <Button variant="secondary" size="sm" type="submit" icon={MagnifyingGlassIcon}>
-                {t("search")}
-              </Button>
+          <div className="flex flex-col gap-6">
+            <form onSubmit={handleSearchSubmit}>
+              <Toolbar size="sm">
+                <Toolbar.InputGroup aria-label={t("searchAria")}>
+                  <InputGroup.Addon>
+                    <MagnifyingGlassIcon size={16} />
+                  </InputGroup.Addon>
+                  <InputGroup.Input
+                    placeholder={t("searchPlaceholder")}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </Toolbar.InputGroup>
+                <Toolbar.Button type="submit">{t("search")}</Toolbar.Button>
+              </Toolbar>
             </form>
 
             {usersLoading ? (
-              <ClientOnly fallback={<div className="min-h-40 animate-pulse rounded-lg border border-kumo-line bg-kumo-base" />}>
-                <div className="flex flex-col gap-3 rounded-lg border border-kumo-line bg-kumo-base p-4">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <SkeletonLine key={i} minWidth={60} maxWidth={80} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-                  ))}
-                </div>
-              </ClientOnly>
+              <TableCardSkeleton
+                columns={[t("userColumn"), t("roleColumn"), t("statusColumn"), t("registeredColumn"), t("actionsColumn")]}
+              />
+            ) : users.length === 0 ? (
+              <LayerCard className="p-0">
+                <Empty
+                  size="sm"
+                  icon={<UsersThreeIcon size={40} />}
+                  title={t("noUsers")}
+                  description={t("noUsersDescription")}
+                />
+              </LayerCard>
             ) : (
               <LayerCard className="p-0">
                 <Table>
@@ -224,7 +239,7 @@ export default function AdminPage() {
                       return (
                         <Table.Row key={u.id}>
                           <Table.Cell>
-                            <div className="flex flex-col">
+                            <div className="grid gap-0.5">
                               <Text as="span" bold>{u.name}</Text>
                               <Text as="span" variant="secondary">{u.email}</Text>
                             </div>
@@ -239,26 +254,35 @@ export default function AdminPage() {
                           </Table.Cell>
                           <Table.Cell>{new Date(u.createdAt).toLocaleDateString(locale)}</Table.Cell>
                           <Table.Cell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                icon={ShieldCheckIcon}
-                                disabled={isSelf || busyUserId === u.id}
-                                onClick={() => handleToggleRole(u)}
-                              >
-                                {u.role === "admin" ? t("demote") : t("promote")}
-                              </Button>
-                              <Button
-                                variant={u.banned ? "secondary" : "destructive"}
-                                size="sm"
-                                icon={ProhibitIcon}
-                                disabled={isSelf || busyUserId === u.id}
-                                onClick={() => handleToggleBan(u)}
-                              >
-                                {busyUserId === u.id ? <Loader size="sm" /> : u.banned ? t("unban") : t("ban")}
-                              </Button>
-                            </div>
+                            <DropdownMenu>
+                              <DropdownMenu.Trigger>
+                                <Button
+                                  variant="ghost"
+                                  shape="square"
+                                  size="sm"
+                                  icon={DotsThreeIcon}
+                                  disabled={isSelf || busyUserId === u.id}
+                                  aria-label={t("rowActionsAria", { email: u.email })}
+                                />
+                              </DropdownMenu.Trigger>
+                              <DropdownMenu.Content>
+                                <DropdownMenu.Item
+                                  icon={ShieldCheckIcon}
+                                  disabled={isSelf || busyUserId === u.id}
+                                  onClick={() => handleToggleRole(u)}
+                                >
+                                  {u.role === "admin" ? t("demote") : t("promote")}
+                                </DropdownMenu.Item>
+                                <DropdownMenu.Item
+                                  variant={u.banned ? undefined : "danger"}
+                                  icon={ProhibitIcon}
+                                  disabled={isSelf || busyUserId === u.id}
+                                  onClick={() => handleToggleBan(u)}
+                                >
+                                  {u.banned ? t("unban") : t("ban")}
+                                </DropdownMenu.Item>
+                              </DropdownMenu.Content>
+                            </DropdownMenu>
                           </Table.Cell>
                         </Table.Row>
                       );
@@ -271,19 +295,27 @@ export default function AdminPage() {
         )}
 
         {activeTab === "workspaces" && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-6">
             {workspacesLoading ? (
-              <ClientOnly fallback={<div className="min-h-40 animate-pulse rounded-lg border border-kumo-line bg-kumo-base" />}>
-                <div className="flex flex-col gap-3 rounded-lg border border-kumo-line bg-kumo-base p-4">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <SkeletonLine key={i} minWidth={60} maxWidth={80} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-                  ))}
-                </div>
-              </ClientOnly>
+              <TableCardSkeleton
+                columns={[
+                  t("workspaceColumn"),
+                  t("typeColumn"),
+                  t("ownerColumn"),
+                  t("membersColumn"),
+                  t("storageColumn"),
+                  t("createdColumn"),
+                  t("actionsColumn"),
+                ]}
+              />
             ) : workspaces.length === 0 ? (
-              <LayerCard className="flex flex-col items-center justify-center p-12 text-center">
-                <BuildingsIcon size={48} className="text-kumo-subtle mb-3" />
-                <Text as="p" variant="heading3">{t("noWorkspaces")}</Text>
+              <LayerCard className="p-0">
+                <Empty
+                  size="sm"
+                  icon={<BuildingsIcon size={40} />}
+                  title={t("noWorkspaces")}
+                  description={t("noWorkspacesDescription")}
+                />
               </LayerCard>
             ) : (
               <LayerCard className="p-0">
@@ -303,7 +335,7 @@ export default function AdminPage() {
                     {workspaces.map((ws) => (
                       <Table.Row key={ws.id}>
                         <Table.Cell>
-                          <div className="flex flex-col">
+                          <div className="grid gap-0.5">
                             <Text as="span" bold>{ws.name}</Text>
                             {ws.organizationName && <Text as="span" variant="secondary">{ws.organizationName}</Text>}
                           </div>
@@ -312,28 +344,44 @@ export default function AdminPage() {
                           <Badge variant="neutral">{ws.type === "personal" ? t("typePersonal") : t("typeTeam")}</Badge>
                         </Table.Cell>
                         <Table.Cell>
-                          <div className="flex flex-col">
+                          <div className="grid gap-0.5">
                             <Text as="span">{ws.ownerName}</Text>
                             <Text as="span" variant="secondary">{ws.ownerEmail}</Text>
                           </div>
                         </Table.Cell>
                         <Table.Cell>
                           <span className="inline-flex items-center gap-1">
-                            <UsersThreeIcon size={14} /> {ws.memberCount}
+                            <span className="h-lh flex items-center">
+                              <UsersThreeIcon size={14} />
+                            </span>
+                            {ws.memberCount}
                           </span>
                         </Table.Cell>
                         <Table.Cell>{formatFileSize(ws.storageBytes)}</Table.Cell>
                         <Table.Cell>{new Date(ws.createdAt).toLocaleDateString(locale)}</Table.Cell>
                         <Table.Cell className="text-right">
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            icon={TrashIcon}
-                            disabled={busyWorkspaceId === ws.id}
-                            onClick={() => handleDeleteWorkspace(ws)}
-                          >
-                            {t("delete")}
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenu.Trigger>
+                              <Button
+                                variant="ghost"
+                                shape="square"
+                                size="sm"
+                                icon={DotsThreeIcon}
+                                disabled={busyWorkspaceId === ws.id}
+                                aria-label={t("workspaceRowActionsAria", { name: ws.name })}
+                              />
+                            </DropdownMenu.Trigger>
+                            <DropdownMenu.Content>
+                              <DropdownMenu.Item
+                                variant="danger"
+                                icon={TrashIcon}
+                                disabled={busyWorkspaceId === ws.id}
+                                onClick={() => setWorkspaceToDelete(ws)}
+                              >
+                                {t("delete")}
+                              </DropdownMenu.Item>
+                            </DropdownMenu.Content>
+                          </DropdownMenu>
                         </Table.Cell>
                       </Table.Row>
                     ))}
@@ -344,6 +392,18 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+
+      <DeleteResource
+        open={workspaceToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setWorkspaceToDelete(null);
+        }}
+        resourceType={t("workspaceResourceType")}
+        resourceName={workspaceToDelete?.name ?? ""}
+        onDelete={handleDeleteWorkspace}
+        isDeleting={busyWorkspaceId !== null}
+        deleteButtonText={t("delete")}
+      />
     </div>
   );
 }

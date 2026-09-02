@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { authClient } from "@/lib/auth-client";
+import { publicAuthClient } from "@/lib/public-auth-client";
 import { Button, Input, LayerCard, Link, Loader, Text, useKumoToastManager } from "@cloudflare/kumo";
 import { ArrowRightIcon, ShieldCheckIcon } from "@phosphor-icons/react";
 import { AppLogo } from "@/components/shell/app-logo";
@@ -26,8 +26,8 @@ export default function TwoFactorLoginPage() {
     setError(null);
 
     const { error: verifyError } = useBackupCode
-      ? await authClient.twoFactor.verifyBackupCode({ code })
-      : await authClient.twoFactor.verifyTotp({ code });
+      ? await publicAuthClient.twoFactor.verifyBackupCode({ code })
+      : await publicAuthClient.twoFactor.verifyTotp({ code });
 
     setSubmitting(false);
     if (verifyError) {

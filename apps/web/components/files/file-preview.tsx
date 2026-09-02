@@ -111,10 +111,10 @@ export function FilePreviewIcon({ item, size = 20 }: { item: FileItem; size?: nu
   const [imgFailed, setImgFailed] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
 
-  if (isPreviewableImage(item) && !imgFailed && (item.hasThumbnail || item.size == null || item.size <= 512 * 1024)) {
-    const src = item.hasThumbnail
-      ? `/api/files/content?id=${item.id}&variant=thumb`
-      : `/api/files/content?id=${item.id}`;
+  if (isPreviewableImage(item) && !imgFailed && (item.hasThumbnail || item.thumbnailUrl || item.size == null || item.size <= 512 * 1024)) {
+    const src =
+      item.thumbnailUrl ??
+      (item.hasThumbnail ? `/api/files/content?id=${item.id}&variant=thumb` : `/api/files/content?id=${item.id}`);
     return (
       <span className="relative inline-block shrink-0" style={{ width: size, height: size }}>
         {!imgLoaded && (

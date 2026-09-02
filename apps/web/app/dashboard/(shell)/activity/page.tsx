@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Breadcrumbs, Empty, LayerCard, SkeletonLine, Table } from "@cloudflare/kumo";
+import { Badge, Breadcrumbs, Empty, LayerCard, Table, Text } from "@cloudflare/kumo";
 import { ActivityIcon } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
-import { ClientOnly } from "@/components/shell/client-only";
+import { TableCardSkeleton } from "@/components/shell/table-card-skeleton";
+import { usePageReady } from "@/components/shell/navigation-provider";
 
 type ActivityEvent = {
   id: string;
@@ -24,6 +25,7 @@ export default function ActivityPage() {
   const { data: activeOrg } = authClient.useActiveOrganization();
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  usePageReady(!loading);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,24 +69,13 @@ export default function ActivityPage() {
         description={t("description")}
       />
 
-      <div className="flex flex-1 flex-col gap-6 max-w-5xl pt-6">
+      <div className="flex flex-1 flex-col gap-6 pt-6">
         {loading ? (
-          <ClientOnly
-            fallback={
-              <div className="flex flex-col gap-3 p-4 bg-kumo-base border border-kumo-line rounded-lg animate-pulse min-h-55" />
-            }
-          >
-            <div className="flex flex-col gap-3 p-4 bg-kumo-base border border-kumo-line rounded-lg">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="flex items-center justify-between py-3 border-b border-kumo-line/40">
-                  <SkeletonLine minWidth={40} maxWidth={60} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-                  <SkeletonLine minWidth={20} maxWidth={20} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-                </div>
-              ))}
-            </div>
-          </ClientOnly>
+          <TableCardSkeleton
+            columns={[t("columns.when"), t("columns.actor"), t("columns.action"), t("columns.target")]}
+          />
         ) : events.length === 0 ? (
-          <LayerCard className="flex flex-col items-center justify-center p-12 text-center">
+          <LayerCard className="p-0">
             <Empty
               size="sm"
               icon={<ActivityIcon size={40} />}
@@ -94,28 +85,35 @@ export default function ActivityPage() {
           </LayerCard>
         ) : (
           <LayerCard className="p-0">
-          <Table>
-            <Table.Header>
-              <Table.Row>
-                <Table.Head>{t("columns.when")}</Table.Head>
-                <Table.Head>{t("columns.actor")}</Table.Head>
-                <Table.Head>{t("columns.action")}</Table.Head>
-                <Table.Head>{t("columns.target")}</Table.Head>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {events.map((event) => (
-                <Table.Row key={event.id}>
-                  <Table.Cell>
-                    {new Date(event.createdAt).toLocaleString(locale)}
-                  </Table.Cell>
-                  <Table.Cell>{event.actor.name}</Table.Cell>
-                  <Table.Cell>{actionLabel(event.action)}</Table.Cell>
-                  <Table.Cell>{targetName(event)}</Table.Cell>
+            <Table>
+              <Table.Header>
+                <Table.Row>
+                  <Table.Head>{t("columns.when")}</Table.Head>
+                  <Table.Head>{t("columns.actor")}</Table.Head>
+                  <Table.Head>{t("columns.action")}</Table.Head>
+                  <Table.Head>{t("columns.target")}</Table.Head>
                 </Table.Row>
-              ))}
-            </Table.Body>
-          </Table>
+              </Table.Header>
+              <Table.Body>
+                {events.map((event) => (
+                  <Table.Row key={event.id}>
+                    <Table.Cell>
+                      <Text variant="secondary">{new Date(event.createdAt).toLocaleString(locale)}</Text>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <div className="grid gap-0.5">
+                        <Text as="span" bold>{event.actor.name}</Text>
+                        <Text as="span" variant="secondary">{event.actor.email}</Text>
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Badge variant="neutral">{actionLabel(event.action)}</Badge>
+                    </Table.Cell>
+                    <Table.Cell>{targetName(event)}</Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table>
           </LayerCard>
         )}
       </div>

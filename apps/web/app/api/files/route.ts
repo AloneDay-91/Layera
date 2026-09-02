@@ -7,6 +7,7 @@ import {
   updateFolder,
   updateFile,
   trashItemInWorkspace,
+  trashItemsInWorkspace,
   permanentlyDeleteItem,
 } from "@/lib/services/files";
 import { ServiceError } from "@/lib/services/errors";
@@ -72,6 +73,30 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const ctx = await getAuthorizedWorkspace();
+    const contentType = request.headers.get("content-type") ?? "";
+
+    if (contentType.includes("application/json")) {
+      const body = (await request.json()) as {
+        items?: Array<{ id?: string; type?: string }>;
+        permanent?: boolean;
+      };
+      const items = (body.items ?? []).filter(
+        (item): item is { id: string; type: "file" | "folder" } =>
+          Boolean(item.id) && (item.type === "file" || item.type === "folder"),
+      );
+      if (items.length === 0) {
+        return NextResponse.json({ error: "Missing items" }, { status: 400 });
+      }
+      if (body.permanent) {
+        for (const item of items) {
+          await permanentlyDeleteItem(ctx, item);
+        }
+      } else {
+        await trashItemsInWorkspace(ctx, items);
+      }
+      return NextResponse.json({ success: true });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     const type = searchParams.get("type");

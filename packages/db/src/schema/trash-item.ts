@@ -21,5 +21,6 @@ export const trashItem = pgTable(
     index("trash_item_workspace_idx").on(table.workspaceId),
     index("trash_item_item_idx").on(table.itemId),
     index("trash_item_purge_at_idx").on(table.purgeAt),
+    index("trash_item_workspace_item_idx").on(table.workspaceId, table.itemId),
   ],
 );

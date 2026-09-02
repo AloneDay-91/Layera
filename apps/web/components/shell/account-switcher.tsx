@@ -23,6 +23,7 @@ import { authClient } from "@/lib/auth-client";
 import { getInitials } from "@/lib/avatar";
 import { SUPPORTED_LOCALES, useAppLocale } from "./locale-provider";
 import { useTheme } from "./theme-provider";
+import type { DashboardUser } from "./dashboard-user";
 
 const LOCALE_LABEL_KEYS = {
   en: "languageEnglish",
@@ -50,7 +51,7 @@ function AccountAvatar({ name, image, size = 36 }: { name: string; image?: strin
   );
 }
 
-export function AccountSwitcher() {
+export function AccountSwitcher({ initialUser }: { initialUser: DashboardUser | null }) {
   const router = useRouter();
   const toasts = useKumoToastManager();
   const { data: session } = authClient.useSession();
@@ -120,9 +121,10 @@ export function AccountSwitcher() {
     });
   }
 
-  const userName = session?.user?.name ?? t("defaultUserName");
-  const userEmail = session?.user?.email ?? "utilisateur@filecloud.io";
-  const userImage = session?.user?.image ?? null;
+  const user = session?.user ?? initialUser;
+  const userName = user?.name ?? t("defaultUserName");
+  const userEmail = user?.email ?? "utilisateur@filecloud.io";
+  const userImage = user?.image ?? null;
   const activeWorkspaceLabel = activeOrg ? activeOrg.name : t("personalWorkspace");
 
   const themeIcon = mode === "dark" ? MoonIcon : mode === "system" ? DesktopIcon : SunIcon;

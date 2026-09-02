@@ -31,7 +31,11 @@ export async function requireSession() {
 }
 
 export async function getAuthorizedWorkspace(): Promise<AuthorizedContext> {
-  const session = await requireSession();
+  const [headerList, cookieStore] = await Promise.all([headers(), cookies()]);
+  const session = await auth.api.getSession({ headers: headerList });
+  if (!session) {
+    throw new ServiceError(401, "Unauthorized");
+  }
   const actor = {
     id: session.user.id,
     name: session.user.name,
@@ -39,7 +43,6 @@ export async function getAuthorizedWorkspace(): Promise<AuthorizedContext> {
     role: session.user.role,
   };
 
-  const cookieStore = await cookies();
   const pinnedWorkspaceId = cookieStore.get(WORKSPACE_COOKIE)?.value;
   if (pinnedWorkspaceId) {
     try {

@@ -1,22 +1,23 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { NextIntlClientProvider } from "next-intl";
 import en from "@/messages/en.json";
 import fr from "@/messages/fr.json";
+import {
+  DEFAULT_LOCALE,
+  isLocale,
+  LOCALE_COOKIE,
+  LOCALE_COOKIE_MAX_AGE,
+  type Locale,
+  parseLocale,
+  SUPPORTED_LOCALES,
+} from "@/lib/locale";
 
-export const SUPPORTED_LOCALES = ["en", "fr"] as const;
-export type Locale = (typeof SUPPORTED_LOCALES)[number];
-
-export const DEFAULT_LOCALE: Locale = "en";
+export { DEFAULT_LOCALE, SUPPORTED_LOCALES, type Locale };
 
 const MESSAGES: Record<Locale, typeof en> = { en, fr };
-
-const STORAGE_KEY = "filecloud-locale";
-
-function isLocale(value: string | null): value is Locale {
-  return value !== null && (SUPPORTED_LOCALES as readonly string[]).includes(value);
-}
 
 type LocaleContextType = {
   locale: Locale;
@@ -25,26 +26,54 @@ type LocaleContextType = {
 
 const LocaleContext = createContext<LocaleContextType | undefined>(undefined);
 
-export function LocaleProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
+function persistLocale(next: Locale) {
+  window.localStorage.setItem(LOCALE_COOKIE, next);
+  document.cookie = `${LOCALE_COOKIE}=${next};path=/;max-age=${LOCALE_COOKIE_MAX_AGE};SameSite=Lax`;
+}
+
+export function LocaleProvider({
+  children,
+  initialLocale,
+}: {
+  children: React.ReactNode;
+  initialLocale: Locale;
+}) {
+  const router = useRouter();
+  const [locale, setLocaleState] = useState<Locale>(initialLocale);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (isLocale(saved)) {
-      setLocaleState(saved);
-    } else {
-      const browserLocale = navigator.language.slice(0, 2);
-      if (isLocale(browserLocale)) setLocaleState(browserLocale);
-    }
-  }, []);
+    setLocaleState(initialLocale);
+  }, [initialLocale]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
 
+  useEffect(() => {
+    const cookieLocale = parseLocale(
+      document.cookie
+        .split("; ")
+        .find((row) => row.startsWith(`${LOCALE_COOKIE}=`))
+        ?.split("=")[1],
+    );
+    if (cookieLocale) {
+      persistLocale(cookieLocale);
+      return;
+    }
+    const saved = window.localStorage.getItem(LOCALE_COOKIE);
+    if (isLocale(saved) && saved !== initialLocale) {
+      persistLocale(saved);
+      router.refresh();
+      return;
+    }
+    persistLocale(initialLocale);
+  }, [initialLocale, router]);
+
   function setLocale(newLocale: Locale) {
     setLocaleState(newLocale);
-    localStorage.setItem(STORAGE_KEY, newLocale);
+    persistLocale(newLocale);
+    document.documentElement.lang = newLocale;
+    router.refresh();
   }
 
   return (

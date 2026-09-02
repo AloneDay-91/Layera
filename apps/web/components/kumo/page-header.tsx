@@ -46,7 +46,7 @@ export function PageHeader({
       {(title || description || children) && (
         <div className="flex flex-wrap items-start justify-between gap-4">
           {(title || description) && (
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               {title && (
                 <Text as="h1" variant="heading2">
                   {title}

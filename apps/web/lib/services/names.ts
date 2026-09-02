@@ -1,4 +1,4 @@
-import { db, folder, file, eq, and } from "@filecloud/db";
+import { db, folder, file, eq, and, ne } from "@filecloud/db";
 
 export function nextAvailableName(baseName: string, taken: Set<string>, kind: "file" | "folder") {
   if (!taken.has(baseName)) return baseName;
@@ -49,11 +49,14 @@ export async function folderNameTaken(
   name: string,
   excludeId?: string,
 ) {
-  const siblings = await db
-    .select({ id: folder.id, name: folder.name })
-    .from(folder)
-    .where(and(eq(folder.workspaceId, workspaceId), eq(folder.parentId, parentId)));
-  return siblings.some((s) => s.name === name && s.id !== excludeId);
+  const conditions = [
+    eq(folder.workspaceId, workspaceId),
+    eq(folder.parentId, parentId),
+    eq(folder.name, name),
+  ];
+  if (excludeId) conditions.push(ne(folder.id, excludeId));
+  const [row] = await db.select({ id: folder.id }).from(folder).where(and(...conditions)).limit(1);
+  return Boolean(row);
 }
 
 export async function fileNameTaken(
@@ -62,9 +65,12 @@ export async function fileNameTaken(
   name: string,
   excludeId?: string,
 ) {
-  const siblings = await db
-    .select({ id: file.id, name: file.name })
-    .from(file)
-    .where(and(eq(file.workspaceId, workspaceId), eq(file.folderId, folderId)));
-  return siblings.some((s) => s.name === name && s.id !== excludeId);
+  const conditions = [
+    eq(file.workspaceId, workspaceId),
+    eq(file.folderId, folderId),
+    eq(file.name, name),
+  ];
+  if (excludeId) conditions.push(ne(file.id, excludeId));
+  const [row] = await db.select({ id: file.id }).from(file).where(and(...conditions)).limit(1);
+  return Boolean(row);
 }

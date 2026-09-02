@@ -24,4 +24,5 @@ export {
 } from "./access";
 export type { AuthorizedWorkspace, WorkspaceRow } from "./access";
 export type { JobType, JobStatus } from "./schema/job";
-export { eq, and, isNull, ilike, inArray, notInArray, gte, lte, sql, desc, ne } from "drizzle-orm";
+export { eq, and, isNull, ilike, inArray, notInArray, gte, lte, sql, desc, ne, exists, notExists } from "drizzle-orm";
+export type { SQL, AnyColumn } from "drizzle-orm";

@@ -2,15 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { Badge, Breadcrumbs, Button, Input, LayerCard, Loader, Table, Text, useKumoToastManager } from "@cloudflare/kumo";
+import { Badge, Breadcrumbs, Button, DropdownMenu, Grid, GridItem, Input, InputGroup, LayerCard, Loader, Table, Text, Toolbar, useKumoToastManager } from "@cloudflare/kumo";
 import {
+  DotsThreeIcon,
   UsersThreeIcon,
-  PlusIcon,
   TrashIcon,
   XCircleIcon,
 } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/kumo/page-header";
 import { authClient } from "@/lib/auth-client";
+import { usePageReady } from "@/components/shell/navigation-provider";
 
 type MemberUI = {
   id: string;
@@ -46,6 +47,8 @@ export default function SettingsPage() {
 
   const [canManageMembers, setCanManageMembers] = useState(false);
   const [workspaceName, setWorkspaceName] = useState("");
+  const [pageReady, setPageReady] = useState(false);
+  usePageReady(pageReady);
 
   // État contrôlé pour les champs S3
   const [s3Endpoint, setS3Endpoint] = useState("http://localhost:9000");
@@ -87,7 +90,13 @@ export default function SettingsPage() {
   }, [activeOrg, session?.user]);
 
   useEffect(() => {
-    loadWorkspaceData();
+    let cancelled = false;
+    loadWorkspaceData().finally(() => {
+      if (!cancelled) setPageReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [loadWorkspaceData]);
 
   async function handleCreateOrganization(e: React.FormEvent) {
@@ -231,232 +240,244 @@ export default function SettingsPage() {
         onValueChange={(val) => setActiveTab(val as "workspaces" | "storage")}
       />
 
-      <div className="flex flex-1 flex-col gap-6 max-w-4xl pt-6">
-
-      {/* Onglet Groupes & Équipes */}
+      <div className="flex flex-1 flex-col gap-6 pt-6">
       {activeTab === "workspaces" && (
         <div className="flex flex-col gap-6">
-          {/* Créer un nouveau groupe d'organisation */}
-          <LayerCard className="flex flex-col gap-4 p-6">
-            <div>
-              <Text as="h2" variant="heading2">
-                {t("createOrgTitle")}
+          <Grid variant="2up" gap="base">
+            <GridItem>
+              <LayerCard>
+                <LayerCard.Secondary>{t("createOrgTitle")}</LayerCard.Secondary>
+                <LayerCard.Primary className="flex flex-col gap-4">
+                  <Text variant="secondary">{t("createOrgDescription")}</Text>
+                  <form onSubmit={handleCreateOrganization}>
+                    <Toolbar size="sm">
+                      <Toolbar.InputGroup aria-label={t("newWorkspaceNamePlaceholder")}>
+                        <InputGroup.Input
+                          placeholder={t("newWorkspaceNamePlaceholder")}
+                          value={newOrgName}
+                          onChange={(e) => setNewOrgName(e.target.value)}
+                        />
+                      </Toolbar.InputGroup>
+                      <Toolbar.Button type="submit" disabled={submittingOrg}>
+                        {submittingOrg ? <Loader size="sm" /> : t("createGroup")}
+                      </Toolbar.Button>
+                    </Toolbar>
+                  </form>
+                </LayerCard.Primary>
+              </LayerCard>
+            </GridItem>
+            <GridItem>
+              <LayerCard>
+                <LayerCard.Secondary>
+                  {t("subteamsTitle", { name: activeOrg?.name ?? t("personalWorkspace") })}
+                </LayerCard.Secondary>
+                <LayerCard.Primary className="flex flex-col gap-4">
+                  <Text variant="secondary">{t("subteamsDescription")}</Text>
+                  <form onSubmit={handleCreateTeam}>
+                    <Toolbar size="sm">
+                      <Toolbar.InputGroup aria-label={t("newSubteamPlaceholder")}>
+                        <InputGroup.Input
+                          placeholder={t("newSubteamPlaceholder")}
+                          value={newTeamName}
+                          onChange={(e) => setNewTeamName(e.target.value)}
+                        />
+                      </Toolbar.InputGroup>
+                      <Toolbar.Button type="submit">{t("addSubteam")}</Toolbar.Button>
+                    </Toolbar>
+                  </form>
+                </LayerCard.Primary>
+              </LayerCard>
+            </GridItem>
+          </Grid>
+
+          <div className="flex flex-col gap-6">
+            <div className="grid gap-1.5">
+              <Text as="h2" variant="heading3">
+                {t("membersTitle", { name: workspaceName || activeOrg?.name || t("personalWorkspace") })}
               </Text>
               <Text variant="secondary">
-                {t("createOrgDescription")}
+                {canManageMembers ? t("membersDescriptionWithOrg") : t("membersDescriptionNoOrg")}
               </Text>
             </div>
-
-            <form onSubmit={handleCreateOrganization} className="flex gap-3">
-              <Input
-                size="sm"
-                placeholder={t("newWorkspaceNamePlaceholder")}
-                value={newOrgName}
-                onChange={(e) => setNewOrgName(e.target.value)}
-                className="flex-1"
-              />
-              <Button variant="primary" size="sm" type="submit" disabled={submittingOrg} icon={PlusIcon}>
-                {submittingOrg ? (
-                  <span className="flex items-center gap-1.5">
-                    <Loader size="sm" /> {t("creating")}
-                  </span>
-                ) : (
-                  t("createGroup")
-                )}
-              </Button>
-            </form>
-          </LayerCard>
-
-          {/* Créer une sous-équipe */}
-          <LayerCard className="flex flex-col gap-4 p-6">
-            <div>
-              <Text as="h2" variant="heading2">
-                {t("subteamsTitle", { name: activeOrg?.name ?? t("personalWorkspace") })}
-              </Text>
-              <Text variant="secondary">
-                {t("subteamsDescription")}
-              </Text>
-            </div>
-
-            <form onSubmit={handleCreateTeam} className="flex gap-3">
-              <Input
-                size="sm"
-                placeholder={t("newSubteamPlaceholder")}
-                value={newTeamName}
-                onChange={(e) => setNewTeamName(e.target.value)}
-                className="flex-1"
-              />
-              <Button variant="secondary" size="sm" type="submit" icon={PlusIcon}>
-                {t("addSubteam")}
-              </Button>
-            </form>
-          </LayerCard>
-
-          {/* Membres & Invitations */}
-          <LayerCard className="flex flex-col gap-4 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <Text as="h2" variant="heading2">
-                  {t("membersTitle", { name: workspaceName || activeOrg?.name || t("personalWorkspace") })}
-                </Text>
-                <Text variant="secondary">
-                  {t("membersDescriptionWithOrg")}
-                </Text>
-              </div>
-            </div>
-
             {canManageMembers && (
-              <form onSubmit={handleInviteMember} className="flex gap-3 my-2">
-                <Input
-                  size="sm"
-                  type="email"
-                  placeholder={t("collaboratorEmailPlaceholder")}
-                  value={newMemberEmail}
-                  onChange={(e) => setNewMemberEmail(e.target.value)}
-                  className="flex-1"
-                />
-                <Button variant="secondary" size="sm" type="submit" disabled={invitingMember} icon={UsersThreeIcon}>
-                  {invitingMember ? (
-                    <span className="flex items-center gap-1.5">
-                      <Loader size="sm" /> {t("sending")}
-                    </span>
-                  ) : (
-                    t("inviteByEmail")
-                  )}
-                </Button>
+              <form onSubmit={handleInviteMember}>
+                <Toolbar size="sm">
+                  <Toolbar.InputGroup aria-label={t("inviteByEmail")}>
+                    <InputGroup.Addon>
+                      <UsersThreeIcon size={16} />
+                    </InputGroup.Addon>
+                    <InputGroup.Input
+                      type="email"
+                      placeholder={t("collaboratorEmailPlaceholder")}
+                      value={newMemberEmail}
+                      onChange={(e) => setNewMemberEmail(e.target.value)}
+                    />
+                  </Toolbar.InputGroup>
+                  <Toolbar.Button type="submit" disabled={invitingMember}>
+                    {invitingMember ? <Loader size="sm" /> : t("inviteByEmail")}
+                  </Toolbar.Button>
+                </Toolbar>
               </form>
             )}
 
-            <Table>
-              <Table.Header>
-                <Table.Row>
-                  <Table.Head>{t("memberColumn")}</Table.Head>
-                  <Table.Head>{t("roleColumn")}</Table.Head>
-                  {canManageMembers && <Table.Head className="text-right">{t("actionColumn")}</Table.Head>}
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {members.map((member) => (
-                  <Table.Row key={member.id}>
-                    <Table.Cell>
-                      <div className="flex flex-col">
-                        <Text as="span" bold>{member.name}</Text>
-                        <Text as="span" variant="secondary">{member.email}</Text>
-                      </div>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Badge variant={member.role === "owner" || member.role === "admin" ? "primary" : "neutral"}>
-                        {member.role === "owner" ? t("roleOwner") : member.role === "admin" ? t("roleAdmin") : t("roleMember")}
-                      </Badge>
-                    </Table.Cell>
-                    {canManageMembers && (
-                      <Table.Cell className="text-right">
-                        {member.role !== "owner" && (
-                          <Button
-                            variant="ghost"
-                            shape="square"
-                            size="sm"
-                            icon={TrashIcon}
-                            title={t("removeMember")}
-                            onClick={() => handleRemoveMember(member.id, member.email)}
-                          />
-                        )}
-                      </Table.Cell>
-                    )}
-                  </Table.Row>
-                ))}
-              </Table.Body>
-            </Table>
-          </LayerCard>
-
-          {/* Invitations en attente */}
-          {activeOrg && canManageMembers && invitations.length > 0 && (
-            <LayerCard className="flex flex-col gap-4 p-6">
-              <div>
-                <Text as="h2" variant="heading2">{t("pendingInvitationsTitle")}</Text>
-                <Text variant="secondary">{t("pendingInvitationsDescription")}</Text>
-              </div>
+            <LayerCard className="p-0">
               <Table>
                 <Table.Header>
                   <Table.Row>
-                    <Table.Head>{t("emailColumn")}</Table.Head>
-                    <Table.Head>{t("proposedRoleColumn")}</Table.Head>
-                    <Table.Head className="text-right">{t("actionColumn")}</Table.Head>
+                    <Table.Head>{t("memberColumn")}</Table.Head>
+                    <Table.Head>{t("roleColumn")}</Table.Head>
+                    {canManageMembers && <Table.Head className="text-right">{t("actionColumn")}</Table.Head>}
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {invitations.map((inv) => (
-                    <Table.Row key={inv.id}>
-                      <Table.Cell>{inv.email}</Table.Cell>
+                  {members.map((member) => (
+                    <Table.Row key={member.id}>
                       <Table.Cell>
-                        <Badge variant="neutral">{inv.role === "admin" ? t("roleAdmin") : t("roleMember")}</Badge>
+                        <div className="grid gap-0.5">
+                          <Text as="span" bold>{member.name}</Text>
+                          <Text as="span" variant="secondary">{member.email}</Text>
+                        </div>
                       </Table.Cell>
-                      <Table.Cell className="text-right">
-                        <Button
-                          variant="ghost"
-                          shape="square"
-                          size="sm"
-                          icon={XCircleIcon}
-                          title={t("cancelInvitation")}
-                          onClick={() => handleCancelInvitation(inv.id, inv.email)}
-                        />
+                      <Table.Cell>
+                        <Badge variant={member.role === "owner" || member.role === "admin" ? "primary" : "neutral"}>
+                          {member.role === "owner" ? t("roleOwner") : member.role === "admin" ? t("roleAdmin") : t("roleMember")}
+                        </Badge>
                       </Table.Cell>
+                      {canManageMembers && (
+                        <Table.Cell className="text-right">
+                          {member.role !== "owner" && (
+                            <DropdownMenu>
+                              <DropdownMenu.Trigger>
+                                <Button
+                                  variant="ghost"
+                                  shape="square"
+                                  size="sm"
+                                  icon={DotsThreeIcon}
+                                  aria-label={t("removeMember")}
+                                />
+                              </DropdownMenu.Trigger>
+                              <DropdownMenu.Content>
+                                <DropdownMenu.Item
+                                  variant="danger"
+                                  icon={TrashIcon}
+                                  onClick={() => handleRemoveMember(member.id, member.email)}
+                                >
+                                  {t("removeMember")}
+                                </DropdownMenu.Item>
+                              </DropdownMenu.Content>
+                            </DropdownMenu>
+                          )}
+                        </Table.Cell>
+                      )}
                     </Table.Row>
                   ))}
                 </Table.Body>
               </Table>
             </LayerCard>
+          </div>
+
+          {activeOrg && canManageMembers && invitations.length > 0 && (
+            <div className="flex flex-col gap-6">
+              <div className="grid gap-1.5">
+                <Text as="h2" variant="heading3">{t("pendingInvitationsTitle")}</Text>
+                <Text variant="secondary">{t("pendingInvitationsDescription")}</Text>
+              </div>
+              <LayerCard className="p-0">
+                <Table>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.Head>{t("emailColumn")}</Table.Head>
+                      <Table.Head>{t("proposedRoleColumn")}</Table.Head>
+                      <Table.Head className="text-right">{t("actionColumn")}</Table.Head>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {invitations.map((inv) => (
+                      <Table.Row key={inv.id}>
+                        <Table.Cell>{inv.email}</Table.Cell>
+                        <Table.Cell>
+                          <Badge variant="neutral">{inv.role === "admin" ? t("roleAdmin") : t("roleMember")}</Badge>
+                        </Table.Cell>
+                        <Table.Cell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenu.Trigger>
+                              <Button
+                                variant="ghost"
+                                shape="square"
+                                size="sm"
+                                icon={DotsThreeIcon}
+                                aria-label={t("cancelInvitation")}
+                              />
+                            </DropdownMenu.Trigger>
+                            <DropdownMenu.Content>
+                              <DropdownMenu.Item
+                                variant="danger"
+                                icon={XCircleIcon}
+                                onClick={() => handleCancelInvitation(inv.id, inv.email)}
+                              >
+                                {t("cancelInvitation")}
+                              </DropdownMenu.Item>
+                            </DropdownMenu.Content>
+                          </DropdownMenu>
+                        </Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table>
+              </LayerCard>
+            </div>
           )}
         </div>
       )}
 
-      {/* Onglet Stockage & S3 */}
       {activeTab === "storage" && (
-        <LayerCard className="flex flex-col gap-6 p-6">
-          <div>
-            <Text as="h2" variant="heading2">
-              {t("storageConfigTitle")}
-            </Text>
-            <Text variant="secondary">
-              {t("storageConfigDescription")}
-            </Text>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
+        <LayerCard>
+          <LayerCard.Secondary>{t("storageConfigTitle")}</LayerCard.Secondary>
+          <LayerCard.Primary className="flex flex-col gap-6">
+            <Text variant="secondary">{t("storageConfigDescription")}</Text>
+            <Grid variant="2up" gap="base">
+              <GridItem>
+                <Input
+                  size="sm"
+                  label={t("s3Endpoint")}
+                  value={s3Endpoint}
+                  onChange={(e) => setS3Endpoint(e.target.value)}
+                />
+              </GridItem>
+              <GridItem>
+                <Input
+                  size="sm"
+                  label={t("bucketName")}
+                  value={s3Bucket}
+                  onChange={(e) => setS3Bucket(e.target.value)}
+                />
+              </GridItem>
+              <GridItem>
+                <Input
+                  size="sm"
+                  label={t("s3Region")}
+                  value={s3Region}
+                  onChange={(e) => setS3Region(e.target.value)}
+                />
+              </GridItem>
+              <GridItem>
+                <Input
+                  size="sm"
+                  label={t("accessKeyId")}
+                  value={s3AccessKey}
+                  onChange={(e) => setS3AccessKey(e.target.value)}
+                />
+              </GridItem>
+            </Grid>
+            <Button
+              variant="primary"
               size="sm"
-              label={t("s3Endpoint")}
-              value={s3Endpoint}
-              onChange={(e) => setS3Endpoint(e.target.value)}
-            />
-            <Input
-              size="sm"
-              label={t("bucketName")}
-              value={s3Bucket}
-              onChange={(e) => setS3Bucket(e.target.value)}
-            />
-            <Input
-              size="sm"
-              label={t("s3Region")}
-              value={s3Region}
-              onChange={(e) => setS3Region(e.target.value)}
-            />
-            <Input
-              size="sm"
-              label={t("accessKeyId")}
-              value={s3AccessKey}
-              onChange={(e) => setS3AccessKey(e.target.value)}
-            />
-          </div>
-
-          <Button
-            variant="primary"
-            size="sm"
-            className="w-fit"
-            onClick={() => toasts.add({ title: tToasts("s3ConfigTitle"), description: tToasts("s3ConnectionSuccess") })}
-          >
-            {t("testS3Connection")}
-          </Button>
+              className="w-fit"
+              onClick={() => toasts.add({ title: tToasts("s3ConfigTitle"), description: tToasts("s3ConnectionSuccess") })}
+            >
+              {t("testS3Connection")}
+            </Button>
+          </LayerCard.Primary>
         </LayerCard>
       )}
       </div>

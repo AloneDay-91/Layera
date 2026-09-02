@@ -3,7 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Button, Dialog, Input, Loader, Pagination, SkeletonLine, Tabs, Text, useKumoToastManager } from "@cloudflare/kumo";
+import { Button, Dialog, Input, Loader, Pagination, Tabs, Text, useKumoToastManager } from "@cloudflare/kumo";
 import {
   GridFourIcon,
   ListBulletsIcon,
@@ -16,7 +16,8 @@ import {
   FileZipIcon,
 } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
-import { ClientOnly } from "@/components/shell/client-only";
+import { DashboardPageSkeleton } from "@/components/shell/dashboard-page-skeleton";
+import { usePageReady } from "@/components/shell/navigation-provider";
 import { FileItem } from "@/lib/file-item";
 import { notifyStorageUpdated } from "@/lib/storage-events";
 import { uploadFileDirect } from "@/lib/upload-file";
@@ -109,6 +110,7 @@ export function FileBrowser() {
   // État de la dropzone plein cadre (glisser-déposer de fichiers depuis le système)
   const [isDraggingFileOver, setIsDraggingFileOver] = useState(false);
   const dragCounter = useRef(0);
+  usePageReady(!loading);
 
   const toasts = useKumoToastManager();
 
@@ -148,8 +150,8 @@ export function FileBrowser() {
   }
 
   // Charger les vrais fichiers & dossiers depuis l'API PostgreSQL
-  async function fetchFiles(folderId: string | null, search?: string | null) {
-    setLoading(true);
+  async function fetchFiles(folderId: string | null, search?: string | null, opts?: { silent?: boolean }) {
+    if (!opts?.silent) setLoading(true);
     try {
       let url = "/api/files";
       const params = new URLSearchParams();
@@ -166,8 +168,12 @@ export function FileBrowser() {
     } catch (err) {
       console.error("Erreur de chargement des fichiers :", err);
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
+  }
+
+  function refreshFiles() {
+    return fetchFiles(currentFolderId, searchQuery, { silent: true });
   }
 
   useEffect(() => {
@@ -295,28 +301,23 @@ export function FileBrowser() {
 
     setBulkDeleting(true);
     try {
-      const results = await Promise.all(
-        targets.map((item) =>
-          fetch(`/api/files?id=${item.id}&type=${item.type}`, { method: "DELETE" }).then((res) => res.ok),
-        ),
-      );
-      const failedCount = results.filter((ok) => !ok).length;
+      const res = await fetch("/api/files", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: targets.map((item) => ({ id: item.id, type: item.type })),
+        }),
+      });
+      if (!res.ok) throw new Error("bulk delete failed");
 
-      if (failedCount === 0) {
-        toasts.add({
-          title: tToasts("itemsDeletedTitle"),
-          description: tToasts("itemsDeletedDescription", { count: targets.length }),
-        });
-      } else {
-        toasts.add({
-          title: tToasts("partialDeleteTitle"),
-          description: tToasts("partialDeleteDescription", { deleted: targets.length - failedCount, total: targets.length }),
-        });
-      }
+      toasts.add({
+        title: tToasts("itemsDeletedTitle"),
+        description: tToasts("itemsDeletedDescription", { count: targets.length }),
+      });
 
       setSelectedIds(new Set());
       setBulkDeleteOpen(false);
-      fetchFiles(currentFolderId, searchQuery);
+      refreshFiles();
       notifyStorageUpdated();
     } catch (err) {
       console.error("Bulk delete error:", err);
@@ -349,7 +350,7 @@ export function FileBrowser() {
         });
         setNewFolderName("");
         setIsFolderModalOpen(false);
-        fetchFiles(currentFolderId, searchQuery);
+        refreshFiles();
       } else {
         toasts.add({
           title: tToasts("genericError"),
@@ -385,7 +386,7 @@ export function FileBrowser() {
           description: tToasts("itemRenamedDescription", { name: renameValue.trim() }),
         });
         setRenameItem(null);
-        fetchFiles(currentFolderId, searchQuery);
+        refreshFiles();
       } else {
         const data = await res.json().catch(() => null);
         toasts.add({
@@ -411,7 +412,7 @@ export function FileBrowser() {
           title: tToasts("itemDeletedTitle"),
           description: tToasts("itemDeletedDescription", { name: item.name }),
         });
-        fetchFiles(currentFolderId, searchQuery);
+        refreshFiles();
       }
     } catch (err) {
       console.error("Delete error:", err);
@@ -440,7 +441,7 @@ export function FileBrowser() {
           title: tToasts("itemMovedTitle"),
           description: tToasts("itemMovedDescription", { name: dragged.name, target: targetName }),
         });
-        fetchFiles(currentFolderId, searchQuery);
+        refreshFiles();
       }
     } catch (err) {
       console.error("Move error:", err);
@@ -474,7 +475,7 @@ export function FileBrowser() {
     }
 
     if (successCount > 0) {
-      fetchFiles(currentFolderId, searchQuery);
+      refreshFiles();
       notifyStorageUpdated();
     }
   }
@@ -496,7 +497,7 @@ export function FileBrowser() {
         description: tToasts("itemArchivedDescription", { name: item.name }),
       });
       if (selectedItemId === item.id) setSelectedItemId(null);
-      fetchFiles(currentFolderId, searchQuery);
+      refreshFiles();
     } catch (err) {
       console.error("Archive error:", err);
       toasts.add({ title: tToasts("genericError"), description: tToasts("archiveErrorDescription") });
@@ -591,7 +592,7 @@ export function FileBrowser() {
           count: data.extractedCount,
         }),
       });
-      fetchFiles(currentFolderId, searchQuery);
+      refreshFiles();
       notifyStorageUpdated();
     } catch (err) {
       console.error("Extract zip error:", err);
@@ -770,29 +771,7 @@ export function FileBrowser() {
 
         <div className="min-h-0 flex-1 overflow-y-auto">
         {loading ? (
-          <ClientOnly
-            fallback={
-              <div className="flex flex-col gap-3 p-4 bg-kumo-base border border-kumo-line rounded-lg animate-pulse min-h-55" />
-            }
-          >
-            <div className="flex flex-col gap-3 p-4 bg-kumo-base border border-kumo-line rounded-lg">
-              <div className="flex items-center justify-between py-2 border-b border-kumo-line">
-                <SkeletonLine minWidth={30} maxWidth={30} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-                <SkeletonLine minWidth={20} maxWidth={20} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-                <SkeletonLine minWidth={15} maxWidth={15} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-              </div>
-              {Array.from({ length: 5 }).map((_, index) => (
-                <div key={index} className="flex items-center justify-between py-3 border-b border-kumo-line/40">
-                  <div className="flex items-center gap-3 flex-1">
-                    <SkeletonLine minWidth={10} maxWidth={10} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-5 w-5" />
-                    <SkeletonLine minWidth={50} maxWidth={50} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-                  </div>
-                  <SkeletonLine minWidth={25} maxWidth={25} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-                  <SkeletonLine minWidth={20} maxWidth={20} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-                </div>
-              ))}
-            </div>
-          </ClientOnly>
+          <DashboardPageSkeleton path="/dashboard" contentOnly />
         ) : items.length === 0 ? (
           <UploadDropzone onFilesSelected={handleUploadFiles} />
         ) : filteredItems.length === 0 ? (
@@ -991,7 +970,7 @@ export function FileBrowser() {
       <TransferDialog
         item={transferItem}
         onClose={() => setTransferItem(null)}
-        onTransferred={() => fetchFiles(currentFolderId, searchQuery)}
+        onTransferred={() => refreshFiles()}
       />
 
       {/* Modale de progression d'upload */}

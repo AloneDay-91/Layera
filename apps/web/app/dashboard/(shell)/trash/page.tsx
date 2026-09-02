@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Badge, Breadcrumbs, Button, LayerCard, Loader, SkeletonLine, Table, Text, useKumoToastManager } from "@cloudflare/kumo";
+import { Badge, Breadcrumbs, Button, Empty, LayerCard, Loader, Table, Text, useKumoToastManager } from "@cloudflare/kumo";
 import { TrashIcon, ArrowCounterClockwiseIcon, XCircleIcon } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
-import { ClientOnly } from "@/components/shell/client-only";
+import { TableCardSkeleton } from "@/components/shell/table-card-skeleton";
+import { usePageReady } from "@/components/shell/navigation-provider";
 import { notifyStorageUpdated } from "@/lib/storage-events";
 
 type TrashedItem = {
@@ -26,6 +27,7 @@ export default function TrashPage() {
   const { data: activeOrg } = authClient.useActiveOrganization();
   const [items, setItems] = useState<TrashedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  usePageReady(!loading);
   const [actionId, setActionId] = useState<string | null>(null);
   const [canManage, setCanManage] = useState(false);
   const t = useTranslations("trashPage");
@@ -146,32 +148,20 @@ export default function TrashPage() {
         )}
       </PageHeader>
 
-      <div className="flex flex-1 flex-col gap-6 max-w-5xl pt-6">
+      <div className="flex flex-1 flex-col gap-6 pt-6">
 
       {loading ? (
-        <ClientOnly
-          fallback={
-            <div className="flex flex-col gap-3 p-4 bg-kumo-base border border-kumo-line rounded-lg animate-pulse min-h-55" />
-          }
-        >
-          <div className="flex flex-col gap-3 p-4 bg-kumo-base border border-kumo-line rounded-lg">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between py-3 border-b border-kumo-line/40">
-                <SkeletonLine minWidth={40} maxWidth={60} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-                <SkeletonLine minWidth={20} maxWidth={20} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-              </div>
-            ))}
-          </div>
-        </ClientOnly>
+        <TableCardSkeleton
+          columns={[t("nameColumn"), t("typeColumn"), t("deletedColumn"), t("expiresColumn"), t("actionsColumn")]}
+        />
       ) : items.length === 0 ? (
-        <LayerCard className="flex flex-col items-center justify-center p-12 text-center">
-          <TrashIcon size={48} className="text-kumo-subtle mb-3" />
-          <Text as="p" variant="heading3" DANGEROUS_className="mb-1">
-            {t("emptyStateTitle")}
-          </Text>
-          <Text variant="secondary">
-            {t("emptyStateDescription")}
-          </Text>
+        <LayerCard className="p-0">
+          <Empty
+            size="sm"
+            icon={<TrashIcon size={40} />}
+            title={t("emptyStateTitle")}
+            description={t("emptyStateDescription")}
+          />
         </LayerCard>
       ) : (
         <LayerCard className="p-0">

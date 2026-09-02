@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { db, folder, file, eq, and, notInArray, desc } from "@filecloud/db";
+import { db, folder, file, eq, and, desc } from "@filecloud/db";
 import { getAuthorizedWorkspace } from "@/lib/services/permissions";
 import { jsonError } from "@/lib/services/http";
-import { hiddenItemIds } from "@/lib/services/hidden";
+import { notHidden } from "@/lib/services/hidden";
 import { usersByIds } from "@/lib/services/users";
+import { previewUrlsByFileId } from "@/lib/services/signed-read";
 
 const RECENT_LIMIT = 30;
 
@@ -12,22 +13,29 @@ export async function GET() {
     const ctx = await getAuthorizedWorkspace();
     const workspaceId = ctx.workspace.id;
 
-    const hiddenIds = [...(await hiddenItemIds(workspaceId))];
-
     const recentFiles = await db
-      .select()
+      .select({
+        id: file.id,
+        folderId: file.folderId,
+        name: file.name,
+        mimeType: file.mimeType,
+        size: file.size,
+        updatedAt: file.updatedAt,
+        createdBy: file.createdBy,
+        storageKey: file.storageKey,
+        thumbnailKey: file.thumbnailKey,
+        folderName: folder.name,
+      })
       .from(file)
-      .where(
-        hiddenIds.length > 0
-          ? and(eq(file.workspaceId, workspaceId), notInArray(file.id, hiddenIds))
-          : eq(file.workspaceId, workspaceId),
-      )
+      .leftJoin(folder, eq(folder.id, file.folderId))
+      .where(and(eq(file.workspaceId, workspaceId), notHidden(file.id, workspaceId)))
       .orderBy(desc(file.updatedAt))
       .limit(RECENT_LIMIT);
 
-    const folders = await db.select().from(folder).where(eq(folder.workspaceId, workspaceId));
-    const folderNameById = new Map(folders.map((f) => [f.id, f.name === "root" ? "Mes fichiers" : f.name]));
-    const owners = await usersByIds(recentFiles.map((f) => f.createdBy));
+    const [owners, previewUrls] = await Promise.all([
+      usersByIds(recentFiles.map((f) => f.createdBy)),
+      previewUrlsByFileId(recentFiles),
+    ]);
 
     const items = recentFiles.map((f) => ({
       id: f.id,
@@ -39,8 +47,9 @@ export async function GET() {
       updatedAt: f.updatedAt.toISOString(),
       owner: (f.createdBy && owners.get(f.createdBy)?.name) || ctx.actor.name,
       ownerId: f.createdBy ?? ctx.actor.id,
-      location: folderNameById.get(f.folderId) ?? "Mes fichiers",
+      location: f.folderName && f.folderName !== "root" ? f.folderName : "Mes fichiers",
       hasThumbnail: Boolean(f.thumbnailKey),
+      thumbnailUrl: previewUrls.get(f.id),
     }));
 
     return NextResponse.json({ items });

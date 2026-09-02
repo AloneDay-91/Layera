@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { db, shareLink, file, folder, user, eq } from "@filecloud/db";
 import { Button, LayerCard, Text } from "@cloudflare/kumo";
 import { FileIcon, FolderIcon } from "@phosphor-icons/react/dist/ssr";
@@ -7,6 +7,7 @@ import { InvalidShareLink } from "@/components/files/invalid-share-link";
 import { SharePasswordGate } from "@/components/files/share-password-gate";
 import { UserAvatar } from "@/components/files/user-avatar";
 import { shareUnlockCookieName, verifyShareUnlock } from "@/lib/share-unlock";
+import { LOCALE_COOKIE, resolveLocale } from "@/lib/locale";
 import en from "@/messages/en.json";
 import fr from "@/messages/fr.json";
 
@@ -17,7 +18,11 @@ type SharePageProps = {
 export default async function PublicSharePage({ params }: SharePageProps) {
   const { token } = await params;
   const cookieStoreForLocale = await cookies();
-  const t = cookieStoreForLocale.get("filecloud-locale")?.value === "fr" ? fr.sharePage : en.sharePage;
+  const locale = resolveLocale(
+    cookieStoreForLocale.get(LOCALE_COOKIE)?.value,
+    (await headers()).get("accept-language"),
+  );
+  const t = locale === "fr" ? fr.sharePage : en.sharePage;
 
   const [sRecord] = await db
     .select()

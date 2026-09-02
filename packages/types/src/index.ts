@@ -30,4 +30,5 @@ export type FileItem = {
   color?: string | null;
   sharedBy?: { id: string; name: string } | null;
   hasThumbnail?: boolean;
+  thumbnailUrl?: string;
 };

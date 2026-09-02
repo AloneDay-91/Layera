@@ -4,24 +4,26 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   Badge,
+  Breadcrumbs,
   Button,
   DeleteResource,
   Dialog,
+  DropdownMenu,
   Empty,
   Input,
   LayerCard,
   Loader,
-  SkeletonLine,
   Table,
   Text,
   cn,
   useKumoToastManager,
 } from "@cloudflare/kumo";
 import type { BadgeVariant } from "@cloudflare/kumo";
-import { PencilSimpleIcon, PlusIcon, TagIcon, TrashIcon, XIcon } from "@phosphor-icons/react";
+import { DotsThreeIcon, PencilSimpleIcon, PlusIcon, TagIcon, TrashIcon, XIcon } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
-import { ClientOnly } from "@/components/shell/client-only";
+import { TableCardSkeleton } from "@/components/shell/table-card-skeleton";
+import { usePageReady } from "@/components/shell/navigation-provider";
 import { TAG_COLOR_OPTIONS, type TagColorValue, type WorkspaceTag } from "@/lib/tags";
 
 export default function TagsPage() {
@@ -30,6 +32,7 @@ export default function TagsPage() {
 
   const [tags, setTags] = useState<WorkspaceTag[]>([]);
   const [loading, setLoading] = useState(true);
+  usePageReady(!loading);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -47,6 +50,7 @@ export default function TagsPage() {
   const t = useTranslations("tagsPage");
   const tToasts = useTranslations("tagsPage.toasts");
   const tColors = useTranslations("tagColors");
+  const tBreadcrumbs = useTranslations("fileBreadcrumbs");
 
   async function fetchTags() {
     setLoading(true);
@@ -150,6 +154,14 @@ export default function TagsPage() {
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
+        className="-mx-6 -mt-6"
+        breadcrumbs={
+          <Breadcrumbs>
+            <Breadcrumbs.Link href="/dashboard">{tBreadcrumbs("myFiles")}</Breadcrumbs.Link>
+            <Breadcrumbs.Separator />
+            <Breadcrumbs.Current>{t("title")}</Breadcrumbs.Current>
+          </Breadcrumbs>
+        }
         title={t("title")}
         description={t("description")}
       >
@@ -158,20 +170,11 @@ export default function TagsPage() {
         </Button>
       </PageHeader>
 
-      <div className="flex flex-1 flex-col px-6 pb-6">
+      <div className="flex flex-1 flex-col gap-6 pt-6">
         {loading ? (
-          <ClientOnly fallback={<div className="min-h-55 rounded-lg border border-kumo-line bg-kumo-base" />}>
-            <div className="flex flex-col gap-3 rounded-lg border border-kumo-line bg-kumo-base p-4">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="flex items-center justify-between border-b border-kumo-line/40 py-3">
-                  <SkeletonLine minWidth={20} maxWidth={30} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-                  <SkeletonLine minWidth={10} maxWidth={15} minDuration={1.5} maxDuration={1.5} minDelay={0} maxDelay={0} className="h-4" />
-                </div>
-              ))}
-            </div>
-          </ClientOnly>
+          <TableCardSkeleton columns={[t("tagColumn"), t("itemsColumn"), t("actionsColumn")]} rows={4} />
         ) : tags.length === 0 ? (
-          <div className="rounded-lg border border-kumo-line bg-kumo-base p-4">
+          <LayerCard className="p-0">
             <Empty
               size="sm"
               icon={<TagIcon size={40} />}
@@ -183,7 +186,7 @@ export default function TagsPage() {
                 </Button>
               }
             />
-          </div>
+          </LayerCard>
         ) : (
           <LayerCard className="p-0">
             <Table>
@@ -204,24 +207,29 @@ export default function TagsPage() {
                       <Text variant="secondary">{t("itemCount", { count: tag.itemCount ?? 0 })}</Text>
                     </Table.Cell>
                     <Table.Cell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          shape="square"
-                          size="sm"
-                          icon={PencilSimpleIcon}
-                          aria-label={t("editTagAria", { name: tag.name })}
-                          onClick={() => openEditDialog(tag)}
-                        />
-                        <Button
-                          variant="ghost"
-                          shape="square"
-                          size="sm"
-                          icon={TrashIcon}
-                          aria-label={t("deleteTagAria", { name: tag.name })}
-                          onClick={() => setDeleteTag(tag)}
-                        />
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenu.Trigger>
+                          <Button
+                            variant="ghost"
+                            shape="square"
+                            size="sm"
+                            icon={DotsThreeIcon}
+                            aria-label={t("rowActionsAria", { name: tag.name })}
+                          />
+                        </DropdownMenu.Trigger>
+                        <DropdownMenu.Content>
+                          <DropdownMenu.Item icon={PencilSimpleIcon} onClick={() => openEditDialog(tag)}>
+                            {t("edit")}
+                          </DropdownMenu.Item>
+                          <DropdownMenu.Item
+                            variant="danger"
+                            icon={TrashIcon}
+                            onClick={() => setDeleteTag(tag)}
+                          >
+                            {t("delete")}
+                          </DropdownMenu.Item>
+                        </DropdownMenu.Content>
+                      </DropdownMenu>
                     </Table.Cell>
                   </Table.Row>
                 ))}

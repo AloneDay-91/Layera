@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { authClient } from "@/lib/auth-client";
+import { publicAuthClient } from "@/lib/public-auth-client";
 import { Button, Input, LayerCard, Link, Loader, Text, useKumoToastManager } from "@cloudflare/kumo";
 import {
   GithubLogoIcon,
@@ -36,7 +36,7 @@ export default function RegisterPage() {
     }
 
     setSubmitting(true);
-    const { error: signUpError } = await authClient.signUp.email({ name, email, password });
+    const { error: signUpError } = await publicAuthClient.signUp.email({ name, email, password });
     setSubmitting(false);
 
     if (signUpError) {
@@ -56,7 +56,7 @@ export default function RegisterPage() {
       title: t("toasts.oauthSignUpTitle"),
       description: t("toasts.oauthSignUpDescription", { provider: provider === "github" ? "GitHub" : "Google" }),
     });
-    await authClient.signIn.social({
+    await publicAuthClient.signIn.social({
       provider,
       callbackURL: "/dashboard",
     });

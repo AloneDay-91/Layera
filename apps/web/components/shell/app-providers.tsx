@@ -1,21 +1,27 @@
 "use client";
 
 import { Toasty, TooltipProvider } from "@cloudflare/kumo";
-import { ShikiProvider } from "@cloudflare/kumo/code";
-import { SHIKI_LANGUAGES } from "@/lib/code-lang";
+import type { Locale } from "@/lib/locale";
 import { AppLinkProvider } from "./app-link-provider";
 import { LocaleProvider } from "./locale-provider";
+import { NavigationProvider } from "./navigation-provider";
 import { ThemeProvider } from "./theme-provider";
 
-export function AppProviders({ children }: { children: React.ReactNode }) {
+export function AppProviders({
+  children,
+  locale,
+}: {
+  children: React.ReactNode;
+  locale: Locale;
+}) {
   return (
-    <LocaleProvider>
+    <LocaleProvider initialLocale={locale}>
       <ThemeProvider>
         <Toasty>
           <TooltipProvider>
-            <ShikiProvider engine="javascript" languages={[...SHIKI_LANGUAGES]}>
+            <NavigationProvider>
               <AppLinkProvider>{children}</AppLinkProvider>
-            </ShikiProvider>
+            </NavigationProvider>
           </TooltipProvider>
         </Toasty>
       </ThemeProvider>

@@ -92,6 +92,13 @@
       "when": 1786815000000,
       "tag": "0012_jobs_thumbnails",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786900000000,
+      "tag": "0013_listing_perf",
+      "breakpoints": true
     }
   ]
 }

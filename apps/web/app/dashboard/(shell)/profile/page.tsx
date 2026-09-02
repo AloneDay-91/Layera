@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import {
   Badge,
+  Banner,
   Breadcrumbs,
   Button,
   ClipboardText,
   DeleteResource,
   Dialog,
+  Grid,
+  GridItem,
   Input,
   LayerCard,
   Loader,
@@ -28,10 +31,11 @@ import {
   ShieldCheckIcon,
   ShieldWarningIcon,
   SignOutIcon,
-  TrashIcon,
   XIcon,
 } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/kumo/page-header";
+import { DashboardPageSkeleton } from "@/components/shell/dashboard-page-skeleton";
+import { usePageReady } from "@/components/shell/navigation-provider";
 import { authClient } from "@/lib/auth-client";
 import { getInitials } from "@/lib/avatar";
 
@@ -124,6 +128,7 @@ export default function ProfilePage() {
   const tRegenerate = useTranslations("profilePage.regenerateDialog");
   const tBreadcrumbs = useTranslations("fileBreadcrumbs");
   const locale = useLocale();
+  usePageReady(!isPending && Boolean(session?.user));
 
   useEffect(() => {
     if (session?.user) {
@@ -412,24 +417,7 @@ export default function ProfilePage() {
   }
 
   if (isPending || !session?.user) {
-    return (
-      <div className="flex flex-1 flex-col">
-        <PageHeader
-          className="-mx-6 -mt-6"
-          breadcrumbs={
-            <Breadcrumbs>
-              <Breadcrumbs.Link href="/dashboard">{tBreadcrumbs("myFiles")}</Breadcrumbs.Link>
-              <Breadcrumbs.Separator />
-              <Breadcrumbs.Current>{t("title")}</Breadcrumbs.Current>
-            </Breadcrumbs>
-          }
-          title={t("title")}
-        />
-        <div className="flex flex-1 items-center justify-center py-12">
-          <Loader size="lg" />
-        </div>
-      </div>
-    );
+    return <DashboardPageSkeleton path="/dashboard/profile" />;
   }
 
   const user = session.user;
@@ -450,76 +438,92 @@ export default function ProfilePage() {
         description={t("description")}
       />
 
-      <div className="flex flex-1 flex-col gap-6 max-w-3xl pt-6">
-        {/* Identité */}
-        <LayerCard className="flex flex-col gap-6 px-5 py-4">
-          <div className="flex items-center gap-4">
-            <div className="relative shrink-0">
-              <input
-                id="avatar-upload"
-                type="file"
-                accept="image/png,image/jpeg,image/gif,image/webp"
-                className="hidden"
-                onChange={handleAvatarSelected}
-              />
-              <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-kumo-info text-lg font-semibold text-white">
-                {user.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={user.image} alt={user.name} className="h-full w-full object-cover" />
-                ) : (
-                  getInitials(user.name)
-                )}
+      <div className="flex flex-1 flex-col gap-6 pt-6">
+        <LayerCard>
+          <LayerCard.Secondary className="flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="relative shrink-0">
+                <input
+                  id="avatar-upload"
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  className="hidden"
+                  onChange={handleAvatarSelected}
+                />
+                <div className="flex size-16 items-center justify-center overflow-hidden rounded-full bg-kumo-info text-white">
+                  {user.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={user.image} alt={user.name} className="size-full object-cover" />
+                  ) : (
+                    <Text as="span" bold>
+                      {getInitials(user.name)}
+                    </Text>
+                  )}
+                </div>
+                <span className="absolute -bottom-1 -right-1">
+                  <Button
+                    variant="secondary"
+                    shape="square"
+                    size="sm"
+                    icon={uploadingAvatar ? undefined : CameraIcon}
+                    onClick={() => document.getElementById("avatar-upload")?.click()}
+                    disabled={uploadingAvatar}
+                    aria-label={t("changeAvatarAria")}
+                  >
+                    {uploadingAvatar ? <Loader size="sm" /> : null}
+                  </Button>
+                </span>
               </div>
-              <button
-                type="button"
-                onClick={() => document.getElementById("avatar-upload")?.click()}
-                disabled={uploadingAvatar}
-                aria-label={t("changeAvatarAria")}
-                className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-kumo-base text-kumo-default ring ring-kumo-line"
-              >
-                {uploadingAvatar ? <Loader size="sm" /> : <CameraIcon size={14} />}
-              </button>
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <Text as="h2" variant="heading3" truncate>
-                  {user.name}
+              <div className="grid min-w-0 gap-0.5">
+                <div className="flex items-center gap-2">
+                  <Text as="span" bold truncate>
+                    {user.name}
+                  </Text>
+                  {isAdmin && <Badge variant="primary">{t("administrator")}</Badge>}
+                </div>
+                <Text variant="secondary" truncate>
+                  {user.email}
                 </Text>
-                {isAdmin && <Badge variant="primary">{t("administrator")}</Badge>}
+                <Text variant="secondary">
+                  {t("memberSince", { date: new Date(user.createdAt).toLocaleDateString(locale) })}
+                </Text>
               </div>
-              <Text variant="secondary" truncate>
-                {user.email}
-              </Text>
-              <Text as="span" size="sm" variant="secondary">
-                {t("memberSince", { date: new Date(user.createdAt).toLocaleDateString(locale) })}
-              </Text>
             </div>
             {user.image && (
               <Button variant="secondary" size="sm" onClick={handleRemoveAvatar} disabled={uploadingAvatar}>
                 {t("removePhoto")}
               </Button>
             )}
-          </div>
-
-          <form onSubmit={handleSaveProfile} className="flex flex-col gap-4 border-t border-kumo-line pt-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Input
+          </LayerCard.Secondary>
+          <LayerCard.Primary className="flex flex-col gap-4">
+            <form onSubmit={handleSaveProfile} className="flex flex-col gap-4">
+              <Grid variant="2up" gap="base">
+                <GridItem>
+                  <Input
+                    size="sm"
+                    label={t("fullNameLabel")}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </GridItem>
+                <GridItem>
+                  <Input
+                    size="sm"
+                    label={t("emailAddressLabel")}
+                    value={user.email}
+                    disabled
+                    description={t("emailNotEditable")}
+                  />
+                </GridItem>
+              </Grid>
+              <Button
+                variant="primary"
                 size="sm"
-                label={t("fullNameLabel")}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-              <Input
-                size="sm"
-                label={t("emailAddressLabel")}
-                value={user.email}
-                disabled
-                description={t("emailNotEditable")}
-              />
-            </div>
-            <div className="flex justify-end">
-              <Button variant="primary" size="sm" type="submit" disabled={savingProfile || name.trim() === user.name}>
+                type="submit"
+                className="w-fit"
+                disabled={savingProfile || name.trim() === user.name}
+              >
                 {savingProfile ? (
                   <span className="flex items-center gap-1.5">
                     <Loader size="sm" /> {t("saving")}
@@ -528,58 +532,61 @@ export default function ProfilePage() {
                   t("save")
                 )}
               </Button>
-            </div>
-          </form>
+            </form>
+          </LayerCard.Primary>
         </LayerCard>
 
-        {/* Mot de passe */}
-        <LayerCard className="flex flex-col gap-4 px-5 py-4">
-          <div>
+        <div className="flex flex-col gap-6">
+          <div className="grid gap-1.5">
             <Text as="h2" variant="heading3">
               {t("passwordTitle")}
             </Text>
             <Text variant="secondary">{t("passwordDescription")}</Text>
           </div>
-
-          <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <SensitiveInput
-                size="sm"
-                label={t("currentPasswordLabel")}
-                value={currentPassword}
-                onValueChange={setCurrentPassword}
-                autoComplete="current-password"
-                required
+          <LayerCard className="px-5 py-4">
+            <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
+              <Grid variant="2up" gap="base">
+                <GridItem>
+                  <SensitiveInput
+                    size="sm"
+                    label={t("currentPasswordLabel")}
+                    value={currentPassword}
+                    onValueChange={setCurrentPassword}
+                    autoComplete="current-password"
+                    required
+                  />
+                </GridItem>
+                <GridItem>
+                  <SensitiveInput
+                    size="sm"
+                    label={t("newPasswordLabel")}
+                    value={newPassword}
+                    onValueChange={setNewPassword}
+                    autoComplete="new-password"
+                    required
+                  />
+                </GridItem>
+                <GridItem>
+                  <SensitiveInput
+                    size="sm"
+                    label={t("confirmNewPasswordLabel")}
+                    value={confirmPassword}
+                    onValueChange={setConfirmPassword}
+                    autoComplete="new-password"
+                    required
+                  />
+                </GridItem>
+              </Grid>
+              <Switch
+                label={t("signOutOtherDevices")}
+                checked={revokeOtherSessionsOnChange}
+                onCheckedChange={setRevokeOtherSessionsOnChange}
               />
-              <SensitiveInput
-                size="sm"
-                label={t("newPasswordLabel")}
-                value={newPassword}
-                onValueChange={setNewPassword}
-                autoComplete="new-password"
-                required
-              />
-              <SensitiveInput
-                size="sm"
-                label={t("confirmNewPasswordLabel")}
-                value={confirmPassword}
-                onValueChange={setConfirmPassword}
-                autoComplete="new-password"
-                required
-              />
-            </div>
-
-            <Switch
-              label={t("signOutOtherDevices")}
-              checked={revokeOtherSessionsOnChange}
-              onCheckedChange={setRevokeOtherSessionsOnChange}
-            />
-
-            <div className="flex justify-end">
               <Button
                 variant="primary"
                 size="sm"
                 type="submit"
+                className="w-fit"
                 disabled={savingPassword || !currentPassword || !newPassword || !confirmPassword}
               >
                 {savingPassword ? (
@@ -590,14 +597,13 @@ export default function ProfilePage() {
                   t("changePassword")
                 )}
               </Button>
-            </div>
-          </form>
-        </LayerCard>
+            </form>
+          </LayerCard>
+        </div>
 
-        {/* Sessions actives */}
-        <LayerCard className="flex flex-col gap-4 px-5 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="grid gap-1.5">
               <Text as="h2" variant="heading3">
                 {t("activeSessionsTitle")}
               </Text>
@@ -614,126 +620,119 @@ export default function ProfilePage() {
             </Button>
           </div>
 
-          {loadingSessions ? (
-            <div className="flex items-center gap-2 py-4">
-              <Loader size="sm" /> {t("loadingSessions")}
-            </div>
-          ) : (
-            <Table>
-              <Table.Header>
-                <Table.Row>
-                  <Table.Head>{t("deviceColumn")}</Table.Head>
-                  <Table.Head>{t("ipAddressColumn")}</Table.Head>
-                  <Table.Head>{t("lastActivityColumn")}</Table.Head>
-                  <Table.Head></Table.Head>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {sortedSessions.map((s) => {
-                  const { label, isMobile } = describeDevice(
-                    s.userAgent,
-                    t("unknownDevice"),
-                    t("browserGeneric"),
-                    (browser, os) => t("deviceOnOs", { browser, os }),
-                  );
-                  const isCurrent = s.token === currentToken;
-                  return (
-                    <Table.Row key={s.id}>
-                      <Table.Cell>
-                        <div className="flex items-center gap-2">
-                          <span className="h-lh flex items-center text-kumo-subtle">
-                            {isMobile ? <DeviceMobileIcon size={16} /> : <DesktopIcon size={16} />}
-                          </span>
-                          {label}
-                          {isCurrent && (
-                            <Badge variant="success">
-                              <span className="flex items-center gap-1">
-                                <CheckCircleIcon size={12} /> {t("thisDevice")}
-                              </span>
-                            </Badge>
-                          )}
-                        </div>
-                      </Table.Cell>
-                      <Table.Cell>{s.ipAddress ?? "—"}</Table.Cell>
-                      <Table.Cell>{new Date(s.updatedAt).toLocaleString(locale)}</Table.Cell>
-                      <Table.Cell>
-                        {!isCurrent && (
-                          <Button
-                            variant="secondary-destructive"
-                            size="sm"
-                            onClick={() => handleRevokeSession(s.token)}
-                            disabled={revokingToken === s.token}
-                          >
-                            {revokingToken === s.token ? <Loader size="sm" /> : t("revoke")}
-                          </Button>
-                        )}
-                      </Table.Cell>
-                    </Table.Row>
-                  );
-                })}
-              </Table.Body>
-            </Table>
-          )}
-        </LayerCard>
-
-        {/* Authentification à deux facteurs */}
-        <LayerCard className="flex flex-col gap-4 px-5 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <Text as="h2" variant="heading3">
-                  {t("twoFactorTitle")}
-                </Text>
-                {user.twoFactorEnabled ? (
-                  <Badge variant="success">{t("twoFactorEnabledBadge")}</Badge>
-                ) : (
-                  <Badge variant="neutral">{t("twoFactorDisabledBadge")}</Badge>
-                )}
+          <LayerCard className="p-0">
+            {loadingSessions ? (
+              <div className="flex items-center gap-2 px-5 py-4">
+                <Loader size="sm" />
+                <Text variant="secondary">{t("loadingSessions")}</Text>
               </div>
-              <Text variant="secondary">
-                {t("twoFactorDescription")}
-              </Text>
-            </div>
-          </div>
+            ) : (
+              <Table>
+                <Table.Header>
+                  <Table.Row>
+                    <Table.Head>{t("deviceColumn")}</Table.Head>
+                    <Table.Head>{t("ipAddressColumn")}</Table.Head>
+                    <Table.Head>{t("lastActivityColumn")}</Table.Head>
+                    <Table.Head></Table.Head>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {sortedSessions.map((s) => {
+                    const { label, isMobile } = describeDevice(
+                      s.userAgent,
+                      t("unknownDevice"),
+                      t("browserGeneric"),
+                      (browser, os) => t("deviceOnOs", { browser, os }),
+                    );
+                    const isCurrent = s.token === currentToken;
+                    return (
+                      <Table.Row key={s.id}>
+                        <Table.Cell>
+                          <div className="flex items-start gap-2">
+                            <span className="h-lh flex items-center text-kumo-subtle">
+                              {isMobile ? <DeviceMobileIcon size={16} /> : <DesktopIcon size={16} />}
+                            </span>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {label}
+                              {isCurrent && (
+                                <Badge variant="success">
+                                  <span className="flex items-center gap-1">
+                                    <CheckCircleIcon size={12} /> {t("thisDevice")}
+                                  </span>
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </Table.Cell>
+                        <Table.Cell>{s.ipAddress ?? "—"}</Table.Cell>
+                        <Table.Cell>{new Date(s.updatedAt).toLocaleString(locale)}</Table.Cell>
+                        <Table.Cell className="text-right">
+                          {!isCurrent && (
+                            <Button
+                              variant="secondary-destructive"
+                              size="sm"
+                              onClick={() => handleRevokeSession(s.token)}
+                              disabled={revokingToken === s.token}
+                            >
+                              {revokingToken === s.token ? <Loader size="sm" /> : t("revoke")}
+                            </Button>
+                          )}
+                        </Table.Cell>
+                      </Table.Row>
+                    );
+                  })}
+                </Table.Body>
+              </Table>
+            )}
+          </LayerCard>
+        </div>
 
-          {user.twoFactorEnabled ? (
-            <div className="flex gap-2 border-t border-kumo-line pt-4">
-              <Button variant="secondary" size="sm" onClick={openRegenerateDialog}>
-                {t("regenerateBackupCodes")}
-              </Button>
-              <Button variant="secondary-destructive" size="sm" onClick={openDisableDialog}>
-                {t("disable2fa")}
-              </Button>
-            </div>
-          ) : (
-            <div className="border-t border-kumo-line pt-4">
-              <Button variant="primary" size="sm" icon={ShieldCheckIcon} onClick={openEnableDialog}>
+        <LayerCard>
+          <LayerCard.Secondary className="flex items-center justify-between gap-4">
+            <Text as="span">{t("twoFactorTitle")}</Text>
+            {user.twoFactorEnabled ? (
+              <Badge variant="success">{t("twoFactorEnabledBadge")}</Badge>
+            ) : (
+              <Badge variant="neutral">{t("twoFactorDisabledBadge")}</Badge>
+            )}
+          </LayerCard.Secondary>
+          <LayerCard.Primary className="flex flex-col gap-4">
+            <Text variant="secondary">{t("twoFactorDescription")}</Text>
+            {user.twoFactorEnabled ? (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" size="sm" onClick={openRegenerateDialog}>
+                  {t("regenerateBackupCodes")}
+                </Button>
+                <Button variant="secondary-destructive" size="sm" onClick={openDisableDialog}>
+                  {t("disable2fa")}
+                </Button>
+              </div>
+            ) : (
+              <Button variant="primary" size="sm" icon={ShieldCheckIcon} className="w-fit" onClick={openEnableDialog}>
                 {t("enable2fa")}
               </Button>
-            </div>
-          )}
+            )}
+          </LayerCard.Primary>
         </LayerCard>
 
-        {/* Zone de danger */}
-        <LayerCard className="flex flex-col gap-4 px-5 py-4 ring-kumo-danger/40">
-          <div className="flex items-center gap-2 text-kumo-danger">
-            <ShieldWarningIcon size={18} />
-            <Text as="h2" variant="heading3" DANGEROUS_className="text-kumo-danger">
+        <div className="flex flex-col gap-6">
+          <div className="grid gap-1.5">
+            <Text as="h2" variant="heading3">
               {t("dangerZoneTitle")}
             </Text>
           </div>
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <Text as="p" bold>{t("deleteAccountTitle")}</Text>
-              <Text variant="secondary">
-                {t("deleteAccountDescription")}
-              </Text>
-            </div>
-            <Button variant="destructive" size="sm" icon={TrashIcon} onClick={() => setDeleteDialogOpen(true)}>
-              {t("deleteAccountButton")}
-            </Button>
-          </div>
-        </LayerCard>
+          <Banner
+            variant="error"
+            icon={<ShieldWarningIcon weight="fill" />}
+            title={t("deleteAccountTitle")}
+            description={t("deleteAccountDescription")}
+            action={
+              <Banner.Action variant="primary" onClick={() => setDeleteDialogOpen(true)}>
+                {t("deleteAccountButton")}
+              </Banner.Action>
+            }
+          />
+        </div>
       </div>
 
       <DeleteResource
@@ -750,7 +749,7 @@ export default function ProfilePage() {
       <Dialog.Root open={enableDialogOpen} onOpenChange={setEnableDialogOpen}>
         <Dialog className="p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold">{tEnable("title")}</Dialog.Title>
+            <Dialog.Title>{tEnable("title")}</Dialog.Title>
             <Dialog.Close
               aria-label={tEnable("close")}
               render={(props) => <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={tEnable("close")} />}
@@ -850,7 +849,7 @@ export default function ProfilePage() {
       <Dialog.Root open={disableDialogOpen} onOpenChange={setDisableDialogOpen}>
         <Dialog className="p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold">{tDisable("title")}</Dialog.Title>
+            <Dialog.Title>{tDisable("title")}</Dialog.Title>
             <Dialog.Close
               aria-label={tEnable("close")}
               render={(props) => <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={tEnable("close")} />}
@@ -888,7 +887,7 @@ export default function ProfilePage() {
       <Dialog.Root open={regenerateDialogOpen} onOpenChange={setRegenerateDialogOpen}>
         <Dialog className="p-6">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold">{tRegenerate("title")}</Dialog.Title>
+            <Dialog.Title>{tRegenerate("title")}</Dialog.Title>
             <Dialog.Close
               aria-label={tEnable("close")}
               render={(props) => <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={tEnable("close")} />}

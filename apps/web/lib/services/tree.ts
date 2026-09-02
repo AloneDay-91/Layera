@@ -1,29 +1,68 @@
-import { db, folder, file, eq, and } from "@filecloud/db";
+import { db, sql, type SQL } from "@filecloud/db";
 import { ServiceError } from "./errors";
 
 export type TreeItem = { id: string; type: "file" | "folder" };
 
-export async function collectDescendantItems(workspaceId: string, folderId: string): Promise<TreeItem[]> {
-  const items: TreeItem[] = [];
-  const [childFolders, childFiles] = await Promise.all([
-    db
-      .select({ id: folder.id })
-      .from(folder)
-      .where(and(eq(folder.workspaceId, workspaceId), eq(folder.parentId, folderId))),
-    db
-      .select({ id: file.id })
-      .from(file)
-      .where(and(eq(file.workspaceId, workspaceId), eq(file.folderId, folderId))),
-  ]);
+async function sqlRows<T extends Record<string, unknown>>(query: SQL): Promise<T[]> {
+  const result = await db.execute(query);
+  if (Array.isArray(result)) return result as T[];
+  return ((result as { rows?: T[] }).rows ?? []) as T[];
+}
 
-  for (const child of childFiles) {
-    items.push({ id: child.id, type: "file" });
-  }
-  for (const child of childFolders) {
-    items.push({ id: child.id, type: "folder" });
-    items.push(...(await collectDescendantItems(workspaceId, child.id)));
-  }
-  return items;
+export async function collectDescendantItems(workspaceId: string, folderId: string): Promise<TreeItem[]> {
+  const rows = await sqlRows<{ id: string; type: "file" | "folder" }>(sql`
+    WITH RECURSIVE tree AS (
+      SELECT id FROM folder WHERE id = ${folderId} AND workspace_id = ${workspaceId}
+      UNION ALL
+      SELECT f.id
+      FROM folder f
+      INNER JOIN tree ON f.parent_id = tree.id
+      WHERE f.workspace_id = ${workspaceId}
+    )
+    SELECT id, 'folder'::text AS type FROM tree WHERE id <> ${folderId}
+    UNION ALL
+    SELECT fl.id, 'file'::text AS type
+    FROM file fl
+    INNER JOIN tree ON fl.folder_id = tree.id
+    WHERE fl.workspace_id = ${workspaceId}
+  `);
+  return rows;
+}
+
+export async function folderAncestorIds(workspaceId: string, folderId: string): Promise<string[]> {
+  const rows = await sqlRows<{ id: string }>(sql`
+    WITH RECURSIVE chain AS (
+      SELECT id, parent_id, 0 AS depth
+      FROM folder
+      WHERE id = ${folderId} AND workspace_id = ${workspaceId}
+      UNION ALL
+      SELECT f.id, f.parent_id, chain.depth + 1
+      FROM folder f
+      INNER JOIN chain ON f.id = chain.parent_id
+      WHERE f.workspace_id = ${workspaceId} AND chain.depth < 64
+    )
+    SELECT id FROM chain
+  `);
+  return rows.map((row) => row.id);
+}
+
+export async function folderBreadcrumbs(
+  workspaceId: string,
+  folderId: string,
+): Promise<Array<{ id: string; name: string }>> {
+  return sqlRows<{ id: string; name: string }>(sql`
+    WITH RECURSIVE chain AS (
+      SELECT id, parent_id, name, 0 AS depth
+      FROM folder
+      WHERE id = ${folderId} AND workspace_id = ${workspaceId}
+      UNION ALL
+      SELECT f.id, f.parent_id, f.name, chain.depth + 1
+      FROM folder f
+      INNER JOIN chain ON f.id = chain.parent_id
+      WHERE f.workspace_id = ${workspaceId} AND chain.depth < 64
+    )
+    SELECT id, name FROM chain WHERE name <> 'root' ORDER BY depth DESC
+  `);
 }
 
 export async function assertFolderMoveAllowed(workspaceId: string, folderId: string, targetFolderId: string) {
@@ -31,21 +70,8 @@ export async function assertFolderMoveAllowed(workspaceId: string, folderId: str
     throw new ServiceError(400, "Cannot move a folder into itself");
   }
 
-  let currentId: string | null = targetFolderId;
-  const seen = new Set<string>();
-  while (currentId) {
-    if (currentId === folderId) {
-      throw new ServiceError(400, "Cannot move a folder into one of its descendants");
-    }
-    if (seen.has(currentId)) {
-      throw new ServiceError(400, "Folder cycle detected");
-    }
-    seen.add(currentId);
-    const [row] = await db
-      .select({ parentId: folder.parentId })
-      .from(folder)
-      .where(and(eq(folder.id, currentId), eq(folder.workspaceId, workspaceId)))
-      .limit(1);
-    currentId = row?.parentId ?? null;
+  const ancestors = await folderAncestorIds(workspaceId, targetFolderId);
+  if (ancestors.includes(folderId)) {
+    throw new ServiceError(400, "Cannot move a folder into one of its descendants");
   }
 }

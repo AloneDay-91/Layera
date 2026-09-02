@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -9,10 +9,12 @@ import { AccountSwitcher } from "./account-switcher";
 import { authClient } from "@/lib/auth-client";
 import { formatFileSize } from "@/lib/file-item";
 import { onStorageUpdated } from "@/lib/storage-events";
+import { useNavigation } from "./navigation-provider";
+import type { DashboardUser } from "./dashboard-user";
 
 type StorageSummary = { usedBytes: number; quotaBytes: number };
 
-export function DashboardHeader() {
+export function DashboardHeader({ initialUser }: { initialUser: DashboardUser | null }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -32,11 +34,16 @@ export function DashboardHeader() {
     "/dashboard/activity": t("pages.activity"),
     "/dashboard/admin": t("pages.admin"),
     "/dashboard/settings": t("pages.settings"),
+    "/dashboard/profile": t("pages.profile"),
   };
+
+  const { displayedPath, markPending } = useNavigation();
+  const pageLabel = PAGE_LABELS[displayedPath] ?? tCommon("appName");
 
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") ?? "");
   const [storage, setStorage] = useState<StorageSummary | null>(null);
   const { data: activeOrg } = authClient.useActiveOrganization();
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     function fetchStorage() {
@@ -49,26 +56,32 @@ export function DashboardHeader() {
     return onStorageUpdated(fetchStorage);
   }, [activeOrg?.id]);
 
-  const pageLabel = PAGE_LABELS[pathname] ?? tCommon("appName");
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, []);
+
   const usedPercent = storage && storage.quotaBytes > 0 ? Math.min(100, (storage.usedBytes / storage.quotaBytes) * 100) : 0;
 
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
     const val = e.target.value;
     setSearchQuery(val);
-    const params = new URLSearchParams(searchParams.toString());
-    if (val.trim()) {
-      params.set("search", val.trim());
-    } else {
-      params.delete("search");
-    }
-    router.replace(`${pathname}?${params.toString()}`);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (val.trim()) {
+        params.set("search", val.trim());
+      } else {
+        params.delete("search");
+      }
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname);
+    }, 300);
   }
 
   return (
-    <header
-      suppressHydrationWarning
-      className="flex h-14.5 shrink-0 items-center justify-between gap-4 border-b border-kumo-line px-4"
-    >
+    <header className="flex h-14.5 shrink-0 items-center justify-between gap-4 border-b border-kumo-line px-4">
       <div className="flex min-w-0 items-center gap-2">
         <Sidebar.Trigger className="md:hidden" />
         <Text as="h1" variant="heading3" DANGEROUS_className="truncate">
@@ -89,12 +102,13 @@ export function DashboardHeader() {
         {storage && (
           <Link
             href="/dashboard/storage"
+            onClick={() => markPending("/dashboard/storage")}
             className="hidden w-36 shrink-0 md:block **:text-xs!"
           >
             <Meter label={t("storageLabel")} value={usedPercent} customValue={formatFileSize(storage.usedBytes)} />
           </Link>
         )}
-        <AccountSwitcher />
+        <AccountSwitcher initialUser={initialUser} />
       </div>
     </header>
   );

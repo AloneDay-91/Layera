@@ -4,6 +4,7 @@ import { getAuthorizedWorkspace } from "@/lib/services/permissions";
 import { jsonError } from "@/lib/services/http";
 import { hiddenItemIds } from "@/lib/services/hidden";
 import { usersByIds } from "@/lib/services/users";
+import { previewUrlsByFileId } from "@/lib/services/signed-read";
 
 export async function GET() {
   try {
@@ -24,21 +25,38 @@ export async function GET() {
     const fileIds = favoriteRows.filter((f) => f.itemType === "file").map((f) => f.itemId);
     const folderIds = favoriteRows.filter((f) => f.itemType === "folder").map((f) => f.itemId);
 
-    const [favFiles, favFolders, allFolders] = await Promise.all([
+    const [favFiles, favFolders] = await Promise.all([
       fileIds.length > 0
         ? db.select().from(file).where(and(inArray(file.id, fileIds), eq(file.workspaceId, wsRecord.id)))
         : Promise.resolve([]),
       folderIds.length > 0
         ? db.select().from(folder).where(and(inArray(folder.id, folderIds), eq(folder.workspaceId, wsRecord.id)))
         : Promise.resolve([]),
-      db.select().from(folder).where(eq(folder.workspaceId, wsRecord.id)),
     ]);
 
-    const folderNameById = new Map(allFolders.map((f) => [f.id, f.name === "root" ? "Mes fichiers" : f.name]));
+    const parentIds = [
+      ...new Set([
+        ...favFiles.map((f) => f.folderId),
+        ...favFolders.map((f) => f.parentId).filter((id): id is string => Boolean(id)),
+      ]),
+    ];
+    const parentFolders =
+      parentIds.length > 0
+        ? await db
+            .select({ id: folder.id, name: folder.name })
+            .from(folder)
+            .where(and(eq(folder.workspaceId, wsRecord.id), inArray(folder.id, parentIds)))
+        : [];
+    const folderNameById = new Map(
+      parentFolders.map((f) => [f.id, f.name === "root" ? "Mes fichiers" : f.name]),
+    );
     const favoriteMeta = new Map(
       favoriteRows.map((f) => [f.itemId, { favoritedAt: f.createdAt.toISOString(), pinned: f.pinned }]),
     );
-    const owners = await usersByIds([...favFiles.map((f) => f.createdBy), ...favFolders.map((f) => f.createdBy)]);
+    const [owners, previewUrls] = await Promise.all([
+      usersByIds([...favFiles.map((f) => f.createdBy), ...favFolders.map((f) => f.createdBy)]),
+      previewUrlsByFileId(favFiles.filter((f) => !hiddenIds.has(f.id))),
+    ]);
 
     const fileItems = favFiles
       .filter((f) => !hiddenIds.has(f.id))
@@ -57,6 +75,7 @@ export async function GET() {
         isPinned: favoriteMeta.get(f.id)?.pinned ?? false,
         favoritedAt: favoriteMeta.get(f.id)?.favoritedAt ?? f.updatedAt.toISOString(),
         hasThumbnail: Boolean(f.thumbnailKey),
+        thumbnailUrl: previewUrls.get(f.id),
       }));
 
     const folderItems = favFolders

@@ -1,5 +1,5 @@
 import type { WorkspaceRole } from "@filecloud/types";
-import { db, workspace, workspaceMember, eq, and, isNull } from "./client";
+import { db, workspace, workspaceMember, eq, and, isNull, type SQL } from "./client";
 import { provisionOrganizationWorkspace, provisionPersonalWorkspace } from "./provisioning";
 
 export class WorkspaceAccessError extends Error {
@@ -24,6 +24,22 @@ async function findMembership(workspaceId: string, actorId: string) {
     .select()
     .from(workspaceMember)
     .where(and(eq(workspaceMember.workspaceId, workspaceId), eq(workspaceMember.userId, actorId)))
+    .limit(1);
+  return row ?? null;
+}
+
+async function loadWorkspaceWithMembership(actorId: string, workspaceWhere: SQL | undefined) {
+  const [row] = await db
+    .select({
+      workspace,
+      role: workspaceMember.role,
+    })
+    .from(workspace)
+    .leftJoin(
+      workspaceMember,
+      and(eq(workspaceMember.workspaceId, workspace.id), eq(workspaceMember.userId, actorId)),
+    )
+    .where(workspaceWhere)
     .limit(1);
   return row ?? null;
 }
@@ -55,62 +71,52 @@ export async function requireWorkspaceAccess(input: {
   actorName: string;
   activeOrganizationId?: string | null;
 }): Promise<AuthorizedWorkspace> {
-  let ws: WorkspaceRow | undefined;
+  const found = input.activeOrganizationId
+    ? await loadWorkspaceWithMembership(input.actorId, eq(workspace.organizationId, input.activeOrganizationId))
+    : await loadWorkspaceWithMembership(
+        input.actorId,
+        and(eq(workspace.ownerId, input.actorId), isNull(workspace.organizationId)),
+      );
 
-  if (input.activeOrganizationId) {
-    const found = await db
-      .select()
-      .from(workspace)
-      .where(eq(workspace.organizationId, input.activeOrganizationId))
-      .limit(1);
-    ws = found[0];
+  let ws = found?.workspace;
+  let role = found?.role ?? null;
 
-    if (!ws) {
-      const provisioned = await provisionOrganizationWorkspace({
-        organizationId: input.activeOrganizationId,
-        name: "Workspace Équipe",
-        ownerId: input.actorId,
-      });
-      const created = await db.select().from(workspace).where(eq(workspace.id, provisioned.workspaceId)).limit(1);
-      ws = created[0];
-    }
-  } else {
-    const found = await db
-      .select()
-      .from(workspace)
-      .where(and(eq(workspace.ownerId, input.actorId), isNull(workspace.organizationId)))
-      .limit(1);
-    ws = found[0];
-
-    if (!ws) {
-      const provisioned = await provisionPersonalWorkspace({
-        userId: input.actorId,
-        userName: input.actorName,
-      });
-      const created = await db.select().from(workspace).where(eq(workspace.id, provisioned.workspaceId)).limit(1);
-      ws = created[0];
-    }
+  if (!ws && input.activeOrganizationId) {
+    const provisioned = await provisionOrganizationWorkspace({
+      organizationId: input.activeOrganizationId,
+      name: "Workspace Équipe",
+      ownerId: input.actorId,
+    });
+    const created = await db.select().from(workspace).where(eq(workspace.id, provisioned.workspaceId)).limit(1);
+    ws = created[0];
+  } else if (!ws) {
+    const provisioned = await provisionPersonalWorkspace({
+      userId: input.actorId,
+      userName: input.actorName,
+    });
+    const created = await db.select().from(workspace).where(eq(workspace.id, provisioned.workspaceId)).limit(1);
+    ws = created[0];
   }
 
   if (!ws) {
     throw new WorkspaceAccessError(404, "Workspace not found");
   }
 
-  let membership = await findMembership(ws.id, input.actorId);
-
-  if (!membership && ws.organizationId && ws.organizationId === input.activeOrganizationId) {
-    membership = await enrollMember(ws.id, input.actorId, "member");
+  if (!role && ws.organizationId && ws.organizationId === input.activeOrganizationId) {
+    const membership = await enrollMember(ws.id, input.actorId, "member");
+    role = membership.role;
   }
 
-  if (!membership && ws.ownerId === input.actorId) {
-    membership = await enrollMember(ws.id, input.actorId, "owner");
+  if (!role && ws.ownerId === input.actorId) {
+    const membership = await enrollMember(ws.id, input.actorId, "owner");
+    role = membership.role;
   }
 
-  if (!membership) {
+  if (!role) {
     throw new WorkspaceAccessError(403, "Forbidden");
   }
 
-  return { workspace: ws, role: membership.role };
+  return { workspace: ws, role };
 }
 
 /** Checks membership of an already-known workspace (no provisioning). */
@@ -118,15 +124,12 @@ export async function requireWorkspaceMember(
   actorId: string,
   workspaceId: string,
 ): Promise<AuthorizedWorkspace> {
-  const [ws] = await db.select().from(workspace).where(eq(workspace.id, workspaceId)).limit(1);
-  if (!ws) {
+  const row = await loadWorkspaceWithMembership(actorId, eq(workspace.id, workspaceId));
+  if (!row) {
     throw new WorkspaceAccessError(404, "Workspace not found");
   }
-
-  const membership = await findMembership(workspaceId, actorId);
-  if (!membership) {
+  if (!row.role) {
     throw new WorkspaceAccessError(403, "Forbidden");
   }
-
-  return { workspace: ws, role: membership.role };
+  return { workspace: row.workspace, role: row.role };
 }

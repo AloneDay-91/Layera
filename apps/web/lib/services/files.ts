@@ -13,7 +13,6 @@ import {
   isNull,
   ilike,
   inArray,
-  notInArray,
   requireWorkspaceMember,
 } from "@filecloud/db";
 import { copyStoredObject, ensureBucket, objectStorageKey, putStoredObject } from "@filecloud/storage";
@@ -28,11 +27,12 @@ import {
   folderNameTaken,
   fileNameTaken,
 } from "./names";
-import { hiddenItemIds } from "./hidden";
+import { hiddenItemIds, notHidden } from "./hidden";
 import { usersByIds } from "./users";
 import { collectItemStorageKeys, deleteStoredFiles } from "./storage-cleanup";
-import { assertFolderMoveAllowed, collectDescendantItems } from "./tree";
+import { assertFolderMoveAllowed, collectDescendantItems, folderBreadcrumbs } from "./tree";
 import { assertOwner } from "./permissions";
+import { previewUrlsByFileId } from "./signed-read";
 
 const FOLDER_COLOR_VALUES = new Set<string>(FOLDER_COLOR_OPTIONS.map((opt) => opt.value));
 
@@ -50,6 +50,7 @@ export type ListedItem = {
   tags: { id: string; name: string; color: string }[];
   color?: string | null;
   hasThumbnail?: boolean;
+  thumbnailUrl?: string;
 };
 
 function escapeIlike(value: string) {
@@ -106,71 +107,60 @@ export async function listFolderContents(
 ) {
   const workspaceId = ctx.workspace.id;
   let targetFolderId = input.parentId ?? null;
-  let dbFolders;
-  let dbFiles;
-
-  const hiddenIds = [...(await hiddenItemIds(workspaceId))];
   const LIST_CAP = 500;
 
-  if (input.search) {
-    const pattern = `%${escapeIlike(input.search.slice(0, 200))}%`;
-    const folderWhere = [eq(folder.workspaceId, workspaceId), ilike(folder.name, pattern)];
-    const fileWhere = [eq(file.workspaceId, workspaceId), ilike(file.name, pattern)];
-    if (hiddenIds.length > 0) {
-      folderWhere.push(notInArray(folder.id, hiddenIds));
-      fileWhere.push(notInArray(file.id, hiddenIds));
-    }
-    dbFolders = await db.select().from(folder).where(and(...folderWhere)).limit(LIST_CAP);
-    dbFiles = await db.select().from(file).where(and(...fileWhere)).limit(LIST_CAP);
-  } else {
+  if (!input.search) {
     if (!targetFolderId) {
       const root = await getRootFolder(workspaceId);
       targetFolderId = root?.id ?? null;
     } else {
       await getFolderInWorkspace(workspaceId, targetFolderId);
     }
-
-    const folderWhere = [
-      eq(folder.workspaceId, workspaceId),
-      targetFolderId ? eq(folder.parentId, targetFolderId) : isNull(folder.parentId),
-    ];
-    const fileWhere = [
-      eq(file.workspaceId, workspaceId),
-      targetFolderId ? eq(file.folderId, targetFolderId) : isNull(file.folderId),
-    ];
-    if (hiddenIds.length > 0) {
-      folderWhere.push(notInArray(folder.id, hiddenIds));
-      fileWhere.push(notInArray(file.id, hiddenIds));
-    }
-    dbFolders = await db.select().from(folder).where(and(...folderWhere)).limit(LIST_CAP);
-    dbFiles = await db.select().from(file).where(and(...fileWhere)).limit(LIST_CAP);
   }
 
-  const favoriteRows = await db
-    .select({ itemId: favorite.itemId })
-    .from(favorite)
-    .where(and(eq(favorite.workspaceId, workspaceId), eq(favorite.userId, ctx.actor.id)));
-  const favoriteIds = new Set(favoriteRows.map((f) => f.itemId));
+  const folderFilters = [eq(folder.workspaceId, workspaceId), notHidden(folder.id, workspaceId)];
+  const fileFilters = [eq(file.workspaceId, workspaceId), notHidden(file.id, workspaceId)];
 
-  const itemIds = [...dbFolders.map((f) => f.id), ...dbFiles.map((f) => f.id)];
-  const tagsByItemId = new Map<string, { id: string; name: string; color: string }[]>();
-  if (itemIds.length > 0) {
-    const tagRows = await db
-      .select({ itemId: itemTag.itemId, id: tag.id, name: tag.name, color: tag.color })
-      .from(itemTag)
-      .innerJoin(tag, eq(itemTag.tagId, tag.id))
-      .where(and(eq(itemTag.workspaceId, workspaceId), inArray(itemTag.itemId, itemIds)));
-    for (const row of tagRows) {
-      const list = tagsByItemId.get(row.itemId) ?? [];
-      list.push({ id: row.id, name: row.name, color: row.color });
-      tagsByItemId.set(row.itemId, list);
-    }
+  if (input.search) {
+    const pattern = `%${escapeIlike(input.search.slice(0, 200))}%`;
+    folderFilters.push(ilike(folder.name, pattern));
+    fileFilters.push(ilike(file.name, pattern));
+  } else {
+    folderFilters.push(targetFolderId ? eq(folder.parentId, targetFolderId) : isNull(folder.parentId));
+    fileFilters.push(targetFolderId ? eq(file.folderId, targetFolderId) : isNull(file.folderId));
   }
 
-  const owners = await usersByIds([
-    ...dbFolders.map((f) => f.createdBy),
-    ...dbFiles.map((f) => f.createdBy),
+  const [dbFolders, dbFiles, favoriteRows, breadcrumbs] = await Promise.all([
+    db.select().from(folder).where(and(...folderFilters)).limit(LIST_CAP),
+    db.select().from(file).where(and(...fileFilters)).limit(LIST_CAP),
+    db
+      .select({ itemId: favorite.itemId })
+      .from(favorite)
+      .where(and(eq(favorite.workspaceId, workspaceId), eq(favorite.userId, ctx.actor.id))),
+    targetFolderId ? folderBreadcrumbs(workspaceId, targetFolderId) : Promise.resolve([]),
   ]);
+
+  const favoriteIds = new Set(favoriteRows.map((f) => f.itemId));
+  const itemIds = [...dbFolders.map((f) => f.id), ...dbFiles.map((f) => f.id)];
+
+  const [tagRows, owners, previewUrls] = await Promise.all([
+    itemIds.length > 0
+      ? db
+          .select({ itemId: itemTag.itemId, id: tag.id, name: tag.name, color: tag.color })
+          .from(itemTag)
+          .innerJoin(tag, eq(itemTag.tagId, tag.id))
+          .where(and(eq(itemTag.workspaceId, workspaceId), inArray(itemTag.itemId, itemIds)))
+      : Promise.resolve([]),
+    usersByIds([...dbFolders.map((f) => f.createdBy), ...dbFiles.map((f) => f.createdBy)]),
+    previewUrlsByFileId(dbFiles),
+  ]);
+
+  const tagsByItemId = new Map<string, { id: string; name: string; color: string }[]>();
+  for (const row of tagRows) {
+    const list = tagsByItemId.get(row.itemId) ?? [];
+    list.push({ id: row.id, name: row.name, color: row.color });
+    tagsByItemId.set(row.itemId, list);
+  }
 
   const formattedFolders: ListedItem[] = dbFolders
     .filter((f) => f.name !== "root")
@@ -205,32 +195,17 @@ export async function listFolderContents(
       owner: owner?.name ?? ctx.actor.name,
       ownerId: f.createdBy ?? ctx.actor.id,
       isFavorite: favoriteIds.has(f.id),
-        tags: tagsByItemId.get(f.id) ?? [],
-        hasThumbnail: Boolean(f.thumbnailKey),
-      };
+      tags: tagsByItemId.get(f.id) ?? [],
+      hasThumbnail: Boolean(f.thumbnailKey),
+      thumbnailUrl: previewUrls.get(f.id),
+    };
   });
-
-  const breadcrumbs: Array<{ id: string; name: string }> = [];
-  let currId = targetFolderId;
-  const seen = new Set<string>();
-  while (currId) {
-    if (seen.has(currId)) break;
-    seen.add(currId);
-    const [f] = await db.select().from(folder).where(eq(folder.id, currId)).limit(1);
-    if (!f || f.workspaceId !== workspaceId) break;
-    if (f.name !== "root") {
-      breadcrumbs.unshift({ id: f.id, name: f.name });
-    }
-    currId = f.parentId;
-  }
-
-  const hiddenIdsSet = new Set(hiddenIds);
 
   return {
     workspaceId,
     currentFolderId: targetFolderId,
     breadcrumbs,
-    items: [...formattedFolders, ...formattedFiles].filter((item) => !hiddenIdsSet.has(item.id)),
+    items: [...formattedFolders, ...formattedFiles],
   };
 }
 
@@ -389,27 +364,55 @@ export async function trashItemInWorkspace(
   ctx: AuthorizedContext,
   input: { id: string; type: "file" | "folder" },
 ) {
-  if (input.type === "file") {
-    await getFileInWorkspace(ctx.workspace.id, input.id);
-  } else {
-    await getFolderInWorkspace(ctx.workspace.id, input.id);
+  await trashItemsInWorkspace(ctx, [input]);
+}
+
+export async function trashItemsInWorkspace(
+  ctx: AuthorizedContext,
+  inputs: Array<{ id: string; type: "file" | "folder" }>,
+) {
+  if (inputs.length === 0) return;
+
+  const fileIds = inputs.filter((item) => item.type === "file").map((item) => item.id);
+  const folderIds = inputs.filter((item) => item.type === "folder").map((item) => item.id);
+  const [foundFiles, foundFolders] = await Promise.all([
+    fileIds.length > 0
+      ? db
+          .select({ id: file.id })
+          .from(file)
+          .where(and(eq(file.workspaceId, ctx.workspace.id), inArray(file.id, fileIds)))
+      : Promise.resolve([]),
+    folderIds.length > 0
+      ? db
+          .select({ id: folder.id })
+          .from(folder)
+          .where(and(eq(folder.workspaceId, ctx.workspace.id), inArray(folder.id, folderIds)))
+      : Promise.resolve([]),
+  ]);
+  if (foundFiles.length !== fileIds.length || foundFolders.length !== folderIds.length) {
+    throw new ServiceError(404, "Item not found");
   }
 
-  const toTrash: Array<{ id: string; type: "file" | "folder" }> = [input];
-  if (input.type === "folder") {
-    toTrash.push(...(await collectDescendantItems(ctx.workspace.id, input.id)));
+  const descendantLists = await Promise.all(
+    folderIds.map((id) => collectDescendantItems(ctx.workspace.id, id)),
+  );
+  const toTrash: Array<{ id: string; type: "file" | "folder" }> = [...inputs];
+  for (const descendants of descendantLists) {
+    toTrash.push(...descendants);
   }
 
+  const uniqueItems = [...new Map(toTrash.map((item) => [item.id, item])).values()];
+  const uniqueIds = uniqueItems.map((item) => item.id);
   const existing = await db
     .select({ itemId: trashItem.itemId })
     .from(trashItem)
-    .where(eq(trashItem.workspaceId, ctx.workspace.id));
+    .where(and(eq(trashItem.workspaceId, ctx.workspace.id), inArray(trashItem.itemId, uniqueIds)));
   const alreadyTrashed = new Set(existing.map((row) => row.itemId));
 
   const purgeAt = new Date();
   purgeAt.setDate(purgeAt.getDate() + 30);
 
-  const rows = toTrash
+  const rows = uniqueItems
     .filter((item) => !alreadyTrashed.has(item.id))
     .map((item) => ({
       workspaceId: ctx.workspace.id,
@@ -422,13 +425,17 @@ export async function trashItemInWorkspace(
     await db.insert(trashItem).values(rows);
   }
 
-  await recordAudit({
-    workspaceId: ctx.workspace.id,
-    actorId: ctx.actor.id,
-    action: input.type === "file" ? "file.trash" : "folder.trash",
-    targetType: input.type,
-    targetId: input.id,
-  });
+  await Promise.all(
+    inputs.map((input) =>
+      recordAudit({
+        workspaceId: ctx.workspace.id,
+        actorId: ctx.actor.id,
+        action: input.type === "file" ? "file.trash" : "folder.trash",
+        targetType: input.type,
+        targetId: input.id,
+      }),
+    ),
+  );
 }
 
 export async function permanentlyDeleteItem(
