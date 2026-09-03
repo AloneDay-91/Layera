@@ -159,6 +159,15 @@ export const auth = betterAuth({
   trustedOrigins: [process.env.BETTER_AUTH_URL, process.env.NEXT_PUBLIC_BETTER_AUTH_URL].filter(
     (value): value is string => Boolean(value),
   ),
+  advanced: {
+    // Otherwise the flag is only inferred from BETTER_AUTH_URL, and the app is
+    // documented as binding loopback behind a TLS proxy — an http:// value
+    // there is plausible and would silently ship the session cookie without
+    // Secure. Browsers treat localhost as a secure context, so local testing
+    // is unaffected; a plain-HTTP deployment has to opt out on purpose.
+    useSecureCookies:
+      process.env.NODE_ENV === "production" && process.env.AUTH_ALLOW_INSECURE_COOKIES !== "true",
+  },
   databaseHooks: {
     user: {
       create: {
