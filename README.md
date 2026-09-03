@@ -105,7 +105,7 @@ the Docker image — you do not need them in `.env`.
 | `DATABASE_URL` | Postgres connection string. Host `postgres` inside Compose; `localhost` for `pnpm dev`. |
 | `BETTER_AUTH_SECRET` | `openssl rand -base64 32`. Also signs public-share unlock cookies. |
 | `BETTER_AUTH_URL` | Public origin Better Auth issues cookies for. |
-| `NEXT_PUBLIC_BETTER_AUTH_URL` | Same origin, exposed to the browser. |
+| `NEXT_PUBLIC_BETTER_AUTH_URL` | Optional, and only honoured at build time — `NEXT_PUBLIC_*` is inlined into the browser bundle. Leave it unset so the browser calls the origin it loaded the page from. |
 
 #### Object storage (required)
 

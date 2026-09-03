@@ -1,24 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
 
-// When S3_PUBLIC_ENDPOINT is configured the browser talks to the object store
-// directly: presigned PUT for uploads, presigned GET for every preview. That
-// origin therefore has to be reachable as a fetch, image, media and frame
-// source, otherwise previews break.
-function storageOrigin(): string | null {
-  const endpoint = process.env.S3_PUBLIC_ENDPOINT?.trim();
-  if (!endpoint) return null;
+function originOf(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
   try {
-    return new URL(endpoint).origin;
+    return new URL(trimmed).origin;
   } catch {
     return null;
   }
 }
 
+// When S3_PUBLIC_ENDPOINT is configured the browser talks to the object store
+// directly: presigned PUT for uploads, presigned GET for every preview. That
+// origin therefore has to be reachable as a fetch, image, media and frame
+// source, otherwise previews break.
+function storageOrigin(): string | null {
+  return originOf(process.env.S3_PUBLIC_ENDPOINT);
+}
+
+// The auth client calls its configured base URL as an absolute address, so an
+// instance whose auth URL is not the page's own origin needs it allowed
+// explicitly. Deployments where both match land on 'self' and add nothing.
+function authOrigins(): string[] {
+  const origins = [
+    originOf(process.env.NEXT_PUBLIC_BETTER_AUTH_URL),
+    originOf(process.env.BETTER_AUTH_URL),
+  ].filter((origin): origin is string => Boolean(origin));
+  return [...new Set(origins)];
+}
+
 function contentSecurityPolicy(nonce: string): string {
   const isDev = process.env.NODE_ENV !== "production";
   const storage = storageOrigin();
-  const withStorage = (...sources: string[]) => [...sources, ...(storage ? [storage] : [])].join(" ");
+  // Every directive that can point at stored bytes gets the object store.
+  const withStorage = (...sources: string[]) =>
+    [...new Set([...sources, ...(storage ? [storage] : [])])].join(" ");
 
   return [
     "default-src 'self'",
@@ -32,7 +49,7 @@ function contentSecurityPolicy(nonce: string): string {
     `img-src ${withStorage("'self'", "data:", "blob:")}`,
     `media-src ${withStorage("'self'", "blob:")}`,
     "font-src 'self' data:",
-    `connect-src ${withStorage("'self'")}${isDev ? " ws: wss:" : ""}`,
+    `connect-src ${withStorage("'self'", ...authOrigins())}${isDev ? " ws: wss:" : ""}`,
     // PDF previews frame either the presigned URL or /api/files/content.
     `frame-src ${withStorage("'self'", "blob:")}`,
     "worker-src 'self' blob:",

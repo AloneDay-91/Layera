@@ -66,6 +66,9 @@ export async function GET(request: Request) {
 
       if (usesPublicPresign) {
         const url = await presignGetObject(fRecord.storageKey, SIGNED_GET_EXPIRY_SECONDS, {
+          // Signed alongside the URL, so the client cannot have the object
+          // served back under the type it chose when it uploaded the bytes.
+          "response-content-type": "application/octet-stream",
           "response-content-disposition": contentDisposition("attachment", fRecord.name),
         });
         return NextResponse.redirect(url, 302);

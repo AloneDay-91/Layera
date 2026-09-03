@@ -7,29 +7,8 @@ import { jsonError } from "@/lib/services/http";
 import { recordAudit } from "@/lib/services/audit";
 import { ServiceError } from "@/lib/services/errors";
 import { storedObjectResponse } from "@/lib/http-file";
+import { serveAs } from "@/lib/mime";
 import { checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
-
-// SVG and HTML are deliberately excluded — they can embed <script> and
-// execute it when navigated to directly (Content-Disposition: inline),
-// unlike raster/media formats and plain text.
-const INLINE_SAFE_MIME_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
-  "application/pdf",
-  "video/mp4",
-  "video/webm",
-  "video/ogg",
-  "audio/mpeg",
-  "audio/ogg",
-  "audio/wav",
-  "audio/webm",
-  "text/plain",
-  "text/markdown",
-  "text/csv",
-  "application/json",
-]);
 
 export async function GET(request: Request) {
   try {
@@ -75,9 +54,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Thumbnail not available" }, { status: 404 });
     }
 
-    const isSafeInline = INLINE_SAFE_MIME_TYPES.has(fRecord.mimeType);
-    const contentType = isThumb ? "image/webp" : isSafeInline ? fRecord.mimeType : "application/octet-stream";
-    const disposition = isThumb || isSafeInline ? "inline" : "attachment";
+    const served = serveAs(fRecord.mimeType);
+    const contentType = isThumb ? "image/webp" : served.contentType;
+    const disposition = isThumb ? "inline" : served.disposition;
     const storageKey = isThumb ? thumbnailKey : fRecord.storageKey;
     if (!storageKey) {
       return NextResponse.json({ error: "Storage file unreadable" }, { status: 500 });

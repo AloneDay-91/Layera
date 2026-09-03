@@ -37,7 +37,11 @@ export async function GET(request: Request) {
     }
 
     const proxyPath = `/api/files/content?id=${encodeURIComponent(id)}${variant === "thumb" ? "&variant=thumb" : ""}`;
-    const signed = await signedOrProxyReadUrl(storageKey, proxyPath);
+    const descriptor =
+      variant === "thumb"
+        ? { mimeType: "image/webp", name: `${fRecord.name}.thumb.webp` }
+        : { mimeType: fRecord.mimeType, name: fRecord.name };
+    const signed = await signedOrProxyReadUrl(storageKey, proxyPath, descriptor);
     return NextResponse.json(signed);
   } catch (error) {
     return jsonError(error, "Failed to sign file URL");
