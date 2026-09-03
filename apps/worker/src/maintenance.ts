@@ -1,4 +1,4 @@
-import { db, upload, trashItem, file, folder, favorite, eq, and, lte } from "@filecloud/db";
+import { db, upload, trashItem, file, folder, favorite, rateLimit, eq, and, lte } from "@filecloud/db";
 import { removeStoredObject, removeStoredObjects } from "@filecloud/storage";
 
 async function collectFolderStorageKeys(workspaceId: string, folderId: string): Promise<string[]> {
@@ -20,6 +20,20 @@ async function collectFolderStorageKeys(workspaceId: string, folderId: string): 
     keys.push(...(await collectFolderStorageKeys(workspaceId, child.id)));
   }
   return keys;
+}
+
+// Rate limit buckets are keyed per identity and per endpoint and are never
+// read again once their window lapses, so without a sweep the table grows for
+// the lifetime of the instance.
+const RATE_LIMIT_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+export async function purgeStaleRateLimits() {
+  const cutoff = Date.now() - RATE_LIMIT_RETENTION_MS;
+  const deleted = await db
+    .delete(rateLimit)
+    .where(lte(rateLimit.lastRequest, cutoff))
+    .returning({ id: rateLimit.id });
+  return deleted.length;
 }
 
 export async function abortExpiredUploads() {

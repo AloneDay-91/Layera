@@ -2,13 +2,21 @@ import { db, job, eq, and, lte, inArray, type JobType } from "@filecloud/db";
 
 const MAX_ATTEMPTS = 8;
 
+// Sweeps are idempotent and re-scheduled on a timer, so a queued one is enough
+// — without this they would pile up once per tick.
+const DEDUPLICATED_TYPES: ReadonlySet<JobType> = new Set<JobType>([
+  "purge-trash",
+  "abort-uploads",
+  "purge-rate-limits",
+]);
+
 export async function enqueueJob(type: JobType, payload: Record<string, unknown> = {}) {
   const [existing] = await db
     .select({ id: job.id })
     .from(job)
     .where(and(eq(job.type, type), inArray(job.status, ["pending", "running"])))
     .limit(1);
-  if (existing && (type === "purge-trash" || type === "abort-uploads")) {
+  if (existing && DEDUPLICATED_TYPES.has(type)) {
     return existing.id;
   }
 
