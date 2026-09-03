@@ -1,5 +1,5 @@
 import type { WorkspaceRole } from "@filecloud/types";
-import { db, workspace, workspaceMember, eq, and, isNull, type SQL } from "./client";
+import { db, workspace, workspaceMember, member, eq, and, isNull, type SQL } from "./client";
 import { provisionOrganizationWorkspace, provisionPersonalWorkspace } from "./provisioning";
 
 export class WorkspaceAccessError extends Error {
@@ -44,6 +44,15 @@ async function loadWorkspaceWithMembership(actorId: string, workspaceWhere: SQL 
   return row ?? null;
 }
 
+async function isOrganizationMember(organizationId: string, actorId: string) {
+  const [row] = await db
+    .select({ id: member.id })
+    .from(member)
+    .where(and(eq(member.organizationId, organizationId), eq(member.userId, actorId)))
+    .limit(1);
+  return Boolean(row);
+}
+
 async function enrollMember(workspaceId: string, actorId: string, role: WorkspaceRole) {
   const [row] = await db
     .insert(workspaceMember)
@@ -63,8 +72,10 @@ async function enrollMember(workspaceId: string, actorId: string, role: Workspac
 /**
  * Resolves the caller's active workspace (personal, or the Better Auth org
  * currently selected) and requires a `workspace_member` row. Org members who
- * are not yet in `workspace_member` are enrolled as `member` — Better Auth
- * already gated `activeOrganizationId`.
+ * are not yet in `workspace_member` are enrolled as `member`, but only after
+ * their row in Better Auth's `member` table is confirmed: taking
+ * `activeOrganizationId` at face value would make the session's own claim the
+ * sole gate on joining a team workspace.
  */
 export async function requireWorkspaceAccess(input: {
   actorId: string;
@@ -81,7 +92,15 @@ export async function requireWorkspaceAccess(input: {
   let ws = found?.workspace;
   let role = found?.role ?? null;
 
+  const belongsToActiveOrg =
+    input.activeOrganizationId !== null && input.activeOrganizationId !== undefined
+      ? await isOrganizationMember(input.activeOrganizationId, input.actorId)
+      : false;
+
   if (!ws && input.activeOrganizationId) {
+    if (!belongsToActiveOrg) {
+      throw new WorkspaceAccessError(403, "Forbidden");
+    }
     const provisioned = await provisionOrganizationWorkspace({
       organizationId: input.activeOrganizationId,
       name: "Workspace Équipe",
@@ -102,7 +121,7 @@ export async function requireWorkspaceAccess(input: {
     throw new WorkspaceAccessError(404, "Workspace not found");
   }
 
-  if (!role && ws.organizationId && ws.organizationId === input.activeOrganizationId) {
+  if (!role && ws.organizationId && ws.organizationId === input.activeOrganizationId && belongsToActiveOrg) {
     const membership = await enrollMember(ws.id, input.actorId, "member");
     role = membership.role;
   }

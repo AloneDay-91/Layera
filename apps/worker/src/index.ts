@@ -1,6 +1,6 @@
 import { enqueueJob, claimPendingJobs, completeJob, failJob } from "./queue";
 import { generateThumbnail } from "./thumbnail";
-import { abortExpiredUploads, purgeExpiredTrash } from "./maintenance";
+import { abortExpiredUploads, purgeExpiredTrash, purgeStaleRateLimits } from "./maintenance";
 import type { JobType } from "@filecloud/db";
 
 const TICK_MS = 5_000;
@@ -19,6 +19,9 @@ async function processJob(type: JobType, payload: Record<string, unknown>) {
       return;
     case "abort-uploads":
       await abortExpiredUploads();
+      return;
+    case "purge-rate-limits":
+      await purgeStaleRateLimits();
       return;
     default: {
       const _exhaustive: never = type;
@@ -43,6 +46,7 @@ async function tick() {
 async function scheduleMaintenance() {
   await enqueueJob("purge-trash");
   await enqueueJob("abort-uploads");
+  await enqueueJob("purge-rate-limits");
 }
 
 async function main() {

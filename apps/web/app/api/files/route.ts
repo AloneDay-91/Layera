@@ -12,6 +12,10 @@ import {
 } from "@/lib/services/files";
 import { ServiceError } from "@/lib/services/errors";
 
+// Each entry fans out into descendant lookups, S3 deletes and audit rows, so an
+// unbounded list turns a single request into an arbitrarily long job.
+const MAX_DELETE_BATCH = 200;
+
 export async function GET(request: Request) {
   try {
     const ctx = await getAuthorizedWorkspace();
@@ -86,6 +90,12 @@ export async function DELETE(request: Request) {
       );
       if (items.length === 0) {
         return NextResponse.json({ error: "Missing items" }, { status: 400 });
+      }
+      if (items.length > MAX_DELETE_BATCH) {
+        return NextResponse.json(
+          { error: `Cannot delete more than ${MAX_DELETE_BATCH} items at once` },
+          { status: 400 },
+        );
       }
       if (body.permanent) {
         for (const item of items) {

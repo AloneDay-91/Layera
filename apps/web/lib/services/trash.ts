@@ -75,16 +75,19 @@ export async function restoreTrashedItem(ctx: AuthorizedContext, input: { id: st
     .limit(1);
   if (!row) throw new ServiceError(404, "Item not found");
 
+  // The trash row is the source of truth: a caller claiming "file" for a
+  // folder would restore the folder while leaving its children in the trash.
+  const itemType = row.itemType;
   const ids = [input.id];
-  if (input.type === "folder") {
+  if (itemType === "folder") {
     ids.push(...(await collectDescendantItems(ctx.workspace.id, input.id)).map((item) => item.id));
   }
   await db.delete(trashItem).where(and(eq(trashItem.workspaceId, ctx.workspace.id), inArray(trashItem.itemId, ids)));
   await recordAudit({
     workspaceId: ctx.workspace.id,
     actorId: ctx.actor.id,
-    action: input.type === "file" ? "file.restore" : "folder.restore",
-    targetType: input.type,
+    action: itemType === "file" ? "file.restore" : "folder.restore",
+    targetType: itemType,
     targetId: input.id,
   });
 }
@@ -130,10 +133,11 @@ export async function permanentlyDeleteTrashedItem(
     .limit(1);
   if (!row) throw new ServiceError(404, "Item not found");
 
-  const storageKeys = await collectItemStorageKeys(ctx.workspace.id, input);
+  const itemType = row.itemType;
+  const storageKeys = await collectItemStorageKeys(ctx.workspace.id, { id: input.id, type: itemType });
   await deleteStoredFiles(storageKeys);
 
-  if (input.type === "file") {
+  if (itemType === "file") {
     await getFileInWorkspace(ctx.workspace.id, input.id);
     await db.delete(file).where(and(eq(file.id, input.id), eq(file.workspaceId, ctx.workspace.id)));
     await db.delete(favorite).where(and(eq(favorite.itemId, input.id), eq(favorite.workspaceId, ctx.workspace.id)));
@@ -149,8 +153,8 @@ export async function permanentlyDeleteTrashedItem(
   await recordAudit({
     workspaceId: ctx.workspace.id,
     actorId: ctx.actor.id,
-    action: input.type === "file" ? "file.delete" : "folder.delete",
-    targetType: input.type,
+    action: itemType === "file" ? "file.delete" : "folder.delete",
+    targetType: itemType,
     targetId: input.id,
   });
 }

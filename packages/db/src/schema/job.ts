@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, uuid, jsonb, integer, index } from "drizzle-orm/pg-core";
 
-export type JobType = "thumbnail" | "purge-trash" | "abort-uploads";
+export type JobType = "thumbnail" | "purge-trash" | "abort-uploads" | "purge-rate-limits";
 export type JobStatus = "pending" | "running" | "completed" | "failed";
 
 export const job = pgTable(

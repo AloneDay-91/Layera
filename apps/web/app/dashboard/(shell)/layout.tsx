@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/shell/dashboard-shell";
 import type { DashboardUser } from "@/components/shell/dashboard-user";
 import { auth } from "@/lib/auth";
@@ -26,6 +27,13 @@ export default async function DashboardShellLayout({ children }: { children: Rea
     auth.api.getSession({ headers: await headers() }),
     getInstanceSettings(),
   ]);
+
+  // The middleware only sees whether a session cookie exists, which anyone can
+  // fabricate to render the shell. This is the check that actually validates it.
+  if (!session) {
+    redirect("/login");
+  }
+
   return (
     <DashboardShell
       initialUser={toDashboardUser(session?.user)}

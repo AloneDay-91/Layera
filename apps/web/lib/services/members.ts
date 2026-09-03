@@ -1,4 +1,4 @@
-import { db, workspace, workspaceMember, user, eq, and } from "@filecloud/db";
+import { db, workspace, workspaceMember, itemShare, user, eq, and } from "@filecloud/db";
 import type { WorkspaceRole } from "@filecloud/types";
 import { ServiceError } from "./errors";
 import { assertOwner, type AuthorizedContext } from "./permissions";
@@ -93,6 +93,12 @@ export async function removeWorkspaceMember(ctx: AuthorizedContext, userId: stri
     .where(and(eq(workspaceMember.workspaceId, ctx.workspace.id), eq(workspaceMember.userId, userId)))
     .returning({ id: workspaceMember.id });
   if (!deleted[0]) throw new ServiceError(404, "Member not found");
+
+  // Leaves no dangling grant behind in "shared with me" for someone who can
+  // no longer reach the workspace.
+  await db
+    .delete(itemShare)
+    .where(and(eq(itemShare.workspaceId, ctx.workspace.id), eq(itemShare.sharedWithUserId, userId)));
 
   await recordAudit({
     workspaceId: ctx.workspace.id,

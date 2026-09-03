@@ -17,6 +17,7 @@ import {
 import { UserPlusIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { AuthCard, AuthSocialButtons } from "@/components/shell/auth-card";
 import { usePublicInstance } from "@/components/shell/use-public-instance";
+import { MIN_PASSWORD_LENGTH } from "@/lib/password-policy";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -122,7 +123,7 @@ export default function RegisterPage() {
               onValueChange={setPassword}
               required
               autoComplete="new-password"
-              minLength={8}
+              minLength={MIN_PASSWORD_LENGTH}
             />
             <SensitiveInput
               size="sm"
@@ -131,7 +132,7 @@ export default function RegisterPage() {
               onValueChange={setConfirmPassword}
               required
               autoComplete="new-password"
-              minLength={8}
+              minLength={MIN_PASSWORD_LENGTH}
             />
             {error ? (
               <Banner

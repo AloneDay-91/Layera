@@ -22,6 +22,7 @@ import { ServiceError } from "./errors";
 import type { AuthorizedContext } from "./permissions";
 import { recordAudit } from "./audit";
 import {
+  assertSafeItemName,
   uniqueFolderName,
   uniqueFileName,
   folderNameTaken,
@@ -211,8 +212,7 @@ export async function listFolderContents(
 }
 
 export async function createFolder(ctx: AuthorizedContext, input: { name: string; parentId?: string | null }) {
-  const requested = input.name.trim();
-  if (!requested) throw new ServiceError(400, "Name is required");
+  const requested = assertSafeItemName(input.name);
   const parent = await resolveFolderInWorkspace(ctx.workspace.id, input.parentId);
   const name = await uniqueFolderName(ctx.workspace.id, parent.id, requested);
   const [created] = await db
@@ -259,13 +259,11 @@ export async function updateFolder(
         : await getFolderInWorkspace(ctx.workspace.id, input.targetFolderId);
     if (!target) throw new ServiceError(400, "Target folder not found");
     await assertFolderMoveAllowed(ctx.workspace.id, input.id, target.id);
-    const desiredName = input.name !== undefined ? input.name.trim() : current.name;
-    if (!desiredName) throw new ServiceError(400, "Name is required");
+    const desiredName = input.name !== undefined ? assertSafeItemName(input.name) : current.name;
     updateData.parentId = target.id;
     updateData.name = await uniqueFolderName(ctx.workspace.id, target.id, desiredName, current.id);
   } else if (input.name !== undefined) {
-    const desiredName = input.name.trim();
-    if (!desiredName) throw new ServiceError(400, "Name is required");
+    const desiredName = assertSafeItemName(input.name);
     if (desiredName !== current.name) {
       if (!current.parentId) throw new ServiceError(400, "Cannot rename the root folder");
       if (await folderNameTaken(ctx.workspace.id, current.parentId, desiredName, current.id)) {
@@ -318,13 +316,11 @@ export async function updateFile(
         ? await getRootFolder(ctx.workspace.id)
         : await getFolderInWorkspace(ctx.workspace.id, input.targetFolderId);
     if (!target) throw new ServiceError(400, "Target folder not found");
-    const desiredName = input.name !== undefined ? input.name.trim() : current.name;
-    if (!desiredName) throw new ServiceError(400, "Name is required");
+    const desiredName = input.name !== undefined ? assertSafeItemName(input.name) : current.name;
     updateData.folderId = target.id;
     updateData.name = await uniqueFileName(ctx.workspace.id, target.id, desiredName, current.id);
   } else if (input.name !== undefined) {
-    const desiredName = input.name.trim();
-    if (!desiredName) throw new ServiceError(400, "Name is required");
+    const desiredName = assertSafeItemName(input.name);
     if (desiredName !== current.name) {
       if (await fileNameTaken(ctx.workspace.id, current.folderId, desiredName, current.id)) {
         throw new ServiceError(409, "A file with this name already exists");

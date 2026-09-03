@@ -6,7 +6,7 @@ import { fetchLatestRelease, toUpdatesResponse } from "@/lib/updates";
 export async function GET() {
   const session = await getInstanceAdminSession();
   if (!session) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const current = getAppVersion();

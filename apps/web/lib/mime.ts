@@ -25,6 +25,32 @@ const EXTENSION_TO_MIME: Record<string, string> = {
   jsx: "text/plain",
 };
 
+// Types the browser will happily execute in the app's own origin if they ever
+// escape the download path. Kept out of storage entirely rather than relying
+// on the response headers alone.
+export const BLOCKED_UPLOAD_MIME_TYPES = new Set([
+  "text/html",
+  "application/xhtml+xml",
+  "image/svg+xml",
+  "text/javascript",
+  "application/javascript",
+  "application/x-javascript",
+  "text/css",
+  "application/x-msdownload",
+]);
+
+/**
+ * Drops parameters and casing so `TEXT/HTML` and `text/html; charset=utf-8`
+ * cannot walk straight past a denylist keyed on the bare type.
+ */
+export function normalizeMimeType(value: string | null | undefined): string {
+  return (value ?? "").split(";")[0]!.trim().toLowerCase();
+}
+
+export function isBlockedUploadMimeType(value: string | null | undefined): boolean {
+  return BLOCKED_UPLOAD_MIME_TYPES.has(normalizeMimeType(value));
+}
+
 export function getMimeTypeFromFilename(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
   return EXTENSION_TO_MIME[ext] ?? "application/octet-stream";

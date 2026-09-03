@@ -1,12 +1,13 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, emailOTP, multiSession, organization, twoFactor } from "better-auth/plugins";
-import { db, provisionPersonalWorkspace, provisionOrganizationWorkspace, eq } from "@filecloud/db";
+import { db, provisionPersonalWorkspace, provisionOrganizationWorkspace, eq, sql } from "@filecloud/db";
 import * as schema from "@filecloud/db";
 import { APIError } from "better-auth/api";
 import { assertRegistrationAllowed } from "./services/instance-settings";
 import { ServiceError } from "./services/errors";
 import { ADMIN_PLUGIN_ROLES, ac, authRoles } from "./auth-permissions";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "./password-policy";
 
 const betterAuthSecret = process.env.BETTER_AUTH_SECRET;
 if (!betterAuthSecret) {
@@ -20,19 +21,40 @@ const ADMIN_EMAILS = new Set(
     .filter(Boolean),
 );
 
+async function instanceHasAdmin(): Promise<boolean> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(schema.user)
+    .where(eq(schema.user.role, "admin"));
+  return Number(row?.count ?? 0) > 0;
+}
+
 // Promotes users whose email is listed in ADMIN_EMAILS to the "admin" role.
 // Runs on every login so it also retroactively promotes existing accounts —
 // there is no other bootstrap mechanism for the very first admin.
+//
+// Listing an address is not proof of owning it. Once the instance has an
+// admin, promotion requires a verified email (which social sign-in provides),
+// so an attacker who registers a listed address with email/password cannot
+// hand themselves the admin panel. Removing an address from the list does not
+// demote anyone: roles are also granted from the admin UI, and revoking them
+// belongs there.
 async function syncAdminRoleForUser(userId: string) {
   if (ADMIN_EMAILS.size === 0) return;
 
   const [user] = await db.select().from(schema.user).where(eq(schema.user.id, userId)).limit(1);
   if (!user) return;
+  if (user.role === "admin") return;
+  if (!ADMIN_EMAILS.has(user.email.toLowerCase())) return;
 
-  const shouldBeAdmin = ADMIN_EMAILS.has(user.email.toLowerCase());
-  if (shouldBeAdmin && user.role !== "admin") {
-    await db.update(schema.user).set({ role: "admin" }).where(eq(schema.user.id, userId));
+  if (!user.emailVerified && (await instanceHasAdmin())) {
+    console.warn(
+      `[auth] Refusing to promote ${user.email} from ADMIN_EMAILS: the address is not verified and this instance already has an admin. Grant the role from the admin panel instead.`,
+    );
+    return;
   }
+
+  await db.update(schema.user).set({ role: "admin" }).where(eq(schema.user.id, userId));
 }
 
 const githubClientId = process.env.GITHUB_CLIENT_ID;
@@ -52,6 +74,14 @@ export const auth = betterAuth({
     // Self-hosted MVP has no mailer yet; turn this on when sendVerificationOTP
     // actually delivers mail, otherwise sign-up locks users out.
     requireEmailVerification: false,
+    minPasswordLength: MIN_PASSWORD_LENGTH,
+    maxPasswordLength: MAX_PASSWORD_LENGTH,
+  },
+  session: {
+    expiresIn: 60 * 60 * 24 * 7,
+    // Slides the expiry at most once a day so a stolen cookie cannot be kept
+    // alive indefinitely by a background tab.
+    updateAge: 60 * 60 * 24,
   },
   user: {
     deleteUser: {
@@ -95,12 +125,18 @@ export const auth = betterAuth({
       maximumSessions: 5,
     }),
     emailOTP({
+      otpLength: 6,
+      expiresIn: 300,
+      allowedAttempts: 3,
       async sendVerificationOTP({ email, otp, type }) {
-        if (process.env.NODE_ENV === "production") {
-          console.warn(`[auth] OTP requested for ${type} but no mailer is configured`);
+        // A logged one-time code is a complete authentication bypass for
+        // anyone who can read the logs, so printing it takes a deliberate
+        // opt-in and is never available on a production build.
+        if (process.env.NODE_ENV !== "production" && process.env.AUTH_DEBUG_OTP === "true") {
+          console.log(`[auth] OTP for ${type} to ${email}: ${otp}`);
           return;
         }
-        console.log(`[Better Auth OTP - ${type}] Sending OTP to ${email}: Code ${otp}`);
+        console.warn(`[auth] OTP requested for ${type} but no mailer is configured`);
       },
     }),
     organization({
@@ -123,6 +159,15 @@ export const auth = betterAuth({
   trustedOrigins: [process.env.BETTER_AUTH_URL, process.env.NEXT_PUBLIC_BETTER_AUTH_URL].filter(
     (value): value is string => Boolean(value),
   ),
+  advanced: {
+    // Otherwise the flag is only inferred from BETTER_AUTH_URL, and the app is
+    // documented as binding loopback behind a TLS proxy — an http:// value
+    // there is plausible and would silently ship the session cookie without
+    // Secure. Browsers treat localhost as a secure context, so local testing
+    // is unaffected; a plain-HTTP deployment has to opt out on purpose.
+    useSecureCookies:
+      process.env.NODE_ENV === "production" && process.env.AUTH_ALLOW_INSECURE_COOKIES !== "true",
+  },
   databaseHooks: {
     user: {
       create: {

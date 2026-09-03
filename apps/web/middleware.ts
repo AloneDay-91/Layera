@@ -1,14 +1,80 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
 
+// When S3_PUBLIC_ENDPOINT is configured the browser talks to the object store
+// directly: presigned PUT for uploads, presigned GET for every preview. That
+// origin therefore has to be reachable as a fetch, image, media and frame
+// source, otherwise previews break.
+function storageOrigin(): string | null {
+  const endpoint = process.env.S3_PUBLIC_ENDPOINT?.trim();
+  if (!endpoint) return null;
+  try {
+    return new URL(endpoint).origin;
+  } catch {
+    return null;
+  }
+}
+
+function contentSecurityPolicy(nonce: string): string {
+  const isDev = process.env.NODE_ENV !== "production";
+  const storage = storageOrigin();
+  const withStorage = (...sources: string[]) => [...sources, ...(storage ? [storage] : [])].join(" ");
+
+  return [
+    "default-src 'self'",
+    // strict-dynamic lets the nonced Next.js bootstrap load its own chunks
+    // without having to allowlist every hashed filename. Dev needs eval for
+    // React Refresh.
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ""}`.trim(),
+    // Tailwind and Kumo set inline style attributes; there is no nonce path
+    // for those, and inline styles are not an script execution vector here.
+    "style-src 'self' 'unsafe-inline'",
+    `img-src ${withStorage("'self'", "data:", "blob:")}`,
+    `media-src ${withStorage("'self'", "blob:")}`,
+    "font-src 'self' data:",
+    `connect-src ${withStorage("'self'")}${isDev ? " ws: wss:" : ""}`,
+    // PDF previews frame either the presigned URL or /api/files/content.
+    `frame-src ${withStorage("'self'", "blob:")}`,
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    ...(isDev ? [] : ["upgrade-insecure-requests"]),
+  ].join("; ");
+}
+
 export function middleware(request: NextRequest) {
-  const sessionCookie = getSessionCookie(request);
-  if (!sessionCookie) {
+  const { pathname } = request.nextUrl;
+
+  if (pathname.startsWith("/dashboard") && !getSessionCookie(request)) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
-  return NextResponse.next();
+
+  // The API renders no documents, and the routes that stream stored bytes ship
+  // a far stricter policy of their own ("default-src 'none'; sandbox"). Setting
+  // the document policy here would overwrite it.
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const csp = contentSecurityPolicy(nonce);
+
+  // Next reads the nonce off the request headers to stamp its own script tags.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("content-security-policy", csp);
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set("content-security-policy", csp);
+  return response;
 }
 
 export const config = {
-  matcher: ["/dashboard", "/dashboard/:path*"],
+  matcher: [
+    // Everything except Next's own static output and public assets, which are
+    // served verbatim and need no policy.
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|logo.svg).*)",
+  ],
 };

@@ -131,6 +131,11 @@ function PdfPreview({ src, title }: { src: string; title: string }) {
       <iframe
         src={src}
         title={title}
+        // A PDF can carry its own scripts, and the viewer runs them. Omitting
+        // allow-same-origin puts the document in an opaque origin, so it reaches
+        // neither cookies, nor storage, nor this page. allow-scripts stays on
+        // because Firefox renders PDFs with pdf.js, which needs to run.
+        sandbox="allow-scripts allow-downloads"
         onLoad={() => setLoaded(true)}
         className={cn("h-full w-full rounded border-0", !loaded && "invisible")}
       />

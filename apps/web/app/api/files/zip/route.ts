@@ -6,6 +6,7 @@ import { getAuthorizedWorkspace } from "@/lib/services/permissions";
 import { jsonError } from "@/lib/services/http";
 import { checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 import { contentDisposition } from "@/lib/http-file";
+import { toZipEntryName } from "@/lib/item-name";
 import { ServiceError } from "@/lib/services/errors";
 
 const MAX_ZIP_FILES = 500;
@@ -46,7 +47,7 @@ async function addFolderToZip(
 
   for (const sub of subfolders) {
     if (trashedIds.has(sub.id)) continue;
-    await addFolderToZip(zip, sub.id, `${basePath}${sub.name}/`, workspaceId, trashedIds, budget);
+    await addFolderToZip(zip, sub.id, `${basePath}${toZipEntryName(sub.name)}/`, workspaceId, trashedIds, budget);
   }
 
   for (const f of files) {
@@ -56,7 +57,7 @@ async function addFolderToZip(
       const stream = await minioClient.getObject(S3_BUCKET, f.storageKey);
       const chunks: Buffer[] = [];
       for await (const chunk of stream) chunks.push(Buffer.from(chunk));
-      zip.file(`${basePath}${f.name}`, Buffer.concat(chunks));
+      zip.file(`${basePath}${toZipEntryName(f.name)}`, Buffer.concat(chunks));
     } catch (err) {
       console.warn(`[zip] Skipping unreadable file ${f.id}:`, err);
     }
@@ -121,7 +122,7 @@ export async function GET(request: Request) {
     const budget = new ZipBudget();
 
     for (const f of activeFolders) {
-      await addFolderToZip(zip, f.id, `${f.name}/`, wsRecord.id, trashedIds, budget);
+      await addFolderToZip(zip, f.id, `${toZipEntryName(f.name)}/`, wsRecord.id, trashedIds, budget);
     }
 
     for (const f of activeFiles) {
@@ -130,7 +131,7 @@ export async function GET(request: Request) {
         const stream = await minioClient.getObject(S3_BUCKET, f.storageKey);
         const chunks: Buffer[] = [];
         for await (const chunk of stream) chunks.push(Buffer.from(chunk));
-        zip.file(f.name, Buffer.concat(chunks));
+        zip.file(toZipEntryName(f.name), Buffer.concat(chunks));
       } catch (err) {
         console.warn(`[zip] Skipping unreadable file ${f.id}:`, err);
       }

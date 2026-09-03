@@ -3,14 +3,17 @@ import { db, rateLimit, sql } from "@filecloud/db";
 
 type RateLimitRule = { windowSeconds: number; max: number };
 
+// Only a trusted reverse proxy may dictate the client IP. Honouring
+// X-Forwarded-For without that guarantee lets anyone pick their own rate
+// limit bucket by rotating the header, which defeats the brute-force limits
+// on public endpoints such as /api/shares/unlock.
 export function getClientIp(request: Request): string {
-  const trustProxy = process.env.TRUST_PROXY === "true" || process.env.NODE_ENV === "production";
-  if (trustProxy) {
-    const forwardedFor = request.headers.get("x-forwarded-for");
-    if (forwardedFor) return forwardedFor.split(",")[0]!.trim();
-    const realIp = request.headers.get("x-real-ip");
-    if (realIp) return realIp;
-  }
+  if (process.env.TRUST_PROXY !== "true") return "unknown";
+
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) return forwardedFor.split(",")[0]!.trim();
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp) return realIp;
   return "unknown";
 }
 
