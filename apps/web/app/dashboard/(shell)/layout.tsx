@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { DashboardShell } from "@/components/shell/dashboard-shell";
 import type { DashboardUser } from "@/components/shell/dashboard-user";
 import { auth } from "@/lib/auth";
+import { getInstanceSettings } from "@/lib/services/instance-settings";
 
 function toDashboardUser(user: {
   id: string;
@@ -21,6 +22,22 @@ function toDashboardUser(user: {
 }
 
 export default async function DashboardShellLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  return <DashboardShell initialUser={toDashboardUser(session?.user)}>{children}</DashboardShell>;
+  const [session, settings] = await Promise.all([
+    auth.api.getSession({ headers: await headers() }),
+    getInstanceSettings(),
+  ]);
+  return (
+    <DashboardShell
+      initialUser={toDashboardUser(session?.user)}
+      initialFeatures={{
+        publicSharingEnabled: settings.publicSharingEnabled,
+        teamsEnabled: settings.teamsEnabled,
+        favoritesEnabled: settings.favoritesEnabled,
+        tagsEnabled: settings.tagsEnabled,
+        archiveEnabled: settings.archiveEnabled,
+      }}
+    >
+      {children}
+    </DashboardShell>
+  );
 }

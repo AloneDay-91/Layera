@@ -275,7 +275,17 @@ function AdminContent({ includeSearch = true }: { includeSearch?: boolean }) {
         </Toolbar>
       ) : null}
       <TableCardSkeleton
-        columns={[t("userColumn"), t("roleColumn"), t("statusColumn"), t("registeredColumn"), t("actionsColumn")]}
+        columns={[
+          t("userColumn"),
+          t("roleColumn"),
+          t("statusColumn"),
+          t("securityColumn"),
+          t("signInColumn"),
+          t("workspacesColumn"),
+          t("lastSeenColumn"),
+          t("registeredColumn"),
+          t("actionsColumn"),
+        ]}
       />
     </div>
   );
@@ -528,6 +538,7 @@ function SkeletonChrome({ kind, children }: { kind: SkeletonKind; children: Reac
             tabs={[
               { value: "users", label: tAdmin("tabUsers") },
               { value: "workspaces", label: tAdmin("tabWorkspaces") },
+              { value: "settings", label: tAdmin("tabSettings") },
             ]}
           />
           <div className="flex flex-1 flex-col gap-6 pt-6">{children}</div>

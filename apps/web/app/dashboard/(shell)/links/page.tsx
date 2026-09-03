@@ -20,8 +20,11 @@ import {
 import { LinkIcon, CopyIcon, XCircleIcon, PencilSimpleIcon, XIcon, LockIcon, ClockIcon, CalendarIcon } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
+import { ConfirmDialog } from "@/components/kumo/confirm-dialog";
 import { TableCardSkeleton } from "@/components/shell/table-card-skeleton";
 import { usePageReady } from "@/components/shell/navigation-provider";
+import { FeatureDisabledState } from "@/components/shell/coming-soon";
+import { useInstanceFeatures } from "@/components/shell/instance-features";
 
 type ShareLinkItem = {
   id: string;
@@ -43,10 +46,12 @@ function endOfDay(date: Date): Date {
 export default function LinksPage() {
   const toasts = useKumoToastManager();
   const { data: activeOrg } = authClient.useActiveOrganization();
+  const { features } = useInstanceFeatures();
   const [shares, setShares] = useState<ShareLinkItem[]>([]);
   const [loading, setLoading] = useState(true);
   usePageReady(!loading);
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [shareToRevoke, setShareToRevoke] = useState<ShareLinkItem | null>(null);
 
   const [editShare, setEditShare] = useState<ShareLinkItem | null>(null);
   const [editExpiresDate, setEditExpiresDate] = useState<Date | undefined>(undefined);
@@ -75,8 +80,12 @@ export default function LinksPage() {
   }
 
   useEffect(() => {
+    if (!features.publicSharingEnabled) {
+      setLoading(false);
+      return;
+    }
     fetchShares();
-  }, [activeOrg?.id]);
+  }, [activeOrg?.id, features.publicSharingEnabled]);
 
   function shareUrl(token: string) {
     return `${window.location.origin}/share/${token}`;
@@ -87,15 +96,17 @@ export default function LinksPage() {
     toasts.add({ title: tToasts("linkCopiedTitle"), description: tToasts("linkCopiedDescription") });
   }
 
-  async function handleRevoke(share: ShareLinkItem) {
-    setRevokingId(share.id);
+  async function handleRevoke() {
+    if (!shareToRevoke) return;
+    setRevokingId(shareToRevoke.id);
     try {
-      const res = await fetch(`/api/shares?id=${share.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/shares?id=${shareToRevoke.id}`, { method: "DELETE" });
       if (res.ok) {
         toasts.add({
           title: tToasts("linkRevokedTitle"),
-          description: tToasts("linkRevokedDescription", { name: share.itemName }),
+          description: tToasts("linkRevokedDescription", { name: shareToRevoke.itemName }),
         });
+        setShareToRevoke(null);
         fetchShares();
       }
     } catch (err) {
@@ -180,7 +191,9 @@ export default function LinksPage() {
 
       <div className="flex flex-1 flex-col gap-6 pt-6">
 
-      {loading ? (
+      {!features.publicSharingEnabled ? (
+        <FeatureDisabledState />
+      ) : loading ? (
         <TableCardSkeleton
           columns={[
             t("nameColumn"),
@@ -255,7 +268,7 @@ export default function LinksPage() {
                         size="sm"
                         disabled={revokingId === share.id}
                         icon={XCircleIcon}
-                        onClick={() => handleRevoke(share)}
+                        onClick={() => setShareToRevoke(share)}
                       >
                         {t("revoke")}
                       </Button>
@@ -360,6 +373,18 @@ export default function LinksPage() {
           </form>
         </Dialog>
       </Dialog.Root>
+
+      <ConfirmDialog
+        open={shareToRevoke !== null}
+        onOpenChange={(open) => {
+          if (!open && revokingId === null) setShareToRevoke(null);
+        }}
+        title={t("revokeTitle")}
+        description={t("revokeDescription", { name: shareToRevoke?.itemName ?? "" })}
+        confirmLabel={t("revokeConfirm")}
+        onConfirm={handleRevoke}
+        isConfirming={revokingId !== null}
+      />
     </div>
   );
 }

@@ -10,8 +10,10 @@ import {
   XCircleIcon,
 } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/kumo/page-header";
+import { ConfirmDialog } from "@/components/kumo/confirm-dialog";
 import { authClient } from "@/lib/auth-client";
 import { usePageReady } from "@/components/shell/navigation-provider";
+import { useInstanceFeatures } from "@/components/shell/instance-features";
 
 type MemberUI = {
   id: string;
@@ -34,6 +36,7 @@ export default function SettingsPage() {
   const t = useTranslations("settingsPage");
   const tToasts = useTranslations("settingsPage.toasts");
   const tBreadcrumbs = useTranslations("fileBreadcrumbs");
+  const { features } = useInstanceFeatures();
 
   const [activeTab, setActiveTab] = useState<"workspaces" | "storage">("workspaces");
   const [members, setMembers] = useState<MemberUI[]>([]);
@@ -48,6 +51,10 @@ export default function SettingsPage() {
   const [canManageMembers, setCanManageMembers] = useState(false);
   const [workspaceName, setWorkspaceName] = useState("");
   const [pageReady, setPageReady] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<MemberUI | null>(null);
+  const [removingMember, setRemovingMember] = useState(false);
+  const [invitationToCancel, setInvitationToCancel] = useState<InvitationUI | null>(null);
+  const [cancellingInvitation, setCancellingInvitation] = useState(false);
   usePageReady(pageReady);
 
   // État contrôlé pour les champs S3
@@ -187,24 +194,34 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleRemoveMember(memberId: string, email: string) {
-    const res = await fetch(`/api/workspace/members?userId=${memberId}`, { method: "DELETE" });
+  async function handleRemoveMember() {
+    if (!memberToRemove) return;
+    setRemovingMember(true);
+    const res = await fetch(`/api/workspace/members?userId=${memberToRemove.id}`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json().catch(() => null);
       toasts.add({ title: tToasts("genericError"), description: data?.error ?? tToasts("removeMemberErrorFallback") });
+      setRemovingMember(false);
       return;
     }
-    toasts.add({ title: tToasts("memberRemovedTitle"), description: tToasts("memberRemovedDescription", { email }) });
+    toasts.add({ title: tToasts("memberRemovedTitle"), description: tToasts("memberRemovedDescription", { email: memberToRemove.email }) });
+    setMemberToRemove(null);
+    setRemovingMember(false);
     loadWorkspaceData();
   }
 
-  async function handleCancelInvitation(invitationId: string, email: string) {
-    const { error } = await authClient.organization.cancelInvitation({ invitationId });
+  async function handleCancelInvitation() {
+    if (!invitationToCancel) return;
+    setCancellingInvitation(true);
+    const { error } = await authClient.organization.cancelInvitation({ invitationId: invitationToCancel.id });
     if (error) {
       toasts.add({ title: tToasts("genericError"), description: error.message ?? tToasts("cancelInvitationErrorFallback") });
+      setCancellingInvitation(false);
       return;
     }
-    toasts.add({ title: tToasts("invitationCancelledTitle"), description: email });
+    toasts.add({ title: tToasts("invitationCancelledTitle"), description: invitationToCancel.email });
+    setInvitationToCancel(null);
+    setCancellingInvitation(false);
     loadWorkspaceData();
   }
 
@@ -243,6 +260,7 @@ export default function SettingsPage() {
       <div className="flex flex-1 flex-col gap-6 pt-6">
       {activeTab === "workspaces" && (
         <div className="flex flex-col gap-6">
+          {features.teamsEnabled ? (
           <Grid variant="2up" gap="base">
             <GridItem>
               <LayerCard>
@@ -289,6 +307,7 @@ export default function SettingsPage() {
               </LayerCard>
             </GridItem>
           </Grid>
+          ) : null}
 
           <div className="flex flex-col gap-6">
             <div className="grid gap-1.5">
@@ -360,7 +379,7 @@ export default function SettingsPage() {
                                 <DropdownMenu.Item
                                   variant="danger"
                                   icon={TrashIcon}
-                                  onClick={() => handleRemoveMember(member.id, member.email)}
+                                  onClick={() => setMemberToRemove(member)}
                                 >
                                   {t("removeMember")}
                                 </DropdownMenu.Item>
@@ -413,7 +432,7 @@ export default function SettingsPage() {
                               <DropdownMenu.Item
                                 variant="danger"
                                 icon={XCircleIcon}
-                                onClick={() => handleCancelInvitation(inv.id, inv.email)}
+                                onClick={() => setInvitationToCancel(inv)}
                               >
                                 {t("cancelInvitation")}
                               </DropdownMenu.Item>
@@ -481,6 +500,30 @@ export default function SettingsPage() {
         </LayerCard>
       )}
       </div>
+
+      <ConfirmDialog
+        open={memberToRemove !== null}
+        onOpenChange={(open) => {
+          if (!open && !removingMember) setMemberToRemove(null);
+        }}
+        title={t("removeMemberTitle")}
+        description={t("removeMemberDescription", { email: memberToRemove?.email ?? "" })}
+        confirmLabel={t("removeMemberConfirm")}
+        onConfirm={handleRemoveMember}
+        isConfirming={removingMember}
+      />
+
+      <ConfirmDialog
+        open={invitationToCancel !== null}
+        onOpenChange={(open) => {
+          if (!open && !cancellingInvitation) setInvitationToCancel(null);
+        }}
+        title={t("cancelInvitationTitle")}
+        description={t("cancelInvitationDescription", { email: invitationToCancel?.email ?? "" })}
+        confirmLabel={t("cancelInvitationConfirm")}
+        onConfirm={handleCancelInvitation}
+        isConfirming={cancellingInvitation}
+      />
     </div>
   );
 }

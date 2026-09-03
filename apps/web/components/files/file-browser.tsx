@@ -32,6 +32,8 @@ import { ItemShareDialog } from "./item-share-dialog";
 import { TransferDialog } from "./transfer-dialog";
 import { ManageTagsDialog } from "./manage-tags-dialog";
 import { FolderColorDialog } from "./folder-color-dialog";
+import { ConfirmDialog } from "@/components/kumo/confirm-dialog";
+import { useInstanceFeatures } from "@/components/shell/instance-features";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
@@ -62,6 +64,7 @@ export function FileBrowser() {
   }
 
   const { data: activeOrg } = authClient.useActiveOrganization();
+  const { features } = useInstanceFeatures();
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
@@ -102,6 +105,10 @@ export function FileBrowser() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<FileItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState(false);
+  const [tagToDelete, setTagToDelete] = useState<WorkspaceTag | null>(null);
+  const [deletingTag, setDeletingTag] = useState(false);
 
   // État des filtres
   const [typeFilter, setTypeFilter] = useState<TypeFilterValue>("all");
@@ -196,12 +203,16 @@ export function FileBrowser() {
   }
 
   useEffect(() => {
-    fetchTags();
+    if (features.tagsEnabled) {
+      fetchTags();
+    } else {
+      setWorkspaceTags([]);
+    }
     fetch("/api/workspace/members")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setCanManage(Boolean(data?.canManage)))
       .catch(() => setCanManage(false));
-  }, [activeOrg?.id]);
+  }, [activeOrg?.id, features.tagsEnabled]);
 
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedItemId) ?? null,
@@ -403,19 +414,28 @@ export function FileBrowser() {
   }
 
   async function handleDeleteItem(item: FileItem) {
+    setItemToDelete(item);
+  }
+
+  async function handleDeleteItemConfirm() {
+    if (!itemToDelete) return;
+    setDeletingItem(true);
     try {
-      const res = await fetch(`/api/files?id=${item.id}&type=${item.type}`, {
+      const res = await fetch(`/api/files?id=${itemToDelete.id}&type=${itemToDelete.type}`, {
         method: "DELETE",
       });
       if (res.ok) {
         toasts.add({
           title: tToasts("itemDeletedTitle"),
-          description: tToasts("itemDeletedDescription", { name: item.name }),
+          description: tToasts("itemDeletedDescription", { name: itemToDelete.name }),
         });
+        setItemToDelete(null);
         refreshFiles();
       }
     } catch (err) {
       console.error("Delete error:", err);
+    } finally {
+      setDeletingItem(false);
     }
   }
 
@@ -650,18 +670,26 @@ export function FileBrowser() {
   }
 
   async function handleDeleteTag(tag: WorkspaceTag) {
-    if (!confirm(t("deleteTagConfirm", { name: tag.name }))) return;
+    setTagToDelete(tag);
+  }
+
+  async function handleDeleteTagConfirm() {
+    if (!tagToDelete) return;
+    setDeletingTag(true);
     try {
-      const res = await fetch(`/api/tags?id=${tag.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/tags?id=${tagToDelete.id}`, { method: "DELETE" });
       if (res.ok) {
-        setWorkspaceTags((prev) => prev.filter((t) => t.id !== tag.id));
-        setItems((prev) => prev.map((i) => ({ ...i, tags: (i.tags ?? []).filter((t) => t.id !== tag.id) })));
-        setManageTagsItem((prev) => (prev ? { ...prev, tags: (prev.tags ?? []).filter((t) => t.id !== tag.id) } : prev));
-        toasts.add({ title: tToasts("tagDeletedTitle"), description: tToasts("tagDeletedDescription", { name: tag.name }) });
+        setWorkspaceTags((prev) => prev.filter((t) => t.id !== tagToDelete.id));
+        setItems((prev) => prev.map((i) => ({ ...i, tags: (i.tags ?? []).filter((t) => t.id !== tagToDelete.id) })));
+        setManageTagsItem((prev) => (prev ? { ...prev, tags: (prev.tags ?? []).filter((t) => t.id !== tagToDelete.id) } : prev));
+        toasts.add({ title: tToasts("tagDeletedTitle"), description: tToasts("tagDeletedDescription", { name: tagToDelete.name }) });
+        setTagToDelete(null);
       }
     } catch (err) {
       console.error("Delete tag error:", err);
       toasts.add({ title: tToasts("genericError"), description: tToasts("tagDeleteErrorDescription") });
+    } finally {
+      setDeletingTag(false);
     }
   }
 
@@ -798,14 +826,14 @@ export function FileBrowser() {
               setRenameItem(item);
               setRenameValue(item.name);
             }}
-            onShareItem={handleShareItem}
+            onShareItem={features.publicSharingEnabled ? handleShareItem : undefined}
             onDeleteItem={handleDeleteItem}
-            onToggleFavorite={handleToggleFavorite}
-            onManageTags={setManageTagsItem}
+            onToggleFavorite={features.favoritesEnabled ? handleToggleFavorite : undefined}
+            onManageTags={features.tagsEnabled ? setManageTagsItem : undefined}
             onChangeColor={setColorItem}
             onDownloadZip={handleDownloadZip}
             onExtractZip={handleExtractZip}
-            onArchive={handleArchiveItem}
+            onArchive={features.archiveEnabled ? handleArchiveItem : undefined}
             onTransfer={canManage ? setTransferItem : undefined}
             onMoveItem={handleMoveItem}
             selectedIds={selectedIds}
@@ -815,7 +843,7 @@ export function FileBrowser() {
             onToggleSelectAll={toggleSelectAll}
             typeFilter={typeFilter}
             onTypeFilterChange={setTypeFilter}
-            workspaceTags={workspaceTags}
+            workspaceTags={features.tagsEnabled ? workspaceTags : []}
             tagFilterIds={tagFilterIds}
             onToggleTagFilter={toggleTagFilter}
             onClearTagFilter={() => setTagFilterIds(new Set())}
@@ -826,7 +854,7 @@ export function FileBrowser() {
             selectedItemId={selectedItemId}
             onOpenFolder={handleOpenFolder}
             onSelectItem={setSelectedItemId}
-            onToggleFavorite={handleToggleFavorite}
+            onToggleFavorite={features.favoritesEnabled ? handleToggleFavorite : undefined}
             onMoveItem={handleMoveItem}
           />
         )}
@@ -859,9 +887,9 @@ export function FileBrowser() {
           item={selectedItem}
           onClose={() => setSelectedItemId(null)}
           onAction={handleDetailAction}
-          onShare={handleShareItem}
-          onToggleFavorite={handleToggleFavorite}
-          onManageTags={setManageTagsItem}
+          onShare={features.publicSharingEnabled ? handleShareItem : undefined}
+          onToggleFavorite={features.favoritesEnabled ? handleToggleFavorite : undefined}
+          onManageTags={features.tagsEnabled ? setManageTagsItem : undefined}
         />
       )}
 
@@ -1015,38 +1043,44 @@ export function FileBrowser() {
       </Dialog.Root>
 
       {/* Modale de confirmation de suppression groupée */}
-      <Dialog.Root open={bulkDeleteOpen} onOpenChange={(open) => !bulkDeleting && setBulkDeleteOpen(open)}>
-        <Dialog className="p-6">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <Dialog.Title className="text-lg font-semibold">
-              {t("deleteConfirmTitle", { count: selectedIds.size })}
-            </Dialog.Title>
-            <Dialog.Close
-              aria-label={t("close")}
-              render={(props) => (
-                <Button {...props} variant="ghost" shape="square" size="sm" icon={XIcon} aria-label={t("close")} disabled={bulkDeleting} />
-              )}
-            />
-          </div>
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onOpenChange={(open) => {
+          if (!bulkDeleting) setBulkDeleteOpen(open);
+        }}
+        title={t("deleteConfirmTitle", { count: selectedIds.size })}
+        description={t("deleteConfirmBody")}
+        confirmLabel={t("delete")}
+        confirmingLabel={t("deleting")}
+        onConfirm={handleBulkDeleteConfirm}
+        isConfirming={bulkDeleting}
+      />
 
-          <Text variant="secondary">{t("deleteConfirmBody")}</Text>
+      <ConfirmDialog
+        open={itemToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !deletingItem) setItemToDelete(null);
+        }}
+        title={t("deleteItemTitle")}
+        description={t("deleteItemDescription", { name: itemToDelete?.name ?? "" })}
+        confirmLabel={t("deleteItemConfirm")}
+        confirmingLabel={t("deleting")}
+        onConfirm={handleDeleteItemConfirm}
+        isConfirming={deletingItem}
+      />
 
-          <div className="mt-4 flex justify-end gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setBulkDeleteOpen(false)} disabled={bulkDeleting}>
-              {t("cancel")}
-            </Button>
-            <Button variant="destructive" size="sm" onClick={handleBulkDeleteConfirm} disabled={bulkDeleting}>
-              {bulkDeleting ? (
-                <span className="flex items-center gap-1.5">
-                  <Loader size="sm" /> {t("deleting")}
-                </span>
-              ) : (
-                t("delete")
-              )}
-            </Button>
-          </div>
-        </Dialog>
-      </Dialog.Root>
+      <ConfirmDialog
+        open={tagToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !deletingTag) setTagToDelete(null);
+        }}
+        title={t("deleteTagTitle")}
+        description={t("deleteTagDescription", { name: tagToDelete?.name ?? "" })}
+        confirmLabel={t("delete")}
+        confirmingLabel={t("deleting")}
+        onConfirm={handleDeleteTagConfirm}
+        isConfirming={deletingTag}
+      />
     </div>
   );
 }

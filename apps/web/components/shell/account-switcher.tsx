@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button, DropdownMenu, Loader, Text, useKumoToastManager } from "@cloudflare/kumo";
+import { ConfirmDialog } from "@/components/kumo/confirm-dialog";
 import {
   UserIcon,
   GearIcon,
@@ -65,6 +66,7 @@ export function AccountSwitcher({ initialUser }: { initialUser: DashboardUser | 
   const [deviceSessions, setDeviceSessions] = useState<DeviceSession[]>([]);
   const [switchingToken, setSwitchingToken] = useState<string | null>(null);
   const [revokingToken, setRevokingToken] = useState<string | null>(null);
+  const [accountToRemove, setAccountToRemove] = useState<DeviceSession | null>(null);
   const [prefsReady, setPrefsReady] = useState(false);
 
   const loadDeviceSessions = useCallback(async () => {
@@ -94,14 +96,15 @@ export function AccountSwitcher({ initialUser }: { initialUser: DashboardUser | 
     }
   }
 
-  async function handleRemoveAccount(sessionToken: string) {
+  async function handleRemoveAccount() {
+    if (!accountToRemove) return;
+    const sessionToken = accountToRemove.session.token;
     setRevokingToken(sessionToken);
     try {
       const { error } = await authClient.multiSession.revoke({ sessionToken });
       if (error) throw new Error(error.message ?? tToasts("unknownError"));
+      setAccountToRemove(null);
       if (sessionToken === session?.session?.token) {
-        // Le compte actif a été retiré : Better Auth a promu une autre session
-        // (ou aucune) côté serveur — on recharge pour resynchroniser le cookie.
         window.location.href = "/dashboard";
         return;
       }
@@ -135,6 +138,7 @@ export function AccountSwitcher({ initialUser }: { initialUser: DashboardUser | 
   const themeIcon = mode === "dark" ? MoonIcon : mode === "system" ? DesktopIcon : SunIcon;
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenu.Trigger>
         <Button variant="ghost" shape="circle" title={userName} aria-label={t("menuAria", { name: userName })}>
@@ -183,7 +187,7 @@ export function AccountSwitcher({ initialUser }: { initialUser: DashboardUser | 
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleRemoveAccount(ds.session.token);
+                      setAccountToRemove(ds);
                     }}
                     aria-label={t("removeAccountAria", { name: ds.user.name })}
                     className="border-0 bg-transparent p-1 text-kumo-subtle hover:text-kumo-danger"
@@ -276,5 +280,17 @@ export function AccountSwitcher({ initialUser }: { initialUser: DashboardUser | 
         </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu>
+    <ConfirmDialog
+      open={accountToRemove !== null}
+      onOpenChange={(open) => {
+        if (!open && revokingToken === null) setAccountToRemove(null);
+      }}
+      title={t("removeAccountTitle")}
+      description={t("removeAccountDescription", { name: accountToRemove?.user.name ?? "" })}
+      confirmLabel={t("removeAccountConfirm")}
+      onConfirm={handleRemoveAccount}
+      isConfirming={revokingToken !== null}
+    />
+    </>
   );
 }

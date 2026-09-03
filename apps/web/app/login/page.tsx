@@ -18,6 +18,7 @@ import {
 import { ArrowRightIcon, EnvelopeSimpleIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { AuthCard, AuthSocialButtons } from "@/components/shell/auth-card";
 import { OtpCodeField } from "@/components/shell/otp-code-field";
+import { usePublicInstance } from "@/components/shell/use-public-instance";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,6 +37,7 @@ export default function LoginPage() {
   const [sendingOtp, setSendingOtp] = useState(false);
 
   const t = useTranslations("loginPage");
+  const { registrationEnabled } = usePublicInstance();
   const tErrors = useTranslations("loginPage.errors");
   const tToasts = useTranslations("loginPage.toasts");
   const tShell = useTranslations("authShell");
@@ -279,9 +281,11 @@ export default function LoginPage() {
           )}
         </div>
 
-        <Text variant="secondary">
-          {t("noAccountYet")} <Link href="/register">{t("createAccount")}</Link>
-        </Text>
+        {registrationEnabled ? (
+          <Text variant="secondary">
+            {t("noAccountYet")} <Link href="/register">{t("createAccount")}</Link>
+          </Text>
+        ) : null}
       </div>
     </AuthCard>
   );

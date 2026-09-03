@@ -1,51 +1,97 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Badge, Breadcrumbs, Button, DeleteResource, DropdownMenu, Empty, InputGroup, LayerCard, Table, Text, Toolbar, useKumoToastManager } from "@cloudflare/kumo";
-import { BuildingsIcon, DotsThreeIcon, ProhibitIcon, ShieldCheckIcon, TrashIcon, UsersThreeIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
+import { Select } from "@cloudflare/kumo/components/select";
+import { BuildingsIcon, DotsThreeIcon, ProhibitIcon, TrashIcon, UsersThreeIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/kumo/page-header";
 import { TableCardSkeleton } from "@/components/shell/table-card-skeleton";
+import { AdminSettingsPanel } from "@/components/shell/admin-settings-panel";
+import { ConfirmDialog } from "@/components/kumo/confirm-dialog";
 import { usePageReady } from "@/components/shell/navigation-provider";
+import { UserAvatar } from "@/components/files/user-avatar";
 import { authClient } from "@/lib/auth-client";
 import { formatFileSize } from "@/lib/file-item";
+import { formatDateTime, formatRelativeTime } from "@/lib/format";
+import {
+  canBanUsers,
+  canDeleteWorkspaces,
+  canManageInstanceSettings,
+  canSetUserRole,
+  normalizeUserRole,
+  roleMessageKey,
+  type UserRole,
+} from "@/lib/auth-permissions";
 
-type AdminUser = {
+type AdminUserRow = {
   id: string;
   name: string;
   email: string;
-  role: string | null;
-  banned: boolean | null;
+  role: string;
+  banned: boolean;
+  banReason: string | null;
+  emailVerified: boolean;
+  twoFactorEnabled: boolean;
+  providers: string[];
+  workspaceCount: number;
+  activeSessionCount: number;
+  lastSeenAt: string | null;
   createdAt: string;
 };
 
-type AdminWorkspace = {
+type AdminWorkspaceRow = {
   id: string;
   name: string;
   type: string;
+  ownerId: string | null;
   ownerName: string;
   ownerEmail: string;
   organizationName: string | null;
   memberCount: number;
+  fileCount: number;
+  folderCount: number;
+  shareCount: number;
   storageBytes: number;
+  quotaBytes: number;
+  lastActivityAt: string | null;
   createdAt: string;
 };
+
+function roleBadgeVariant(role: UserRole): "primary" | "warning" | "info" | "neutral" {
+  switch (role) {
+    case "admin":
+      return "primary";
+    case "moderator":
+      return "warning";
+    case "support":
+      return "info";
+    case "user":
+      return "neutral";
+    default: {
+      const _exhaustive: never = role;
+      return _exhaustive;
+    }
+  }
+}
 
 export default function AdminPage() {
   const toasts = useKumoToastManager();
   const { data: session } = authClient.useSession();
 
-  const [activeTab, setActiveTab] = useState<"users" | "workspaces">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "workspaces" | "settings">("users");
 
-  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [userToBan, setUserToBan] = useState<AdminUserRow | null>(null);
 
-  const [workspaces, setWorkspaces] = useState<AdminWorkspace[]>([]);
+  const [workspaces, setWorkspaces] = useState<AdminWorkspaceRow[]>([]);
   const [workspacesLoading, setWorkspacesLoading] = useState(true);
+  const [workspaceSearch, setWorkspaceSearch] = useState("");
   const [busyWorkspaceId, setBusyWorkspaceId] = useState<string | null>(null);
-  const [workspaceToDelete, setWorkspaceToDelete] = useState<AdminWorkspace | null>(null);
+  const [workspaceToDelete, setWorkspaceToDelete] = useState<AdminWorkspaceRow | null>(null);
 
   const t = useTranslations("adminPage");
   const tToasts = useTranslations("adminPage.toasts");
@@ -53,28 +99,40 @@ export default function AdminPage() {
   const locale = useLocale();
   usePageReady(!usersLoading && !workspacesLoading);
 
+  const actorRole = normalizeUserRole(session?.user?.role);
+  const canEditRoles = canSetUserRole(actorRole);
+  const canBan = canBanUsers(actorRole);
+  const canRemoveWorkspace = canDeleteWorkspaces(actorRole);
+  const showSettings = canManageInstanceSettings(actorRole);
+  const adminCount = users.filter((userRow) => normalizeUserRole(userRow.role) === "admin").length;
+  const moderatorCount = users.filter((userRow) => normalizeUserRole(userRow.role) === "moderator").length;
+  const supportCount = users.filter((userRow) => normalizeUserRole(userRow.role) === "support").length;
+  const filteredWorkspaces = useMemo(() => {
+    const query = workspaceSearch.trim().toLowerCase();
+    if (!query) return workspaces;
+    return workspaces.filter((workspace) => {
+      const haystack = [workspace.name, workspace.organizationName, workspace.ownerName, workspace.ownerEmail]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [workspaceSearch, workspaces]);
+
   async function fetchUsers(searchValue?: string) {
     setUsersLoading(true);
     try {
-      const { data, error } = await authClient.admin.listUsers({
-        query: {
-          limit: 50,
-          ...(searchValue ? { searchValue, searchField: "email" as const, searchOperator: "contains" as const } : {}),
-        },
-      });
-      if (error) {
-        toasts.add({ title: tToasts("genericError"), description: error.message ?? tToasts("loadUsersError") });
+      const params = new URLSearchParams();
+      if (searchValue) params.set("q", searchValue);
+      const res = await fetch(`/api/admin/users${params.size ? `?${params}` : ""}`);
+      if (!res.ok) {
+        toasts.add({ title: tToasts("genericError"), description: tToasts("loadUsersError") });
         return;
       }
-      const mapped: AdminUser[] = (data?.users ?? []).map((u) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role ?? null,
-        banned: u.banned ?? null,
-        createdAt: new Date(u.createdAt).toISOString(),
-      }));
-      setUsers(mapped);
+      const data = await res.json();
+      setUsers(data.users ?? []);
+    } catch {
+      toasts.add({ title: tToasts("genericError"), description: tToasts("loadUsersError") });
     } finally {
       setUsersLoading(false);
     }
@@ -87,9 +145,12 @@ export default function AdminPage() {
       if (res.ok) {
         const data = await res.json();
         setWorkspaces(data.workspaces ?? []);
+      } else {
+        toasts.add({ title: tToasts("genericError"), description: tToasts("loadWorkspacesError") });
       }
     } catch (err) {
       console.error("Erreur chargement des workspaces :", err);
+      toasts.add({ title: tToasts("genericError"), description: tToasts("loadWorkspacesError") });
     } finally {
       setWorkspacesLoading(false);
     }
@@ -105,8 +166,41 @@ export default function AdminPage() {
     fetchUsers(search.trim() || undefined);
   }
 
-  async function handleToggleRole(targetUser: AdminUser) {
-    const nextRole = targetUser.role === "admin" ? "user" : "admin";
+  function providerLabel(provider: string): string {
+    switch (provider) {
+      case "credential":
+      case "email":
+        return t("providerEmail");
+      case "github":
+        return t("providerGithub");
+      case "google":
+        return t("providerGoogle");
+      default:
+        return provider;
+    }
+  }
+
+  function roleToastLabel(role: UserRole): string {
+    switch (role) {
+      case "admin":
+        return tToasts("administrator");
+      case "moderator":
+        return tToasts("moderator");
+      case "support":
+        return tToasts("support");
+      case "user":
+        return tToasts("standardUser");
+      default: {
+        const _exhaustive: never = role;
+        return _exhaustive;
+      }
+    }
+  }
+
+  async function handleChangeRole(targetUser: AdminUserRow, nextValue: string | null) {
+    if (!nextValue) return;
+    const nextRole = normalizeUserRole(nextValue);
+    if (nextRole === normalizeUserRole(targetUser.role)) return;
     setBusyUserId(targetUser.id);
     try {
       const { error } = await authClient.admin.setRole({ userId: targetUser.id, role: nextRole });
@@ -118,7 +212,7 @@ export default function AdminPage() {
         title: tToasts("roleUpdatedTitle"),
         description: tToasts("roleUpdatedDescription", {
           email: targetUser.email,
-          role: nextRole === "admin" ? tToasts("administrator") : tToasts("standardUser"),
+          role: roleToastLabel(nextRole),
         }),
       });
       fetchUsers(search.trim() || undefined);
@@ -127,20 +221,22 @@ export default function AdminPage() {
     }
   }
 
-  async function handleToggleBan(targetUser: AdminUser) {
-    setBusyUserId(targetUser.id);
+  async function handleToggleBan() {
+    if (!userToBan) return;
+    setBusyUserId(userToBan.id);
     try {
-      const { error } = targetUser.banned
-        ? await authClient.admin.unbanUser({ userId: targetUser.id })
-        : await authClient.admin.banUser({ userId: targetUser.id, banReason: tToasts("banReason") });
+      const { error } = userToBan.banned
+        ? await authClient.admin.unbanUser({ userId: userToBan.id })
+        : await authClient.admin.banUser({ userId: userToBan.id, banReason: tToasts("banReason") });
       if (error) {
         toasts.add({ title: tToasts("genericError"), description: error.message ?? tToasts("actionImpossible") });
         return;
       }
       toasts.add({
-        title: targetUser.banned ? tToasts("userUnbannedTitle") : tToasts("userBannedTitle"),
-        description: targetUser.email,
+        title: userToBan.banned ? tToasts("userUnbannedTitle") : tToasts("userBannedTitle"),
+        description: userToBan.email,
       });
+      setUserToBan(null);
       fetchUsers(search.trim() || undefined);
     } finally {
       setBusyUserId(null);
@@ -168,6 +264,30 @@ export default function AdminPage() {
     }
   }
 
+  const userColumns = [
+    t("userColumn"),
+    t("roleColumn"),
+    t("statusColumn"),
+    t("securityColumn"),
+    t("signInColumn"),
+    t("workspacesColumn"),
+    t("lastSeenColumn"),
+    t("registeredColumn"),
+    t("actionsColumn"),
+  ];
+
+  const workspaceColumns = [
+    t("workspaceColumn"),
+    t("typeColumn"),
+    t("ownerColumn"),
+    t("membersColumn"),
+    t("contentColumn"),
+    t("storageColumn"),
+    t("lastActivityColumn"),
+    t("createdColumn"),
+    t("actionsColumn"),
+  ];
+
   return (
     <div className="flex flex-1 flex-col">
       <PageHeader
@@ -184,9 +304,10 @@ export default function AdminPage() {
         tabs={[
           { value: "users", label: t("tabUsers") },
           { value: "workspaces", label: t("tabWorkspaces") },
+          ...(showSettings ? [{ value: "settings" as const, label: t("tabSettings") }] : []),
         ]}
         activeTab={activeTab}
-        onValueChange={(val) => setActiveTab(val as "users" | "workspaces")}
+        onValueChange={(val) => setActiveTab(val as "users" | "workspaces" | "settings")}
       />
 
       <div className="flex flex-1 flex-col gap-6 pt-6">
@@ -208,10 +329,19 @@ export default function AdminPage() {
               </Toolbar>
             </form>
 
+            {!usersLoading && users.length > 0 ? (
+              <Text variant="secondary">
+                {t("usersSummary", {
+                  count: users.length,
+                  admins: adminCount,
+                  moderators: moderatorCount,
+                  support: supportCount,
+                })}
+              </Text>
+            ) : null}
+
             {usersLoading ? (
-              <TableCardSkeleton
-                columns={[t("userColumn"), t("roleColumn"), t("statusColumn"), t("registeredColumn"), t("actionsColumn")]}
-              />
+              <TableCardSkeleton columns={userColumns} />
             ) : users.length === 0 ? (
               <LayerCard className="p-0">
                 <Empty
@@ -222,67 +352,136 @@ export default function AdminPage() {
                 />
               </LayerCard>
             ) : (
-              <LayerCard className="p-0">
+              <LayerCard className="overflow-x-auto p-0">
                 <Table>
                   <Table.Header>
                     <Table.Row>
                       <Table.Head>{t("userColumn")}</Table.Head>
                       <Table.Head>{t("roleColumn")}</Table.Head>
                       <Table.Head>{t("statusColumn")}</Table.Head>
+                      <Table.Head>{t("securityColumn")}</Table.Head>
+                      <Table.Head>{t("signInColumn")}</Table.Head>
+                      <Table.Head>{t("workspacesColumn")}</Table.Head>
+                      <Table.Head>{t("lastSeenColumn")}</Table.Head>
                       <Table.Head>{t("registeredColumn")}</Table.Head>
                       <Table.Head className="text-right">{t("actionsColumn")}</Table.Head>
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
-                    {users.map((u) => {
-                      const isSelf = u.id === session?.user?.id;
+                    {users.map((userRow) => {
+                      const isSelf = userRow.id === session?.user?.id;
+                      const targetRole = normalizeUserRole(userRow.role);
+                      const showBan =
+                        canBan &&
+                        !isSelf &&
+                        (actorRole === "admin" || targetRole !== "admin");
                       return (
-                        <Table.Row key={u.id}>
+                        <Table.Row key={userRow.id}>
                           <Table.Cell>
-                            <div className="grid gap-0.5">
-                              <Text as="span" bold>{u.name}</Text>
-                              <Text as="span" variant="secondary">{u.email}</Text>
+                            <div className="flex items-start gap-2">
+                              <span className="h-lh flex items-center">
+                                <UserAvatar userId={userRow.id} name={userRow.name} size={24} />
+                              </span>
+                              <div className="grid gap-0.5">
+                                <Text as="span" bold>{userRow.name}</Text>
+                                <Text as="span" variant="secondary">{userRow.email}</Text>
+                              </div>
                             </div>
                           </Table.Cell>
                           <Table.Cell>
-                            <Badge variant={u.role === "admin" ? "primary" : "neutral"}>
-                              {u.role === "admin" ? t("roleAdmin") : t("roleUser")}
-                            </Badge>
+                            {canEditRoles ? (
+                              <Select
+                                size="sm"
+                                className="min-w-40"
+                                aria-label={t("roleChangeAria", { email: userRow.email })}
+                                value={normalizeUserRole(userRow.role)}
+                                disabled={isSelf || busyUserId === userRow.id}
+                                onValueChange={(value) => handleChangeRole(userRow, value)}
+                                items={{
+                                  admin: t("roleAdmin"),
+                                  moderator: t("roleModerator"),
+                                  support: t("roleSupport"),
+                                  user: t("roleUser"),
+                                }}
+                              />
+                            ) : (
+                              <Badge variant={roleBadgeVariant(normalizeUserRole(userRow.role))}>
+                                {t(roleMessageKey(normalizeUserRole(userRow.role)))}
+                              </Badge>
+                            )}
                           </Table.Cell>
                           <Table.Cell>
-                            {u.banned ? <Badge variant="error">{t("statusBanned")}</Badge> : <Badge variant="success">{t("statusActive")}</Badge>}
+                            <div className="grid gap-0.5">
+                              {userRow.banned ? (
+                                <Badge variant="error">{t("statusBanned")}</Badge>
+                              ) : (
+                                <Badge variant="success">{t("statusActive")}</Badge>
+                              )}
+                              {userRow.banned && userRow.banReason ? (
+                                <Text as="span" variant="secondary">{userRow.banReason}</Text>
+                              ) : null}
+                            </div>
                           </Table.Cell>
-                          <Table.Cell>{new Date(u.createdAt).toLocaleDateString(locale)}</Table.Cell>
+                          <Table.Cell>
+                            <div className="flex flex-wrap gap-1">
+                              <Badge variant={userRow.emailVerified ? "success" : "neutral"}>
+                                {userRow.emailVerified ? t("emailVerified") : t("emailUnverified")}
+                              </Badge>
+                              <Badge variant={userRow.twoFactorEnabled ? "success" : "neutral"}>
+                                {userRow.twoFactorEnabled ? t("twoFactorOn") : t("twoFactorOff")}
+                              </Badge>
+                            </div>
+                          </Table.Cell>
+                          <Table.Cell>
+                            {userRow.providers.length === 0 ? (
+                              <Text as="span" variant="secondary">{t("providerUnknown")}</Text>
+                            ) : (
+                              <div className="flex flex-wrap gap-1">
+                                {userRow.providers.map((provider) => (
+                                  <Badge key={provider} variant="neutral">
+                                    {providerLabel(provider)}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </Table.Cell>
+                          <Table.Cell>{t("workspaceCount", { count: userRow.workspaceCount })}</Table.Cell>
+                          <Table.Cell>
+                            <div className="grid gap-0.5">
+                              <Text as="span">
+                                {formatRelativeTime(userRow.lastSeenAt, locale, t("neverSeen"))}
+                              </Text>
+                              <Text as="span" variant="secondary">
+                                {t("sessionsCount", { count: userRow.activeSessionCount })}
+                              </Text>
+                            </div>
+                          </Table.Cell>
+                          <Table.Cell>{formatDateTime(userRow.createdAt, locale)}</Table.Cell>
                           <Table.Cell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenu.Trigger>
-                                <Button
-                                  variant="ghost"
-                                  shape="square"
-                                  size="sm"
-                                  icon={DotsThreeIcon}
-                                  disabled={isSelf || busyUserId === u.id}
-                                  aria-label={t("rowActionsAria", { email: u.email })}
-                                />
-                              </DropdownMenu.Trigger>
-                              <DropdownMenu.Content>
-                                <DropdownMenu.Item
-                                  icon={ShieldCheckIcon}
-                                  disabled={isSelf || busyUserId === u.id}
-                                  onClick={() => handleToggleRole(u)}
-                                >
-                                  {u.role === "admin" ? t("demote") : t("promote")}
-                                </DropdownMenu.Item>
-                                <DropdownMenu.Item
-                                  variant={u.banned ? undefined : "danger"}
-                                  icon={ProhibitIcon}
-                                  disabled={isSelf || busyUserId === u.id}
-                                  onClick={() => handleToggleBan(u)}
-                                >
-                                  {u.banned ? t("unban") : t("ban")}
-                                </DropdownMenu.Item>
-                              </DropdownMenu.Content>
-                            </DropdownMenu>
+                            {showBan ? (
+                              <DropdownMenu>
+                                <DropdownMenu.Trigger>
+                                  <Button
+                                    variant="ghost"
+                                    shape="square"
+                                    size="sm"
+                                    icon={DotsThreeIcon}
+                                    disabled={busyUserId === userRow.id}
+                                    aria-label={t("rowActionsAria", { email: userRow.email })}
+                                  />
+                                </DropdownMenu.Trigger>
+                                <DropdownMenu.Content>
+                                  <DropdownMenu.Item
+                                    variant={userRow.banned ? undefined : "danger"}
+                                    icon={ProhibitIcon}
+                                    disabled={busyUserId === userRow.id}
+                                    onClick={() => setUserToBan(userRow)}
+                                  >
+                                    {userRow.banned ? t("unban") : t("ban")}
+                                  </DropdownMenu.Item>
+                                </DropdownMenu.Content>
+                              </DropdownMenu>
+                            ) : null}
                           </Table.Cell>
                         </Table.Row>
                       );
@@ -294,31 +493,48 @@ export default function AdminPage() {
           </div>
         )}
 
+        {activeTab === "settings" && showSettings && <AdminSettingsPanel />}
+
         {activeTab === "workspaces" && (
           <div className="flex flex-col gap-6">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+              }}
+            >
+              <Toolbar size="sm">
+                <Toolbar.InputGroup aria-label={t("workspaceSearchAria")}>
+                  <InputGroup.Addon>
+                    <MagnifyingGlassIcon size={16} />
+                  </InputGroup.Addon>
+                  <InputGroup.Input
+                    placeholder={t("workspaceSearchPlaceholder")}
+                    value={workspaceSearch}
+                    onChange={(e) => setWorkspaceSearch(e.target.value)}
+                  />
+                </Toolbar.InputGroup>
+              </Toolbar>
+            </form>
+
+            {!workspacesLoading && workspaces.length > 0 ? (
+              <Text variant="secondary">
+                {t("workspacesSummary", { count: filteredWorkspaces.length, total: workspaces.length })}
+              </Text>
+            ) : null}
+
             {workspacesLoading ? (
-              <TableCardSkeleton
-                columns={[
-                  t("workspaceColumn"),
-                  t("typeColumn"),
-                  t("ownerColumn"),
-                  t("membersColumn"),
-                  t("storageColumn"),
-                  t("createdColumn"),
-                  t("actionsColumn"),
-                ]}
-              />
-            ) : workspaces.length === 0 ? (
+              <TableCardSkeleton columns={workspaceColumns} />
+            ) : filteredWorkspaces.length === 0 ? (
               <LayerCard className="p-0">
                 <Empty
                   size="sm"
                   icon={<BuildingsIcon size={40} />}
-                  title={t("noWorkspaces")}
-                  description={t("noWorkspacesDescription")}
+                  title={workspaceSearch.trim() ? t("noWorkspaceMatch") : t("noWorkspaces")}
+                  description={workspaceSearch.trim() ? t("noWorkspaceMatchDescription") : t("noWorkspacesDescription")}
                 />
               </LayerCard>
             ) : (
-              <LayerCard className="p-0">
+              <LayerCard className="overflow-x-auto p-0">
                 <Table>
                   <Table.Header>
                     <Table.Row>
@@ -326,65 +542,102 @@ export default function AdminPage() {
                       <Table.Head>{t("typeColumn")}</Table.Head>
                       <Table.Head>{t("ownerColumn")}</Table.Head>
                       <Table.Head>{t("membersColumn")}</Table.Head>
+                      <Table.Head>{t("contentColumn")}</Table.Head>
                       <Table.Head>{t("storageColumn")}</Table.Head>
+                      <Table.Head>{t("lastActivityColumn")}</Table.Head>
                       <Table.Head>{t("createdColumn")}</Table.Head>
                       <Table.Head className="text-right">{t("actionsColumn")}</Table.Head>
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
-                    {workspaces.map((ws) => (
-                      <Table.Row key={ws.id}>
-                        <Table.Cell>
-                          <div className="grid gap-0.5">
-                            <Text as="span" bold>{ws.name}</Text>
-                            {ws.organizationName && <Text as="span" variant="secondary">{ws.organizationName}</Text>}
-                          </div>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Badge variant="neutral">{ws.type === "personal" ? t("typePersonal") : t("typeTeam")}</Badge>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <div className="grid gap-0.5">
-                            <Text as="span">{ws.ownerName}</Text>
-                            <Text as="span" variant="secondary">{ws.ownerEmail}</Text>
-                          </div>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <span className="inline-flex items-center gap-1">
-                            <span className="h-lh flex items-center">
-                              <UsersThreeIcon size={14} />
+                    {filteredWorkspaces.map((ws) => {
+                      const usedPercent =
+                        ws.quotaBytes > 0 ? Math.min(100, Math.round((ws.storageBytes / ws.quotaBytes) * 100)) : 0;
+                      return (
+                        <Table.Row key={ws.id}>
+                          <Table.Cell>
+                            <div className="grid gap-0.5">
+                              <Text as="span" bold>{ws.name}</Text>
+                              {ws.organizationName ? (
+                                <Text as="span" variant="secondary">{ws.organizationName}</Text>
+                              ) : null}
+                            </div>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Badge variant="neutral">{ws.type === "personal" ? t("typePersonal") : t("typeTeam")}</Badge>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <div className="flex items-start gap-2">
+                              <span className="h-lh flex items-center">
+                                <UserAvatar userId={ws.ownerId} name={ws.ownerName || t("deletedUser")} size={24} />
+                              </span>
+                              <div className="grid gap-0.5">
+                                <Text as="span">{ws.ownerName || t("deletedUser")}</Text>
+                                {ws.ownerEmail ? (
+                                  <Text as="span" variant="secondary">{ws.ownerEmail}</Text>
+                                ) : null}
+                              </div>
+                            </div>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <span className="inline-flex items-start gap-1">
+                              <span className="h-lh flex items-center">
+                                <UsersThreeIcon size={14} />
+                              </span>
+                              {t("memberCount", { count: ws.memberCount })}
                             </span>
-                            {ws.memberCount}
-                          </span>
-                        </Table.Cell>
-                        <Table.Cell>{formatFileSize(ws.storageBytes)}</Table.Cell>
-                        <Table.Cell>{new Date(ws.createdAt).toLocaleDateString(locale)}</Table.Cell>
-                        <Table.Cell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenu.Trigger>
-                              <Button
-                                variant="ghost"
-                                shape="square"
-                                size="sm"
-                                icon={DotsThreeIcon}
-                                disabled={busyWorkspaceId === ws.id}
-                                aria-label={t("workspaceRowActionsAria", { name: ws.name })}
-                              />
-                            </DropdownMenu.Trigger>
-                            <DropdownMenu.Content>
-                              <DropdownMenu.Item
-                                variant="danger"
-                                icon={TrashIcon}
-                                disabled={busyWorkspaceId === ws.id}
-                                onClick={() => setWorkspaceToDelete(ws)}
-                              >
-                                {t("delete")}
-                              </DropdownMenu.Item>
-                            </DropdownMenu.Content>
-                          </DropdownMenu>
-                        </Table.Cell>
-                      </Table.Row>
-                    ))}
+                          </Table.Cell>
+                          <Table.Cell>
+                            <div className="grid gap-0.5">
+                              <Text as="span">{t("fileCount", { count: ws.fileCount })}</Text>
+                              <Text as="span" variant="secondary">
+                                {t("contentSecondary", { folders: ws.folderCount, shares: ws.shareCount })}
+                              </Text>
+                            </div>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <div className="grid gap-0.5">
+                              <Text as="span">
+                                {formatFileSize(ws.storageBytes)} / {formatFileSize(ws.quotaBytes)}
+                              </Text>
+                              <Text as="span" variant="secondary">
+                                {t("storageUsedPercent", { percent: usedPercent })}
+                              </Text>
+                            </div>
+                          </Table.Cell>
+                          <Table.Cell>
+                            {formatRelativeTime(ws.lastActivityAt, locale, t("neverSeen"))}
+                          </Table.Cell>
+                          <Table.Cell>{formatDateTime(ws.createdAt, locale)}</Table.Cell>
+                          <Table.Cell className="text-right">
+                            {canRemoveWorkspace ? (
+                              <DropdownMenu>
+                                <DropdownMenu.Trigger>
+                                  <Button
+                                    variant="ghost"
+                                    shape="square"
+                                    size="sm"
+                                    icon={DotsThreeIcon}
+                                    disabled={busyWorkspaceId === ws.id}
+                                    aria-label={t("workspaceRowActionsAria", { name: ws.name })}
+                                  />
+                                </DropdownMenu.Trigger>
+                                <DropdownMenu.Content>
+                                  <DropdownMenu.Item
+                                    variant="danger"
+                                    icon={TrashIcon}
+                                    disabled={busyWorkspaceId === ws.id}
+                                    onClick={() => setWorkspaceToDelete(ws)}
+                                  >
+                                    {t("delete")}
+                                  </DropdownMenu.Item>
+                                </DropdownMenu.Content>
+                              </DropdownMenu>
+                            ) : null}
+                          </Table.Cell>
+                        </Table.Row>
+                      );
+                    })}
                   </Table.Body>
                 </Table>
               </LayerCard>
@@ -392,6 +645,23 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={userToBan !== null}
+        onOpenChange={(open) => {
+          if (!open && busyUserId === null) setUserToBan(null);
+        }}
+        title={userToBan?.banned ? t("unbanTitle") : t("banTitle")}
+        description={
+          userToBan?.banned
+            ? t("unbanDescription", { email: userToBan.email })
+            : t("banDescription", { email: userToBan?.email ?? "" })
+        }
+        confirmLabel={userToBan?.banned ? t("unbanConfirm") : t("banConfirm")}
+        onConfirm={handleToggleBan}
+        isConfirming={busyUserId !== null}
+        variant={userToBan?.banned ? "primary" : "destructive"}
+      />
 
       <DeleteResource
         open={workspaceToDelete !== null}

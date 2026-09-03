@@ -13,21 +13,28 @@ import { FileRowMenu } from "@/components/files/file-row-menu";
 import { FileDetailsPanel } from "@/components/files/file-details-panel";
 import { ItemShareDialog } from "@/components/files/item-share-dialog";
 import { formatFileSize, type FileItem } from "@/lib/file-item";
+import { ConfirmDialog } from "@/components/kumo/confirm-dialog";
+import { FeatureDisabledState } from "@/components/shell/coming-soon";
+import { useInstanceFeatures } from "@/components/shell/instance-features";
 
 type FavoriteItem = FileItem & { location: string; isPinned?: boolean };
 
 export default function FavoritesPage() {
   const toasts = useKumoToastManager();
   const { data: activeOrg } = authClient.useActiveOrganization();
+  const { features } = useInstanceFeatures();
   const [items, setItems] = useState<FavoriteItem[]>([]);
   const [loading, setLoading] = useState(true);
   usePageReady(!loading);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   const [shareItem, setShareItem] = useState<FileItem | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<FileItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState(false);
 
   const t = useTranslations("favoritesPage");
   const tToasts = useTranslations("favoritesPage.toasts");
+  const tBrowser = useTranslations("fileBrowser");
   const tBrowserToasts = useTranslations("fileBrowser.toasts");
   const tTable = useTranslations("fileTable");
   const tBreadcrumbs = useTranslations("fileBreadcrumbs");
@@ -49,8 +56,12 @@ export default function FavoritesPage() {
   }
 
   useEffect(() => {
+    if (!features.favoritesEnabled) {
+      setLoading(false);
+      return;
+    }
     fetchFavorites();
-  }, [activeOrg?.id]);
+  }, [activeOrg?.id, features.favoritesEnabled]);
 
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedItemId) ?? null,
@@ -102,16 +113,25 @@ export default function FavoritesPage() {
     }
   }
 
-  async function handleDeleteItem(item: FileItem) {
+  function handleDeleteItem(item: FileItem) {
+    setItemToDelete(item);
+  }
+
+  async function handleDeleteItemConfirm() {
+    if (!itemToDelete) return;
+    setDeletingItem(true);
     try {
-      const res = await fetch(`/api/files?id=${item.id}&type=${item.type}`, { method: "DELETE" });
+      const res = await fetch(`/api/files?id=${itemToDelete.id}&type=${itemToDelete.type}`, { method: "DELETE" });
       if (res.ok) {
-        toasts.add({ title: tToasts("itemDeletedTitle"), description: tToasts("itemDeletedDescription", { name: item.name }) });
-        if (selectedItemId === item.id) setSelectedItemId(null);
+        toasts.add({ title: tToasts("itemDeletedTitle"), description: tToasts("itemDeletedDescription", { name: itemToDelete.name }) });
+        if (selectedItemId === itemToDelete.id) setSelectedItemId(null);
+        setItemToDelete(null);
         fetchFavorites();
       }
     } catch (err) {
       console.error("Delete error:", err);
+    } finally {
+      setDeletingItem(false);
     }
   }
 
@@ -140,7 +160,9 @@ export default function FavoritesPage() {
 
       <div className="flex flex-1 gap-6 pt-6">
         <div className="flex min-w-0 flex-1 flex-col gap-6">
-          {loading ? (
+          {!features.favoritesEnabled ? (
+            <FeatureDisabledState />
+          ) : loading ? (
             <TableCardSkeleton
               columns={[
                 " ",
@@ -250,6 +272,19 @@ export default function FavoritesPage() {
       </div>
 
       <ItemShareDialog item={shareItem} onClose={() => setShareItem(null)} />
+
+      <ConfirmDialog
+        open={itemToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !deletingItem) setItemToDelete(null);
+        }}
+        title={tBrowser("deleteItemTitle")}
+        description={tBrowser("deleteItemDescription", { name: itemToDelete?.name ?? "" })}
+        confirmLabel={tBrowser("deleteItemConfirm")}
+        confirmingLabel={tBrowser("deleting")}
+        onConfirm={handleDeleteItemConfirm}
+        isConfirming={deletingItem}
+      />
     </div>
   );
 }

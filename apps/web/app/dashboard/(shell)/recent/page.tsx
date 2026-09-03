@@ -12,6 +12,7 @@ import { FilePreviewIcon } from "@/components/files/file-preview";
 import { FileRowMenu } from "@/components/files/file-row-menu";
 import { FileDetailsPanel } from "@/components/files/file-details-panel";
 import { formatFileSize, type FileItem } from "@/lib/file-item";
+import { ConfirmDialog } from "@/components/kumo/confirm-dialog";
 
 type RecentItem = FileItem & { location: string };
 
@@ -26,6 +27,8 @@ export default function RecentPage() {
   const [shareItem, setShareItem] = useState<FileItem | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<FileItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState(false);
 
   const t = useTranslations("recentPage");
   const tToasts = useTranslations("recentPage.toasts");
@@ -60,16 +63,25 @@ export default function RecentPage() {
     [items, selectedItemId],
   );
 
-  async function handleDeleteItem(item: FileItem) {
+  function handleDeleteItem(item: FileItem) {
+    setItemToDelete(item);
+  }
+
+  async function handleDeleteItemConfirm() {
+    if (!itemToDelete) return;
+    setDeletingItem(true);
     try {
-      const res = await fetch(`/api/files?id=${item.id}&type=${item.type}`, { method: "DELETE" });
+      const res = await fetch(`/api/files?id=${itemToDelete.id}&type=${itemToDelete.type}`, { method: "DELETE" });
       if (res.ok) {
-        toasts.add({ title: tToasts("itemDeletedTitle"), description: tToasts("itemDeletedDescription", { name: item.name }) });
-        if (selectedItemId === item.id) setSelectedItemId(null);
+        toasts.add({ title: tToasts("itemDeletedTitle"), description: tToasts("itemDeletedDescription", { name: itemToDelete.name }) });
+        if (selectedItemId === itemToDelete.id) setSelectedItemId(null);
+        setItemToDelete(null);
         fetchRecent();
       }
     } catch (err) {
       console.error("Delete error:", err);
+    } finally {
+      setDeletingItem(false);
     }
   }
 
@@ -219,6 +231,19 @@ export default function RecentPage() {
           ) : null}
         </Dialog>
       </Dialog.Root>
+
+      <ConfirmDialog
+        open={itemToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !deletingItem) setItemToDelete(null);
+        }}
+        title={tBrowser("deleteItemTitle")}
+        description={tBrowser("deleteItemDescription", { name: itemToDelete?.name ?? "" })}
+        confirmLabel={tBrowser("deleteItemConfirm")}
+        confirmingLabel={tBrowser("deleting")}
+        onConfirm={handleDeleteItemConfirm}
+        isConfirming={deletingItem}
+      />
     </div>
   );
 }

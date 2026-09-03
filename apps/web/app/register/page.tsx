@@ -16,6 +16,7 @@ import {
 } from "@cloudflare/kumo";
 import { UserPlusIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { AuthCard, AuthSocialButtons } from "@/components/shell/auth-card";
+import { usePublicInstance } from "@/components/shell/use-public-instance";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -30,6 +31,7 @@ export default function RegisterPage() {
 
   const t = useTranslations("registerPage");
   const tLogin = useTranslations("loginPage");
+  const { registrationEnabled, loaded } = usePublicInstance();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -69,7 +71,20 @@ export default function RegisterPage() {
 
   return (
     <AuthCard title={t("title")} description={t("tagline")}>
-      <div className="grid gap-5">
+      {loaded && !registrationEnabled ? (
+        <div className="grid gap-5">
+          <Banner
+            variant="alert"
+            size="sm"
+            title={t("disabledTitle")}
+            description={t("disabledDescription")}
+          />
+          <Text variant="secondary">
+            {t("alreadyHaveAccount")} <Link href="/login">{t("signIn")}</Link>
+          </Text>
+        </div>
+      ) : (
+        <div className="grid gap-5">
         <AuthSocialButtons
           githubLabel={tLogin("continueWithGithub")}
           googleLabel={tLogin("continueWithGoogle")}
@@ -149,7 +164,8 @@ export default function RegisterPage() {
         <Text variant="secondary">
           {t("alreadyHaveAccount")} <Link href="/login">{t("signIn")}</Link>
         </Text>
-      </div>
+        </div>
+      )}
     </AuthCard>
   );
 }

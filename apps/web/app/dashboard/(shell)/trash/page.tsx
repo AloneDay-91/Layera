@@ -6,6 +6,7 @@ import { Badge, Breadcrumbs, Button, Empty, LayerCard, Loader, Table, Text, useK
 import { TrashIcon, ArrowCounterClockwiseIcon, XCircleIcon } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
+import { ConfirmDialog } from "@/components/kumo/confirm-dialog";
 import { TableCardSkeleton } from "@/components/shell/table-card-skeleton";
 import { usePageReady } from "@/components/shell/navigation-provider";
 import { notifyStorageUpdated } from "@/lib/storage-events";
@@ -30,6 +31,9 @@ export default function TrashPage() {
   usePageReady(!loading);
   const [actionId, setActionId] = useState<string | null>(null);
   const [canManage, setCanManage] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<TrashedItem | null>(null);
+  const [emptyOpen, setEmptyOpen] = useState(false);
+  const [emptying, setEmptying] = useState(false);
   const t = useTranslations("trashPage");
   const tToasts = useTranslations("trashPage.toasts");
   const tBreadcrumbs = useTranslations("fileBreadcrumbs");
@@ -80,17 +84,19 @@ export default function TrashPage() {
     }
   }
 
-  async function handlePermanentDelete(item: TrashedItem) {
-    setActionId(item.id);
+  async function handlePermanentDelete() {
+    if (!itemToDelete) return;
+    setActionId(itemToDelete.id);
     try {
-      const res = await fetch(`/api/trash?id=${item.id}&type=${item.type}`, {
+      const res = await fetch(`/api/trash?id=${itemToDelete.id}&type=${itemToDelete.type}`, {
         method: "DELETE",
       });
       if (res.ok) {
         toasts.add({
           title: tToasts("permanentDeleteTitle"),
-          description: tToasts("permanentDeleteDescription", { name: item.name }),
+          description: tToasts("permanentDeleteDescription", { name: itemToDelete.name }),
         });
+        setItemToDelete(null);
         fetchTrash();
         notifyStorageUpdated();
       }
@@ -102,9 +108,7 @@ export default function TrashPage() {
   }
 
   async function handleEmptyTrash() {
-    if (!confirm(t("emptyConfirm"))) return;
-
-    setLoading(true);
+    setEmptying(true);
     try {
       const res = await fetch("/api/trash?empty=true", { method: "DELETE" });
       if (res.ok) {
@@ -112,13 +116,14 @@ export default function TrashPage() {
           title: tToasts("trashEmptiedTitle"),
           description: tToasts("trashEmptiedDescription"),
         });
+        setEmptyOpen(false);
         fetchTrash();
         notifyStorageUpdated();
       }
     } catch (err) {
       console.error("Empty trash error:", err);
     } finally {
-      setLoading(false);
+      setEmptying(false);
     }
   }
 
@@ -141,7 +146,7 @@ export default function TrashPage() {
             variant="destructive"
             size="sm"
             icon={XCircleIcon}
-            onClick={handleEmptyTrash}
+            onClick={() => setEmptyOpen(true)}
           >
             {t("emptyTrash")}
           </Button>
@@ -203,7 +208,7 @@ export default function TrashPage() {
                         size="sm"
                         disabled={actionId === item.id}
                         icon={XCircleIcon}
-                        onClick={() => handlePermanentDelete(item)}
+                        onClick={() => setItemToDelete(item)}
                       >
                         {t("delete")}
                       </Button>
@@ -217,6 +222,30 @@ export default function TrashPage() {
         </LayerCard>
       )}
       </div>
+
+      <ConfirmDialog
+        open={itemToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && actionId === null) setItemToDelete(null);
+        }}
+        title={t("deleteForeverTitle")}
+        description={t("deleteForeverDescription", { name: itemToDelete?.name ?? "" })}
+        confirmLabel={t("deleteForeverAction")}
+        onConfirm={handlePermanentDelete}
+        isConfirming={actionId !== null}
+      />
+
+      <ConfirmDialog
+        open={emptyOpen}
+        onOpenChange={(open) => {
+          if (!emptying) setEmptyOpen(open);
+        }}
+        title={t("emptyConfirmTitle")}
+        description={t("emptyConfirm")}
+        confirmLabel={t("emptyConfirmAction")}
+        onConfirm={handleEmptyTrash}
+        isConfirming={emptying}
+      />
     </div>
   );
 }

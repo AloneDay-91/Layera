@@ -13,6 +13,7 @@ import {
   UsersThreeIcon,
 } from "@phosphor-icons/react";
 import { AppLogo } from "@/components/shell/app-logo";
+import { usePublicInstance } from "@/components/shell/use-public-instance";
 
 export function AuthCard({
   title,
@@ -24,6 +25,7 @@ export function AuthCard({
   children: ReactNode;
 }) {
   const t = useTranslations("authShell");
+  const { instanceName } = usePublicInstance();
 
   const previewRows = [
     { name: t("file1Name"), type: t("file1Type"), size: t("file1Size"), icon: FileTextIcon },
@@ -45,7 +47,7 @@ export function AuthCard({
             <span className="h-lh flex items-center">
               <AppLogo size={20} />
             </span>
-            <Text>Layera</Text>
+            <Text>{instanceName}</Text>
             <Badge variant="outline">{t("badge")}</Badge>
           </div>
 
@@ -120,7 +122,7 @@ export function AuthCard({
             <span className="h-lh flex items-center">
               <AppLogo size={18} />
             </span>
-            <Text>Layera</Text>
+            <Text>{instanceName}</Text>
           </div>
           <Badge variant="outline">{t("badge")}</Badge>
         </div>

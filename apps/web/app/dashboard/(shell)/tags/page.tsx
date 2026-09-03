@@ -23,12 +23,15 @@ import { DotsThreeIcon, PencilSimpleIcon, PlusIcon, TagIcon, TrashIcon, XIcon } 
 import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
 import { TableCardSkeleton } from "@/components/shell/table-card-skeleton";
+import { FeatureDisabledState } from "@/components/shell/coming-soon";
+import { useInstanceFeatures } from "@/components/shell/instance-features";
 import { usePageReady } from "@/components/shell/navigation-provider";
 import { TAG_COLOR_OPTIONS, type TagColorValue, type WorkspaceTag } from "@/lib/tags";
 
 export default function TagsPage() {
   const toasts = useKumoToastManager();
   const { data: activeOrg } = authClient.useActiveOrganization();
+  const { features } = useInstanceFeatures();
 
   const [tags, setTags] = useState<WorkspaceTag[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,8 +71,12 @@ export default function TagsPage() {
   }
 
   useEffect(() => {
+    if (!features.tagsEnabled) {
+      setLoading(false);
+      return;
+    }
     fetchTags();
-  }, [activeOrg?.id]);
+  }, [activeOrg?.id, features.tagsEnabled]);
 
   async function handleCreateSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -165,13 +172,17 @@ export default function TagsPage() {
         title={t("title")}
         description={t("description")}
       >
-        <Button variant="primary" size="sm" icon={PlusIcon} onClick={() => setIsCreateOpen(true)}>
-          {t("newTag")}
-        </Button>
+        {features.tagsEnabled ? (
+          <Button variant="primary" size="sm" icon={PlusIcon} onClick={() => setIsCreateOpen(true)}>
+            {t("newTag")}
+          </Button>
+        ) : null}
       </PageHeader>
 
       <div className="flex flex-1 flex-col gap-6 pt-6">
-        {loading ? (
+        {!features.tagsEnabled ? (
+          <FeatureDisabledState />
+        ) : loading ? (
           <TableCardSkeleton columns={[t("tagColumn"), t("itemsColumn"), t("actionsColumn")]} rows={4} />
         ) : tags.length === 0 ? (
           <LayerCard className="p-0">

@@ -34,9 +34,11 @@ import {
   XIcon,
 } from "@phosphor-icons/react";
 import { PageHeader } from "@/components/kumo/page-header";
+import { ConfirmDialog } from "@/components/kumo/confirm-dialog";
 import { DashboardPageSkeleton } from "@/components/shell/dashboard-page-skeleton";
 import { usePageReady } from "@/components/shell/navigation-provider";
 import { authClient } from "@/lib/auth-client";
+import { normalizeUserRole, type UserRole } from "@/lib/auth-permissions";
 import { getInitials } from "@/lib/avatar";
 
 type SessionRow = {
@@ -97,7 +99,9 @@ export default function ProfilePage() {
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [revokingToken, setRevokingToken] = useState<string | null>(null);
+  const [sessionToRevoke, setSessionToRevoke] = useState<string | null>(null);
   const [revokingOthers, setRevokingOthers] = useState(false);
+  const [signOutOthersOpen, setSignOutOthersOpen] = useState(false);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -269,12 +273,14 @@ export default function ProfilePage() {
     }
   }
 
-  async function handleRevokeSession(token: string) {
-    setRevokingToken(token);
+  async function handleRevokeSession() {
+    if (!sessionToRevoke) return;
+    setRevokingToken(sessionToRevoke);
     try {
-      const { error } = await authClient.revokeSession({ token });
+      const { error } = await authClient.revokeSession({ token: sessionToRevoke });
       if (error) throw new Error(error.message ?? tErrors("unknown"));
       toasts.add({ title: tToasts("sessionRevokedTitle"), description: tToasts("sessionRevokedDescription") });
+      setSessionToRevoke(null);
       loadSessions();
     } catch (err) {
       console.error("Revoke session error:", err);
@@ -290,6 +296,7 @@ export default function ProfilePage() {
       const { error } = await authClient.revokeOtherSessions();
       if (error) throw new Error(error.message ?? tErrors("unknown"));
       toasts.add({ title: tToasts("devicesSignedOutTitle"), description: tToasts("devicesSignedOutDescription") });
+      setSignOutOthersOpen(false);
       loadSessions();
     } catch (err) {
       console.error("Revoke other sessions error:", err);
@@ -421,7 +428,41 @@ export default function ProfilePage() {
   }
 
   const user = session.user;
-  const isAdmin = user.role === "admin";
+  const role = normalizeUserRole(user.role);
+
+  function profileRoleLabel(value: UserRole): string {
+    switch (value) {
+      case "admin":
+        return t("administrator");
+      case "moderator":
+        return t("moderator");
+      case "support":
+        return t("support");
+      case "user":
+        return "";
+      default: {
+        const _exhaustive: never = value;
+        return _exhaustive;
+      }
+    }
+  }
+
+  function profileRoleBadgeVariant(value: UserRole): "primary" | "warning" | "info" | "neutral" {
+    switch (value) {
+      case "admin":
+        return "primary";
+      case "moderator":
+        return "warning";
+      case "support":
+        return "info";
+      case "user":
+        return "neutral";
+      default: {
+        const _exhaustive: never = value;
+        return _exhaustive;
+      }
+    }
+  }
 
   return (
     <div className="flex flex-1 flex-col">
@@ -479,7 +520,9 @@ export default function ProfilePage() {
                   <Text as="span" bold truncate>
                     {user.name}
                   </Text>
-                  {isAdmin && <Badge variant="primary">{t("administrator")}</Badge>}
+                  {role !== "user" && (
+                    <Badge variant={profileRoleBadgeVariant(role)}>{profileRoleLabel(role)}</Badge>
+                  )}
                 </div>
                 <Text variant="secondary" truncate>
                   {user.email}
@@ -613,7 +656,7 @@ export default function ProfilePage() {
               variant="secondary"
               size="sm"
               icon={SignOutIcon}
-              onClick={handleRevokeOtherSessions}
+              onClick={() => setSignOutOthersOpen(true)}
               disabled={revokingOthers || sortedSessions.length <= 1}
             >
               {t("signOutOthers")}
@@ -671,7 +714,7 @@ export default function ProfilePage() {
                             <Button
                               variant="secondary-destructive"
                               size="sm"
-                              onClick={() => handleRevokeSession(s.token)}
+                              onClick={() => setSessionToRevoke(s.token)}
                               disabled={revokingToken === s.token}
                             >
                               {revokingToken === s.token ? <Loader size="sm" /> : t("revoke")}
@@ -743,6 +786,30 @@ export default function ProfilePage() {
         onDelete={handleDeleteAccount}
         isDeleting={deletingAccount}
         deleteButtonText={t("deleteAccountButton")}
+      />
+
+      <ConfirmDialog
+        open={sessionToRevoke !== null}
+        onOpenChange={(open) => {
+          if (!open && revokingToken === null) setSessionToRevoke(null);
+        }}
+        title={t("revokeSessionTitle")}
+        description={t("revokeSessionDescription")}
+        confirmLabel={t("revokeSessionConfirm")}
+        onConfirm={handleRevokeSession}
+        isConfirming={revokingToken !== null}
+      />
+
+      <ConfirmDialog
+        open={signOutOthersOpen}
+        onOpenChange={(open) => {
+          if (!revokingOthers) setSignOutOthersOpen(open);
+        }}
+        title={t("signOutOthersTitle")}
+        description={t("signOutOthersDescription")}
+        confirmLabel={t("signOutOthersConfirm")}
+        onConfirm={handleRevokeOtherSessions}
+        isConfirming={revokingOthers}
       />
 
       {/* Activer la 2FA */}

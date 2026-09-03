@@ -11,20 +11,25 @@ import type { DashboardUser } from "./dashboard-user";
 import { UpdateBanner } from "./update-banner";
 import { UpdateHelpDialog } from "./update-help-dialog";
 import { useAvailableUpdate } from "./use-available-update";
+import { InstanceFeaturesProvider, type InstanceFeatures } from "./instance-features";
+import { canManageInstanceSettings } from "@/lib/auth-permissions";
 
 export function DashboardShell({
   children,
   initialUser,
+  initialFeatures,
 }: {
   children: React.ReactNode;
   initialUser: DashboardUser | null;
+  initialFeatures: InstanceFeatures;
 }) {
   const { isPending } = useNavigation();
-  const isAdmin = initialUser?.role === "admin";
+  const isAdmin = canManageInstanceSettings(initialUser?.role);
   const { update, dismiss } = useAvailableUpdate(isAdmin);
   const [helpOpen, setHelpOpen] = useState(false);
 
   return (
+    <InstanceFeaturesProvider initial={initialFeatures}>
     <DashboardCodeProvider>
       <Sidebar.Provider
         defaultOpen
@@ -52,10 +57,11 @@ export function DashboardShell({
             className="relative flex min-w-0 flex-1 flex-col overflow-auto bg-kumo-base p-6 text-kumo-default"
             aria-busy={isPending}
           >
-            <div className={isPending ? "hidden" : "flex min-h-0 min-w-0 flex-1 flex-col"} aria-hidden={isPending}>
-              {children}
-            </div>
-            {isPending ? <DashboardPageSkeleton /> : null}
+            {isPending ? (
+              <DashboardPageSkeleton />
+            ) : (
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+            )}
           </main>
         </div>
         {update ? (
@@ -63,5 +69,6 @@ export function DashboardShell({
         ) : null}
       </Sidebar.Provider>
     </DashboardCodeProvider>
+    </InstanceFeaturesProvider>
   );
 }

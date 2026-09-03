@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button, Dialog, Input, Loader, Tabs, Text, useKumoToastManager } from "@cloudflare/kumo";
+import { ConfirmDialog } from "@/components/kumo/confirm-dialog";
 import { CopyIcon, TrashIcon, XIcon } from "@phosphor-icons/react";
 import type { FileItem } from "@/lib/file-item";
 import { UserAvatar } from "./user-avatar";
@@ -28,12 +29,15 @@ export function ItemShareDialog({
   const [selectedUserId, setSelectedUserId] = useState("");
   const [sharing, setSharing] = useState(false);
   const [canManage, setCanManage] = useState(false);
+  const [shareToRevoke, setShareToRevoke] = useState<ShareRow | null>(null);
+  const [revoking, setRevoking] = useState(false);
 
   useEffect(() => {
     if (!item) return;
     setTab("members");
     setShareUrl(null);
     setSelectedUserId("");
+    setShareToRevoke(null);
     fetch("/api/workspace/members")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -98,11 +102,15 @@ export function ItemShareDialog({
     }
   }
 
-  async function handleRevoke(shareId: string) {
-    const res = await fetch(`/api/item-shares?id=${shareId}`, { method: "DELETE" });
+  async function handleRevoke() {
+    if (!shareToRevoke) return;
+    setRevoking(true);
+    const res = await fetch(`/api/item-shares?id=${shareToRevoke.id}`, { method: "DELETE" });
     if (res.ok) {
-      setShares((prev) => prev.filter((share) => share.id !== shareId));
+      setShares((prev) => prev.filter((share) => share.id !== shareToRevoke.id));
+      setShareToRevoke(null);
     }
+    setRevoking(false);
   }
 
   async function handleCopy() {
@@ -116,6 +124,7 @@ export function ItemShareDialog({
   );
 
   return (
+    <>
     <Dialog.Root open={item !== null} onOpenChange={(open) => !open && onClose()}>
       <Dialog className="p-6">
         <div className="mb-4 flex items-center justify-between gap-4">
@@ -189,7 +198,7 @@ export function ItemShareDialog({
                       size="sm"
                       icon={TrashIcon}
                       aria-label={t("revoke")}
-                      onClick={() => handleRevoke(share.id)}
+                      onClick={() => setShareToRevoke(share)}
                     />
                   </li>
                 ))}
@@ -215,5 +224,17 @@ export function ItemShareDialog({
         ) : null}
       </Dialog>
     </Dialog.Root>
+    <ConfirmDialog
+      open={shareToRevoke !== null}
+      onOpenChange={(open) => {
+        if (!open && !revoking) setShareToRevoke(null);
+      }}
+      title={t("revokeTitle")}
+      description={t("revokeDescription", { name: shareToRevoke?.name ?? "" })}
+      confirmLabel={t("revokeConfirm")}
+      onConfirm={handleRevoke}
+      isConfirming={revoking}
+    />
+    </>
   );
 }

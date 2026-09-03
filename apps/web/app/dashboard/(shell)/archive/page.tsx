@@ -6,10 +6,13 @@ import { Breadcrumbs, Button, Empty, LayerCard, Loader, Table, Text, useKumoToas
 import { ArchiveIcon, ArrowCounterClockwiseIcon, XCircleIcon } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { PageHeader } from "@/components/kumo/page-header";
+import { ConfirmDialog } from "@/components/kumo/confirm-dialog";
 import { TableCardSkeleton } from "@/components/shell/table-card-skeleton";
 import { usePageReady } from "@/components/shell/navigation-provider";
 import { UserAvatar } from "@/components/files/user-avatar";
 import { notifyStorageUpdated } from "@/lib/storage-events";
+import { FeatureDisabledState } from "@/components/shell/coming-soon";
+import { useInstanceFeatures } from "@/components/shell/instance-features";
 
 type ArchivedItem = {
   id: string;
@@ -26,11 +29,13 @@ type ArchivedItem = {
 export default function ArchivePage() {
   const toasts = useKumoToastManager();
   const { data: activeOrg } = authClient.useActiveOrganization();
+  const { features } = useInstanceFeatures();
   const [items, setItems] = useState<ArchivedItem[]>([]);
   const [loading, setLoading] = useState(true);
   usePageReady(!loading);
   const [actionId, setActionId] = useState<string | null>(null);
   const [canManage, setCanManage] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<ArchivedItem | null>(null);
   const t = useTranslations("archivePage");
   const tToasts = useTranslations("archivePage.toasts");
   const tBreadcrumbs = useTranslations("fileBreadcrumbs");
@@ -52,12 +57,16 @@ export default function ArchivePage() {
   }
 
   useEffect(() => {
+    if (!features.archiveEnabled) {
+      setLoading(false);
+      return;
+    }
     fetchArchive();
     fetch("/api/workspace/members")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setCanManage(Boolean(data?.canManage)))
       .catch(() => setCanManage(false));
-  }, [activeOrg?.id]);
+  }, [activeOrg?.id, features.archiveEnabled]);
 
   async function handleRestore(item: ArchivedItem) {
     setActionId(item.id);
@@ -81,15 +90,17 @@ export default function ArchivePage() {
     }
   }
 
-  async function handlePermanentDelete(item: ArchivedItem) {
-    setActionId(item.id);
+  async function handlePermanentDelete() {
+    if (!itemToDelete) return;
+    setActionId(itemToDelete.id);
     try {
-      const res = await fetch(`/api/archive?id=${item.id}&type=${item.type}`, { method: "DELETE" });
+      const res = await fetch(`/api/archive?id=${itemToDelete.id}&type=${itemToDelete.type}`, { method: "DELETE" });
       if (res.ok) {
         toasts.add({
           title: tToasts("permanentDeleteTitle"),
-          description: tToasts("permanentDeleteDescription", { name: item.name }),
+          description: tToasts("permanentDeleteDescription", { name: itemToDelete.name }),
         });
+        setItemToDelete(null);
         fetchArchive();
         notifyStorageUpdated();
       }
@@ -116,7 +127,9 @@ export default function ArchivePage() {
       />
 
       <div className="flex flex-1 flex-col gap-6 pt-6">
-        {loading ? (
+        {!features.archiveEnabled ? (
+          <FeatureDisabledState />
+        ) : loading ? (
           <TableCardSkeleton columns={[t("nameColumn"), t("ownerColumn"), t("archivedColumn"), " "]} />
         ) : items.length === 0 ? (
           <LayerCard className="p-0">
@@ -166,7 +179,7 @@ export default function ArchivePage() {
                           size="sm"
                           icon={XCircleIcon}
                           disabled={actionId === item.id}
-                          onClick={() => handlePermanentDelete(item)}
+                          onClick={() => setItemToDelete(item)}
                         >
                           {t("delete")}
                         </Button>
@@ -180,6 +193,18 @@ export default function ArchivePage() {
           </LayerCard>
         )}
       </div>
+
+      <ConfirmDialog
+        open={itemToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && actionId === null) setItemToDelete(null);
+        }}
+        title={t("deleteForeverTitle")}
+        description={t("deleteForeverDescription", { name: itemToDelete?.name ?? "" })}
+        confirmLabel={t("deleteForeverAction")}
+        onConfirm={handlePermanentDelete}
+        isConfirming={actionId !== null}
+      />
     </div>
   );
 }

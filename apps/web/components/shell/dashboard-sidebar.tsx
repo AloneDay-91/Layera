@@ -20,6 +20,8 @@ import { useNavigation } from "./navigation-provider";
 import type { DashboardUser } from "./dashboard-user";
 import type { AvailableUpdate } from "@/lib/updates";
 import { UpdateSidebarCard } from "./update-sidebar-card";
+import { useInstanceFeatures } from "./instance-features";
+import { canAccessAdmin } from "@/lib/auth-permissions";
 
 export function DashboardSidebar({
   initialUser,
@@ -34,11 +36,12 @@ export function DashboardSidebar({
 }) {
   const { displayedPath } = useNavigation();
   const t = useTranslations("sidebar");
-  const isAdmin = initialUser?.role === "admin";
+  const isAdmin = canAccessAdmin(initialUser?.role);
+  const { features } = useInstanceFeatures();
 
   const ORGANIZER_SUB_ITEMS = [
-    { href: "/dashboard/links", label: t("shareLinks") },
-    { href: "/dashboard/archive", label: t("archive") },
+    ...(features.publicSharingEnabled ? [{ href: "/dashboard/links", label: t("shareLinks") }] : []),
+    ...(features.archiveEnabled ? [{ href: "/dashboard/archive", label: t("archive") }] : []),
     { href: "/dashboard/trash", label: t("trash") },
   ];
 
@@ -59,9 +62,11 @@ export function DashboardSidebar({
             <Sidebar.MenuButton icon={ClockIcon} href="/dashboard/recent" active={displayedPath === "/dashboard/recent"}>
               {t("recent")}
             </Sidebar.MenuButton>
-            <Sidebar.MenuButton icon={StarIcon} href="/dashboard/favorites" active={displayedPath === "/dashboard/favorites"}>
-              {t("favorites")}
-            </Sidebar.MenuButton>
+            {features.favoritesEnabled ? (
+              <Sidebar.MenuButton icon={StarIcon} href="/dashboard/favorites" active={displayedPath === "/dashboard/favorites"}>
+                {t("favorites")}
+              </Sidebar.MenuButton>
+            ) : null}
             <Sidebar.MenuButton icon={ShareIcon} href="/dashboard/shared" active={displayedPath === "/dashboard/shared"}>
               {t("sharedWithMe")}
             </Sidebar.MenuButton>
@@ -96,13 +101,15 @@ export function DashboardSidebar({
                 </Sidebar.CollapsibleContent>
               </Sidebar.Collapsible>
             </Sidebar.MenuItem>
-            <Sidebar.MenuButton
-              icon={TagIcon}
-              href="/dashboard/tags"
-              active={displayedPath === "/dashboard/tags"}
-            >
-              {t("tags")}
-            </Sidebar.MenuButton>
+            {features.tagsEnabled ? (
+              <Sidebar.MenuButton
+                icon={TagIcon}
+                href="/dashboard/tags"
+                active={displayedPath === "/dashboard/tags"}
+              >
+                {t("tags")}
+              </Sidebar.MenuButton>
+            ) : null}
             <Sidebar.MenuButton
               icon={HardDriveIcon}
               href="/dashboard/storage"

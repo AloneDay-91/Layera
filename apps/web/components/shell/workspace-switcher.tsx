@@ -8,6 +8,7 @@ import { FoldersIcon, UsersThreeIcon, PlusIcon, CheckIcon, CaretUpDownIcon, XIco
 import { authClient } from "@/lib/auth-client";
 import { AppLogo } from "./app-logo";
 import type { DashboardUser } from "./dashboard-user";
+import { useInstanceFeatures } from "./instance-features";
 
 type WorkspaceOption = {
   id: string;
@@ -24,6 +25,7 @@ export function WorkspaceSwitcher({ initialUser }: { initialUser: DashboardUser 
   const { data: activeOrg } = authClient.useActiveOrganization();
   const t = useTranslations("workspaceSwitcher");
   const tToasts = useTranslations("workspaceSwitcher.toasts");
+  const { features } = useInstanceFeatures();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newOrgName, setNewOrgName] = useState("");
@@ -154,10 +156,14 @@ export function WorkspaceSwitcher({ initialUser }: { initialUser: DashboardUser 
               })}
             </DropdownMenu.Group>
 
-            <DropdownMenu.Separator />
-            <DropdownMenu.Item icon={PlusIcon} onClick={() => setIsModalOpen(true)}>
-              {t("newWorkspace")}
-            </DropdownMenu.Item>
+            {features.teamsEnabled ? (
+              <>
+                <DropdownMenu.Separator />
+                <DropdownMenu.Item icon={PlusIcon} onClick={() => setIsModalOpen(true)}>
+                  {t("newWorkspace")}
+                </DropdownMenu.Item>
+              </>
+            ) : null}
           </DropdownMenu.Content>
         </DropdownMenu>
       </div>
