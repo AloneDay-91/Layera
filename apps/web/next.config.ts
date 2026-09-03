@@ -22,7 +22,12 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "X-Frame-Options", value: "DENY" },
+          // Clickjacking protection comes from "frame-ancestors 'none'" in the
+          // middleware CSP, which modern browsers honour over this legacy
+          // header. DENY would also block the app from framing its own
+          // /api/files/content, which the PDF preview relies on when the bucket
+          // is private and reads go through the proxy.
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(self)",

@@ -1,20 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
 
-// The browser uploads straight to the object store with a presigned PUT when
-// S3_PUBLIC_ENDPOINT is configured, so that origin has to be reachable.
-function connectSources(): string {
+// When S3_PUBLIC_ENDPOINT is configured the browser talks to the object store
+// directly: presigned PUT for uploads, presigned GET for every preview. That
+// origin therefore has to be reachable as a fetch, image, media and frame
+// source, otherwise previews break.
+function storageOrigin(): string | null {
   const endpoint = process.env.S3_PUBLIC_ENDPOINT?.trim();
-  if (!endpoint) return "'self'";
+  if (!endpoint) return null;
   try {
-    return `'self' ${new URL(endpoint).origin}`;
+    return new URL(endpoint).origin;
   } catch {
-    return "'self'";
+    return null;
   }
 }
 
 function contentSecurityPolicy(nonce: string): string {
   const isDev = process.env.NODE_ENV !== "production";
+  const storage = storageOrigin();
+  const withStorage = (...sources: string[]) => [...sources, ...(storage ? [storage] : [])].join(" ");
+
   return [
     "default-src 'self'",
     // strict-dynamic lets the nonced Next.js bootstrap load its own chunks
@@ -24,12 +29,12 @@ function contentSecurityPolicy(nonce: string): string {
     // Tailwind and Kumo set inline style attributes; there is no nonce path
     // for those, and inline styles are not an script execution vector here.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
-    "media-src 'self' blob:",
+    `img-src ${withStorage("'self'", "data:", "blob:")}`,
+    `media-src ${withStorage("'self'", "blob:")}`,
     "font-src 'self' data:",
-    `connect-src ${connectSources()}${isDev ? " ws: wss:" : ""}`,
-    // PDF previews render /api/files/content in an iframe.
-    "frame-src 'self' blob:",
+    `connect-src ${withStorage("'self'")}${isDev ? " ws: wss:" : ""}`,
+    // PDF previews frame either the presigned URL or /api/files/content.
+    `frame-src ${withStorage("'self'", "blob:")}`,
     "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
@@ -40,8 +45,17 @@ function contentSecurityPolicy(nonce: string): string {
 }
 
 export function middleware(request: NextRequest) {
-  if (request.nextUrl.pathname.startsWith("/dashboard") && !getSessionCookie(request)) {
+  const { pathname } = request.nextUrl;
+
+  if (pathname.startsWith("/dashboard") && !getSessionCookie(request)) {
     return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  // The API renders no documents, and the routes that stream stored bytes ship
+  // a far stricter policy of their own ("default-src 'none'; sandbox"). Setting
+  // the document policy here would overwrite it.
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.next();
   }
 
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
