@@ -78,7 +78,11 @@ export default async function PublicSharePage({ params }: SharePageProps) {
   }
 
   if (sRecord.passwordHash) {
-    const unlocked = verifyShareUnlock(token, cookieStoreForLocale.get(shareUnlockCookieName(token))?.value);
+    const unlocked = verifyShareUnlock(
+      token,
+      sRecord.passwordHash,
+      cookieStoreForLocale.get(shareUnlockCookieName(token))?.value,
+    );
     if (!unlocked) {
       return <SharePasswordGate token={token} />;
     }

@@ -10,17 +10,19 @@ import { SIGNED_GET_EXPIRY_SECONDS } from "@/lib/services/signed-read";
 
 export async function GET(request: Request) {
   try {
-    const { allowed, retryAfter } = await checkRateLimit(`share-download:${getClientIp(request)}`, {
-      windowSeconds: 60,
-      max: 30,
-    });
-    if (!allowed) return rateLimitedResponse(retryAfter!);
-
     const { searchParams } = new URL(request.url);
     const token = searchParams.get("token");
 
     if (!token) {
       return NextResponse.json({ error: "Missing token" }, { status: 400 });
+    }
+
+    // Per-link as well as per-IP: without a trusted proxy every visitor looks
+    // like the same client, and one popular link must not exhaust the budget
+    // of every other link on the instance.
+    for (const key of [`share-download:${token}`, `share-download:${getClientIp(request)}`]) {
+      const { allowed, retryAfter } = await checkRateLimit(key, { windowSeconds: 60, max: 30 });
+      if (!allowed) return rateLimitedResponse(retryAfter!);
     }
 
     const [sRecord] = await db.select().from(shareLink).where(eq(shareLink.token, token)).limit(1);
@@ -36,7 +38,11 @@ export async function GET(request: Request) {
 
     if (sRecord.passwordHash) {
       const cookieStore = await cookies();
-      const unlocked = verifyShareUnlock(token, cookieStore.get(shareUnlockCookieName(token))?.value);
+      const unlocked = verifyShareUnlock(
+        token,
+        sRecord.passwordHash,
+        cookieStore.get(shareUnlockCookieName(token))?.value,
+      );
       if (!unlocked) {
         return NextResponse.json({ error: "Password required" }, { status: 401 });
       }

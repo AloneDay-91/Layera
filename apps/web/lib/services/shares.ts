@@ -1,6 +1,6 @@
 import { db, shareLink, file, folder, eq, and, isNull, inArray } from "@filecloud/db";
 import { randomBytes } from "crypto";
-import { hashSharePassword } from "@/lib/share-password";
+import { MAX_SHARE_PASSWORD_LENGTH, hashSharePassword } from "@/lib/share-password";
 import { ServiceError } from "./errors";
 import { assertOwner, type AuthorizedContext } from "./permissions";
 import { getFileInWorkspace, getFolderInWorkspace } from "./files";
@@ -46,6 +46,12 @@ export async function listShareLinks(ctx: AuthorizedContext) {
   });
 }
 
+function assertPasswordLength(password: string) {
+  if (password.length > MAX_SHARE_PASSWORD_LENGTH) {
+    throw new ServiceError(400, `Password must be at most ${MAX_SHARE_PASSWORD_LENGTH} characters`);
+  }
+}
+
 export async function createShareLink(
   ctx: AuthorizedContext,
   input: { itemId: string; itemType: "file" | "folder"; expiresAt?: string | null; password?: string },
@@ -81,6 +87,7 @@ export async function createShareLink(
   else values.folderId = input.itemId;
   if (input.expiresAt) values.expiresAt = new Date(input.expiresAt);
   if (typeof input.password === "string" && input.password.length > 0) {
+    assertPasswordLength(input.password);
     values.passwordHash = hashSharePassword(input.password);
   }
 
@@ -125,8 +132,12 @@ export async function updateShareLink(
     }
   }
   if (input.password !== undefined) {
-    updateData.passwordHash =
-      typeof input.password === "string" && input.password.length > 0 ? hashSharePassword(input.password) : null;
+    if (typeof input.password === "string" && input.password.length > 0) {
+      assertPasswordLength(input.password);
+      updateData.passwordHash = hashSharePassword(input.password);
+    } else {
+      updateData.passwordHash = null;
+    }
   }
 
   const [updated] = await db.update(shareLink).set(updateData).where(eq(shareLink.id, input.id)).returning();
