@@ -1,6 +1,4 @@
-import { DEV_VERSION, getAppVersion } from "./app-version";
-
-export { getAppVersion };
+import { DEV_VERSION } from "./app-version";
 
 export const DEFAULT_GITHUB_REPO = "AloneDay-91/filecloud-v2";
 export const COMPOSE_UPDATE_COMMAND =
