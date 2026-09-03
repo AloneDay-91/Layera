@@ -102,7 +102,11 @@ export function DashboardHeader({ initialUser }: { initialUser: DashboardUser | 
         {storage && (
           <Link
             href="/dashboard/storage"
-            onClick={() => markPending("/dashboard/storage")}
+            onClick={(event) => {
+              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              event.preventDefault();
+              markPending("/dashboard/storage");
+            }}
             className="hidden w-36 shrink-0 md:block **:text-xs!"
           >
             <Meter label={t("storageLabel")} value={usedPercent} customValue={formatFileSize(storage.usedBytes)} />

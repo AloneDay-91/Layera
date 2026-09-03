@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 
 type NavigationContextValue = {
   pathname: string;
@@ -12,7 +12,7 @@ type NavigationContextValue = {
 };
 
 const NavigationContext = createContext<NavigationContextValue | null>(null);
-const PENDING_TIMEOUT_MS = 8000;
+const PENDING_TIMEOUT_MS = 4000;
 
 export function normalizeAppPath(href: string) {
   const path = href.split("#")[0]?.split("?")[0] ?? href;
@@ -20,57 +20,100 @@ export function normalizeAppPath(href: string) {
   return path || "/";
 }
 
+function navigationTarget(href: string) {
+  return href.split("#")[0] || href;
+}
+
 export function NavigationProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [pendingPath, setPendingPath] = useState<string | null>(null);
-  const reachedDestRef = useRef(false);
-
-  const clearPending = useCallback(() => {
-    reachedDestRef.current = false;
-    setPendingPath(null);
-  }, []);
+  const intendedPathRef = useRef<string | null>(null);
+  const inflightRef = useRef(false);
+  const lastCorrectionRef = useRef<string | null>(null);
+  const pathnameRef = useRef(pathname);
+  const routerRef = useRef(router);
+  pathnameRef.current = pathname;
+  routerRef.current = router;
 
   const markPending = useCallback(
     (href: string) => {
       const next = normalizeAppPath(href);
-      if (next.startsWith("/dashboard") && next !== pathname) {
-        reachedDestRef.current = false;
-        setPendingPath(next);
+      if (!next.startsWith("/dashboard")) return;
+
+      const wasInflight = inflightRef.current;
+      const previousIntended = intendedPathRef.current;
+
+      intendedPathRef.current = next;
+      inflightRef.current = true;
+      lastCorrectionRef.current = null;
+
+      if (next === pathname) {
+        if (wasInflight && previousIntended && previousIntended !== next) {
+          setPendingPath(next);
+          router.push(navigationTarget(href));
+          return;
+        }
+        inflightRef.current = false;
+        setPendingPath(null);
+        return;
       }
+
+      setPendingPath(next);
+      router.push(navigationTarget(href));
     },
-    [pathname],
+    [pathname, router],
   );
 
   const notifyReady = useCallback((fromPath: string) => {
     const path = normalizeAppPath(fromPath);
-    setPendingPath((current) => {
-      if (current !== path) return current;
-      reachedDestRef.current = false;
-      return null;
-    });
+    if (intendedPathRef.current !== path) return;
+    inflightRef.current = false;
+    lastCorrectionRef.current = null;
+    setPendingPath((current) => (current === path ? null : current));
   }, []);
 
-  useEffect(() => {
-    if (!pendingPath) {
-      reachedDestRef.current = false;
+  useLayoutEffect(() => {
+    const intended = intendedPathRef.current;
+    if (!inflightRef.current || !intended) return;
+
+    if (pathname === intended) {
+      inflightRef.current = false;
+      lastCorrectionRef.current = null;
+      setPendingPath(null);
       return;
     }
-    if (pathname === pendingPath) {
-      reachedDestRef.current = true;
-      return;
-    }
-    if (reachedDestRef.current) {
-      clearPending();
-    }
-  }, [pathname, pendingPath, clearPending]);
+
+    if (!pathname.startsWith("/dashboard")) return;
+
+    const key = `${pathname}->${intended}`;
+    if (lastCorrectionRef.current === key) return;
+    lastCorrectionRef.current = key;
+    setPendingPath(intended);
+    routerRef.current.push(intended);
+  }, [pathname]);
 
   useEffect(() => {
     if (!pendingPath) return;
     const timer = window.setTimeout(() => {
-      clearPending();
+      inflightRef.current = false;
+      intendedPathRef.current = pathnameRef.current;
+      lastCorrectionRef.current = null;
+      setPendingPath(null);
     }, PENDING_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
-  }, [pendingPath, clearPending]);
+  }, [pendingPath]);
+
+  useEffect(() => {
+    function onPopState() {
+      inflightRef.current = false;
+      intendedPathRef.current = null;
+      lastCorrectionRef.current = null;
+      setPendingPath(null);
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   const value = useMemo<NavigationContextValue>(
     () => ({

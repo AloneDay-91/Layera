@@ -3,11 +3,10 @@
 import { forwardRef, type MouseEvent } from "react";
 import NextLink from "next/link";
 import { LinkProvider, type LinkComponentProps } from "@cloudflare/kumo";
-import { useNavigation } from "./navigation-provider";
+import { normalizeAppPath, useNavigation } from "./navigation-provider";
 
 function hrefToPath(href: LinkComponentProps["href"] | LinkComponentProps["to"]): string {
-  if (typeof href === "string") return href;
-  return "";
+  return typeof href === "string" ? href : "";
 }
 
 const AppLink = forwardRef<HTMLAnchorElement, LinkComponentProps>(({ to, href, onClick, ...rest }, ref) => {
@@ -15,13 +14,18 @@ const AppLink = forwardRef<HTMLAnchorElement, LinkComponentProps>(({ to, href, o
   const target = href ?? to ?? "#";
 
   function handleClick(event: MouseEvent<HTMLAnchorElement>) {
-    const unmodified =
-      event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && !event.defaultPrevented;
-    if (unmodified) {
-      const path = hrefToPath(target);
-      if (path) markPending(path);
-    }
     onClick?.(event);
+    if (event.defaultPrevented) return;
+
+    const unmodified = event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+    if (!unmodified) return;
+
+    const path = hrefToPath(target);
+    if (!path || path.startsWith("http") || path.startsWith("mailto:")) return;
+    if (!normalizeAppPath(path).startsWith("/dashboard")) return;
+
+    event.preventDefault();
+    markPending(path);
   }
 
   return <NextLink ref={ref} {...rest} prefetch={false} href={target} onClick={handleClick} />;
