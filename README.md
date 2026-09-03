@@ -61,7 +61,6 @@ specs.
 layera/
 ├── apps/
 │   ├── web/          # Next.js app
-│   ├── marketing/    # Public landing (isolated Next.js, port 3002)
 │   └── worker/       # Thumbnails, trash purge, expired upload cleanup
 ├── packages/
 │   ├── db/           # Drizzle schema, client, migrations
@@ -87,7 +86,6 @@ layera/
 7. `pnpm db:migrate`
 8. `pnpm dev` — app runs at `http://localhost:3000`.
 9. `pnpm dev:worker` — thumbnails and deferred deletion (optional in local `pnpm dev`; included in Docker Compose).
-10. `pnpm dev:marketing` — public landing at `http://localhost:3002` (no Postgres/MinIO).
 
 Or run everything in Docker: `docker compose up --build`. The `web` service runs on
 `http://localhost:3000`, the worker processes jobs, Postgres on `localhost:5432`, the MinIO S3 API on
@@ -201,11 +199,6 @@ Every push/PR also runs `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm bu
 published to `ghcr.io/aloneday-91/filecloud-v2`. `docker-compose.prod.yml`
 pulls that image for `web` and builds the worker locally, with a
 deliberately locked-down network:
-
-On Dokploy (`docker-compose.dokploy.yml`), `marketing` is a separate
-Next.js service (`apps/marketing/Dockerfile`). It does not use Postgres
-or MinIO. Attach a domain to that service in the Dokploy UI (container
-port `3000`).
 
 - **Postgres and MinIO publish no ports to the host at all** — only
   reachable from other containers on the compose network.
