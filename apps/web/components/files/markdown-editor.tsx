@@ -57,7 +57,15 @@ export function MarkdownEditor({ itemId, initialContent }: { itemId: string; ini
     }
   }
 
-  const html = DOMPurify.sanitize(marked.parse(value, { async: false }));
+  // Markdown files are shared between workspace members, so the preview
+  // renders content someone else wrote. Keep the sanitiser's allowances
+  // narrow: no raw <style>, no nested browsing contexts, and only http(s),
+  // mailto and data-image URLs.
+  const html = DOMPurify.sanitize(marked.parse(value, { async: false }), {
+    FORBID_TAGS: ["style", "iframe", "form", "object", "embed"],
+    FORBID_ATTR: ["style", "srcset", "formaction"],
+    ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|#|\/|data:image\/(?:png|jpeg|gif|webp);base64,)/i,
+  });
 
   return (
     <div className="flex flex-col gap-3">

@@ -131,6 +131,10 @@ function PdfPreview({ src, title }: { src: string; title: string }) {
       <iframe
         src={src}
         title={title}
+        // A PDF can carry its own scripts, and the viewer runs them. An empty
+        // sandbox keeps the document off the app's origin and out of its
+        // storage, while still letting the built-in viewer render it.
+        sandbox=""
         onLoad={() => setLoaded(true)}
         className={cn("h-full w-full rounded border-0", !loaded && "invisible")}
       />
