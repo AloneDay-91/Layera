@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { db, user, organization, workspaceMember, file } from "./client";
+import { db, user, organization, member, workspaceMember, file } from "./client";
 import { provisionOrganizationWorkspace, provisionPersonalWorkspace } from "./provisioning";
 import { requireWorkspaceAccess, requireWorkspaceMember, WorkspaceAccessError } from "./access";
 
@@ -67,6 +67,12 @@ describe("workspace access", () => {
     const orgId = `test-org-${randomUUID()}`;
     createdOrgIds.push(orgId);
     await db.insert(organization).values({ id: orgId, name: "Team", slug: orgId });
+    await db.insert(member).values({
+      id: `test-member-${randomUUID()}`,
+      organizationId: orgId,
+      userId: memberId,
+      role: "member",
+    });
 
     const provisioned = await provisionOrganizationWorkspace({
       organizationId: orgId,
@@ -89,6 +95,34 @@ describe("workspace access", () => {
       .where(eq(workspaceMember.userId, memberId));
     expect(row?.workspaceId).toBe(provisioned.workspaceId);
     expect(row?.role).toBe("member");
+  });
+
+  it("denies a session claiming an organization the user does not belong to", async () => {
+    const ownerId = await insertUser("Org Owner");
+    const outsiderId = await insertUser("Outsider");
+    createdUserIds.push(ownerId, outsiderId);
+
+    const orgId = `test-org-${randomUUID()}`;
+    createdOrgIds.push(orgId);
+    await db.insert(organization).values({ id: orgId, name: "Team", slug: orgId });
+
+    await provisionOrganizationWorkspace({ organizationId: orgId, name: "Team", ownerId });
+
+    await expect(
+      requireWorkspaceAccess({
+        actorId: outsiderId,
+        actorName: "Outsider",
+        activeOrganizationId: orgId,
+      }),
+    ).rejects.toSatisfy(
+      (error: unknown) => error instanceof WorkspaceAccessError && error.status === 403,
+    );
+
+    const rows = await db
+      .select()
+      .from(workspaceMember)
+      .where(eq(workspaceMember.userId, outsiderId));
+    expect(rows).toHaveLength(0);
   });
 
   it("does not leak files from one personal workspace into another", async () => {

@@ -97,7 +97,10 @@ export async function getInstanceSettings(): Promise<InstanceSettings> {
     return value;
   } catch (error) {
     console.error("[instance-settings] Failed to load settings, using defaults:", error);
-    return { ...DEFAULT_INSTANCE_SETTINGS };
+    // Fail closed on the one default that grants access: a transient read
+    // error must not reopen sign-ups on an instance that closed them. The
+    // first-user bootstrap in assertRegistrationAllowed still works.
+    return { ...DEFAULT_INSTANCE_SETTINGS, registrationEnabled: false };
   }
 }
 
