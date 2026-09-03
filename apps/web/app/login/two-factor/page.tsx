@@ -4,9 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { publicAuthClient } from "@/lib/public-auth-client";
-import { Button, Input, LayerCard, Link, Loader, Text, useKumoToastManager } from "@cloudflare/kumo";
-import { ArrowRightIcon, ShieldCheckIcon } from "@phosphor-icons/react";
-import { AppLogo } from "@/components/shell/app-logo";
+import { Banner, Button, Input, Link, Loader, Text, useKumoToastManager } from "@cloudflare/kumo";
+import { ArrowRightIcon, WarningCircleIcon } from "@phosphor-icons/react";
+import { AuthCard } from "@/components/shell/auth-card";
+import { OtpCodeField } from "@/components/shell/otp-code-field";
 
 export default function TwoFactorLoginPage() {
   const router = useRouter();
@@ -19,15 +20,18 @@ export default function TwoFactorLoginPage() {
 
   const t = useTranslations("twoFactorPage");
   const tLogin = useTranslations("loginPage");
+  const tShell = useTranslations("authShell");
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function verify(nextCode: string) {
+    const trimmed = nextCode.trim();
+    if (!trimmed || submitting) return;
+
     setSubmitting(true);
     setError(null);
 
     const { error: verifyError } = useBackupCode
-      ? await publicAuthClient.twoFactor.verifyBackupCode({ code })
-      : await publicAuthClient.twoFactor.verifyTotp({ code });
+      ? await publicAuthClient.twoFactor.verifyBackupCode({ code: trimmed })
+      : await publicAuthClient.twoFactor.verifyTotp({ code: trimmed });
 
     setSubmitting(false);
     if (verifyError) {
@@ -38,70 +42,84 @@ export default function TwoFactorLoginPage() {
     router.push("/dashboard");
   }
 
-  return (
-    <main className="flex min-h-screen items-center justify-center p-4">
-      <LayerCard className="w-full max-w-sm px-8 py-7">
-        <div className="mb-6 flex flex-col gap-1">
-          <div className="mb-1 flex items-center gap-2">
-            <AppLogo size={36} />
-            <Text as="h1" variant="heading1" DANGEROUS_className="font-logo">
-              Layera
-            </Text>
-          </div>
-          <div className="flex items-center gap-1.5 text-kumo-info">
-            <ShieldCheckIcon size={16} />
-            <Text variant="secondary">{t("title")}</Text>
-          </div>
-        </div>
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await verify(code);
+  }
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Text variant="secondary">
-            {useBackupCode ? t("instructionsBackup") : t("instructionsTotp")}
-          </Text>
+  const totpComplete = !useBackupCode && code.length === 6;
+  const canSubmit = useBackupCode ? code.trim().length > 0 : totpComplete;
+
+  return (
+    <AuthCard title={t("title")} description={useBackupCode ? t("instructionsBackup") : t("instructionsTotp")}>
+      <form onSubmit={handleSubmit} className="grid gap-4">
+        {useBackupCode ? (
           <Input
             size="sm"
             type="text"
-            label={useBackupCode ? t("backupCodeLabel") : t("verificationCodeLabel")}
+            label={t("backupCodeLabel")}
             value={code}
             onChange={(e) => setCode(e.target.value)}
             required
             autoFocus
-            placeholder={useBackupCode ? "xxxxxxxxxx" : "123456"}
-            maxLength={useBackupCode ? undefined : 6}
-            error={error ?? undefined}
+            placeholder="xxxxxxxxxx"
           />
-          <Button
-            variant="primary"
-            size="sm"
-            type="submit"
-            disabled={submitting || !code}
-            icon={ArrowRightIcon}
-            className="w-full justify-center"
-          >
-            {submitting ? (
-              <span className="flex items-center gap-1.5">
-                <Loader size="sm" /> {t("verifying")}
-              </span>
-            ) : (
-              t("validate")
-            )}
-          </Button>
-        </form>
-
-        <div className="mt-4 text-center">
-          <Link
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              setUseBackupCode((prev) => !prev);
-              setCode("");
+        ) : (
+          <OtpCodeField
+            label={t("verificationCodeLabel")}
+            value={code}
+            onValueChange={(next) => {
+              setCode(next);
               setError(null);
             }}
-          >
-            {useBackupCode ? t("useAuthenticatorApp") : t("useBackupCode")}
-          </Link>
-        </div>
-      </LayerCard>
-    </main>
+            onValueComplete={(next) => {
+              void verify(next);
+            }}
+            error={Boolean(error)}
+            autoFocus
+            digitAriaLabel={(current, total) => tShell("digitAria", { current, total })}
+          />
+        )}
+        {error ? (
+          <Banner
+            variant="error"
+            size="sm"
+            icon={<WarningCircleIcon weight="fill" />}
+            title={error}
+          />
+        ) : null}
+        <Button
+          variant="primary"
+          size="sm"
+          type="submit"
+          disabled={submitting || !canSubmit}
+          icon={submitting ? undefined : ArrowRightIcon}
+          className="w-full justify-center"
+        >
+          {submitting ? (
+            <>
+              <Loader size="sm" />
+              {t("verifying")}
+            </>
+          ) : (
+            t("validate")
+          )}
+        </Button>
+      </form>
+
+      <Text variant="secondary">
+        <Link
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            setUseBackupCode((prev) => !prev);
+            setCode("");
+            setError(null);
+          }}
+        >
+          {useBackupCode ? t("useAuthenticatorApp") : t("useBackupCode")}
+        </Link>
+      </Text>
+    </AuthCard>
   );
 }

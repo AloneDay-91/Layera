@@ -501,7 +501,35 @@
       "keyboardShortcutsFeature": "Keyboard Shortcuts"
     }
   },
+  "authShell": {
+    "badge": "Self-hosted",
+    "headline": "Your files, your servers",
+    "body": "A file manager for small teams that want to keep control of their data.",
+    "previewTitle": "Personal workspace",
+    "previewCount": "12 files",
+    "colName": "Name",
+    "colType": "Type",
+    "colSize": "Size",
+    "file1Name": "Quarterly report.pdf",
+    "file1Type": "PDF",
+    "file1Size": "2.4 MB",
+    "file2Name": "Brand assets",
+    "file2Type": "Folder",
+    "file2Size": "18 items",
+    "file3Name": "Notes.md",
+    "file3Type": "Markdown",
+    "file3Size": "12 KB",
+    "filesTitle": "Files and folders",
+    "filesBody": "Tree view, search, and previews.",
+    "shareTitle": "Public sharing",
+    "shareBody": "Expiring links, without exposing your storage.",
+    "teamTitle": "Team spaces",
+    "teamBody": "Personal workspaces and organizations.",
+    "footnote": "Built to be hosted on your own infrastructure.",
+    "digitAria": "Digit {current} of {total}"
+  },
   "loginPage": {
+    "title": "Sign in",
     "tagline": "Sign in to your files and workspaces",
     "continueWithGithub": "Continue with GitHub",
     "continueWithGoogle": "Continue with Google",
@@ -554,6 +582,7 @@
     }
   },
   "registerPage": {
+    "title": "Create an account",
     "tagline": "Set up your personal workspace",
     "nameLabel": "Name",
     "namePlaceholder": "Your name",

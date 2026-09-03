@@ -4,13 +4,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { publicAuthClient } from "@/lib/public-auth-client";
-import { Button, Input, LayerCard, Link, Loader, Text, useKumoToastManager } from "@cloudflare/kumo";
 import {
-  GithubLogoIcon,
-  GoogleLogoIcon,
-  UserPlusIcon,
-} from "@phosphor-icons/react";
-import { AppLogo } from "@/components/shell/app-logo";
+  Banner,
+  Button,
+  Input,
+  Link,
+  Loader,
+  SensitiveInput,
+  Text,
+  useKumoToastManager,
+} from "@cloudflare/kumo";
+import { UserPlusIcon, WarningCircleIcon } from "@phosphor-icons/react";
+import { AuthCard, AuthSocialButtons } from "@/components/shell/auth-card";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -63,123 +68,88 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-4">
-      <LayerCard className="w-full max-w-sm px-8 py-7">
-        {/* En-tête de marque */}
-        <div className="mb-6 flex flex-col gap-1 justify-center items-center">
-          <div className="flex items-center justify-center gap-2 mb-1">
-            <AppLogo size={36} />
-            <Text as="h1" variant="heading1" DANGEROUS_className="font-logo">
-              Layera
-            </Text>
-          </div>
-          <Text variant="secondary">{t("tagline")}</Text>
+    <AuthCard title={t("title")} description={t("tagline")}>
+      <div className="grid gap-5">
+        <AuthSocialButtons
+          githubLabel={tLogin("continueWithGithub")}
+          googleLabel={tLogin("continueWithGoogle")}
+          onGithub={() => handleSocialSignUp("github")}
+          onGoogle={() => handleSocialSignUp("google")}
+        />
+
+        <div className="grid gap-4">
+          <Text variant="secondary">{tLogin("orEmail")}</Text>
+
+          <form onSubmit={handleSubmit} className="grid gap-4">
+            <Input
+              size="sm"
+              label={t("nameLabel")}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              autoComplete="name"
+              placeholder={t("namePlaceholder")}
+            />
+            <Input
+              size="sm"
+              type="email"
+              label={tLogin("emailLabel")}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+              placeholder={tLogin("emailPlaceholder")}
+            />
+            <SensitiveInput
+              size="sm"
+              label={tLogin("passwordLabel")}
+              value={password}
+              onValueChange={setPassword}
+              required
+              autoComplete="new-password"
+              minLength={8}
+            />
+            <SensitiveInput
+              size="sm"
+              label={t("confirmPasswordLabel")}
+              value={confirmPassword}
+              onValueChange={setConfirmPassword}
+              required
+              autoComplete="new-password"
+              minLength={8}
+            />
+            {error ? (
+              <Banner
+                variant="error"
+                size="sm"
+                icon={<WarningCircleIcon weight="fill" />}
+                title={error}
+              />
+            ) : null}
+            <Button
+              variant="primary"
+              size="sm"
+              type="submit"
+              disabled={submitting}
+              icon={submitting ? undefined : UserPlusIcon}
+              className="w-full justify-center"
+            >
+              {submitting ? (
+                <>
+                  <Loader size="sm" />
+                  {t("creating")}
+                </>
+              ) : (
+                t("createAccount")
+              )}
+            </Button>
+          </form>
         </div>
 
-        {/* Inscription Sociale */}
-        <div className="flex flex-col gap-2 mb-6">
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={GithubLogoIcon}
-            onClick={() => handleSocialSignUp("github")}
-            className="w-full justify-center"
-          >
-            {tLogin("continueWithGithub")}
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={GoogleLogoIcon}
-            onClick={() => handleSocialSignUp("google")}
-            className="w-full justify-center"
-          >
-            {tLogin("continueWithGoogle")}
-          </Button>
-        </div>
-
-        {/* Séparateur */}
-        <div className="relative my-6 flex items-center justify-center">
-          <div className="w-full border-t border-kumo-line" />
-          <Text as="span" variant="secondary" DANGEROUS_className="absolute bg-kumo-base px-3">
-            {tLogin("orEmail")}
-          </Text>
-        </div>
-
-        {/* Formulaire classique */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Input
-            size="sm"
-            label={t("nameLabel")}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            autoComplete="name"
-            placeholder={t("namePlaceholder")}
-          />
-
-          <Input
-            size="sm"
-            type="email"
-            label={tLogin("emailLabel")}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-            placeholder={tLogin("emailPlaceholder")}
-          />
-
-          <Input
-            size="sm"
-            type="password"
-            label={tLogin("passwordLabel")}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={8}
-            required
-            autoComplete="new-password"
-            placeholder="••••••••"
-          />
-
-          <Input
-            size="sm"
-            type="password"
-            label={t("confirmPasswordLabel")}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            minLength={8}
-            required
-            autoComplete="new-password"
-            placeholder="••••••••"
-            error={error ?? undefined}
-          />
-
-          <Button
-            variant="primary"
-            size="sm"
-            type="submit"
-            disabled={submitting}
-            icon={UserPlusIcon}
-            className="mt-2 w-full justify-center"
-          >
-            {submitting ? (
-              <span className="flex items-center gap-1.5">
-                <Loader size="sm" /> {t("creating")}
-              </span>
-            ) : (
-              t("createAccount")
-            )}
-          </Button>
-        </form>
-
-        {/* Footer Redirection Login */}
-        <div className="mt-6 text-center">
-          <Text variant="secondary">
-            {t("alreadyHaveAccount")}{" "}
-            <Link href="/login">{t("signIn")}</Link>
-          </Text>
-        </div>
-      </LayerCard>
-    </main>
+        <Text variant="secondary">
+          {t("alreadyHaveAccount")} <Link href="/login">{t("signIn")}</Link>
+        </Text>
+      </div>
+    </AuthCard>
   );
 }
