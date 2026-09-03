@@ -1,4 +1,14 @@
 import { db, folder, file, eq, and, ne } from "@filecloud/db";
+import { isSafeItemName } from "@/lib/item-name";
+import { ServiceError } from "./errors";
+
+/** Trims and validates a user-supplied display name, rejecting unsafe ones. */
+export function assertSafeItemName(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) throw new ServiceError(400, "Name is required");
+  if (!isSafeItemName(trimmed)) throw new ServiceError(400, "This name contains invalid characters");
+  return trimmed;
+}
 
 export function nextAvailableName(baseName: string, taken: Set<string>, kind: "file" | "folder") {
   if (!taken.has(baseName)) return baseName;
