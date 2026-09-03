@@ -157,7 +157,7 @@ These seed the instance defaults. Admins can change them later in
 | -------- | ----- |
 | `GITHUB_REPO` | Override `AloneDay-91/filecloud-v2` for the admin update banner. |
 | `GITHUB_TOKEN` | Optional GitHub token to raise Releases API rate limits. |
-| `APP_VERSION` | Stamped into the web image from the git tag (`v1.1.0` → `1.1.0`). Local fallback is `0.0.0-dev`. |
+| `APP_VERSION` | Stamped into the web image from the git tag (`v1.1.0` → `1.1.0`). Dokploy source builds read the repo `VERSION` file when this is unset. Local fallback is `0.0.0-dev`. |
 
 #### Production Compose only
 

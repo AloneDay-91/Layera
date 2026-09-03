@@ -36,17 +36,24 @@ ENV S3_ENDPOINT=minio
 ENV S3_ACCESS_KEY=build-placeholder
 ENV S3_SECRET_KEY=build-placeholder
 ENV S3_BUCKET=filecloud
+# Must be declared in this stage — ARG is per-stage. GHCR passes the tag;
+# Dokploy source builds fall back to the repo VERSION file.
+ARG APP_VERSION=
+RUN if [ -n "$APP_VERSION" ]; then printf '%s\n' "$APP_VERSION" > VERSION; \
+    elif [ ! -s VERSION ]; then printf '%s\n' "0.0.0-dev" > VERSION; fi
+ENV APP_VERSION=$APP_VERSION
 RUN pnpm --filter @filecloud/web build
 
 # ---- runner: minimal production image ----
 FROM node:20-slim AS runner
 WORKDIR /repo
-ARG APP_VERSION=0.0.0-dev
+ARG APP_VERSION=
 ENV NODE_ENV=production
 ENV APP_VERSION=$APP_VERSION
 RUN addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nextjs
 
+COPY --from=builder /repo/VERSION ./VERSION
 COPY --from=builder /repo/apps/web/public ./apps/web/public
 COPY --from=builder --chown=nextjs:nodejs /repo/apps/web/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /repo/apps/web/.next/static ./apps/web/.next/static

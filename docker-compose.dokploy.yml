@@ -49,11 +49,13 @@ services:
       args:
         BETTER_AUTH_URL: ${BETTER_AUTH_URL}
         NEXT_PUBLIC_BETTER_AUTH_URL: ${NEXT_PUBLIC_BETTER_AUTH_URL}
+        APP_VERSION: ${APP_VERSION:-}
     restart: unless-stopped
     env_file:
       - .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      APP_VERSION: ${APP_VERSION:-}
     expose:
       - "3000"
     depends_on:

@@ -114,6 +114,9 @@ jobs:
             type=sha,format=short
             type=raw,value=${{ steps.ver.outputs.tag }}
 
+      - name: Stamp VERSION for the image
+        run: printf '%s\n' "${{ steps.ver.outputs.version }}" > VERSION
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
