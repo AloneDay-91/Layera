@@ -284,7 +284,9 @@ name — so a restored dump cannot be used to guess another tenant's objects.
 Three GitHub Actions workflows live under [`.github/workflows/`](.github/workflows/):
 
 - **`ci.yml`** — lint, typecheck, and build on every push/PR to `main`,
-  plus a `pnpm audit --audit-level=high` gate.
+  plus a `pnpm audit --audit-level=high` gate. Registry timeouts are
+  retried, then skipped, so a dead npm audit API does not block the rest
+  of CI; real high/critical findings still fail the job.
 - **`docker-publish.yml`** — once CI is green on `main` (or on a manual
   `vX.Y.Z` tag): bumps semver, pushes the tag, creates the GitHub Release,
   stamps `APP_VERSION`, and publishes `ghcr.io/aloneday-91/filecloud-v2`.

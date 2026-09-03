@@ -50,6 +50,7 @@ jobs:
   audit:
     name: pnpm audit
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
 
@@ -64,7 +65,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Audit (fails on high/critical)
-        run: pnpm audit --audit-level=high
+        run: bash scripts/ci-audit.sh
 
   test:
     name: Unit tests
