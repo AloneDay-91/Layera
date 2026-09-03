@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthorizedWorkspace } from "@/lib/services/permissions";
 import { jsonError } from "@/lib/services/http";
+import { assertFeatureEnabled } from "@/lib/services/instance-settings";
 import {
   listArchivedItems,
   archiveItemInWorkspace,
@@ -11,6 +12,7 @@ import {
 export async function GET() {
   try {
     const ctx = await getAuthorizedWorkspace();
+    await assertFeatureEnabled("archiveEnabled");
     const items = await listArchivedItems(ctx);
     return NextResponse.json({ items });
   } catch (error) {
@@ -21,6 +23,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthorizedWorkspace();
+    await assertFeatureEnabled("archiveEnabled");
     const body = await request.json();
     const { id, type, restore } = body;
     if (!id || (type !== "file" && type !== "folder")) {
@@ -40,6 +43,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const ctx = await getAuthorizedWorkspace();
+    await assertFeatureEnabled("archiveEnabled");
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     const type = searchParams.get("type");

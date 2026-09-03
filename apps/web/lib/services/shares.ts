@@ -5,6 +5,7 @@ import { ServiceError } from "./errors";
 import { assertOwner, type AuthorizedContext } from "./permissions";
 import { getFileInWorkspace, getFolderInWorkspace } from "./files";
 import { recordAudit } from "./audit";
+import { assertFeatureEnabled } from "./instance-settings";
 
 export async function listShareLinks(ctx: AuthorizedContext) {
   const shares = await db
@@ -50,6 +51,7 @@ export async function createShareLink(
   input: { itemId: string; itemType: "file" | "folder"; expiresAt?: string | null; password?: string },
 ) {
   assertOwner(ctx);
+  await assertFeatureEnabled("publicSharingEnabled");
   if (input.itemType === "file") {
     await getFileInWorkspace(ctx.workspace.id, input.itemId);
   } else {

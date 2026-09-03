@@ -3,10 +3,12 @@ import { db, tag, itemTag, TAG_COLORS, eq, and } from "@filecloud/db";
 import type { TagColor } from "@filecloud/db";
 import { getAuthorizedWorkspace } from "@/lib/services/permissions";
 import { jsonError } from "@/lib/services/http";
+import { assertFeatureEnabled } from "@/lib/services/instance-settings";
 
 export async function GET() {
   try {
     const ctx = await getAuthorizedWorkspace();
+    await assertFeatureEnabled("tagsEnabled");
     const wsRecord = ctx.workspace;
 
     const tags = await db.select().from(tag).where(eq(tag.workspaceId, wsRecord.id)).orderBy(tag.name);
@@ -31,6 +33,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthorizedWorkspace();
+    await assertFeatureEnabled("tagsEnabled");
     const { name, color } = await request.json();
     const trimmedName = typeof name === "string" ? name.trim() : "";
     if (!trimmedName) {
@@ -62,6 +65,7 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const ctx = await getAuthorizedWorkspace();
+    await assertFeatureEnabled("tagsEnabled");
     const { id, name, color } = await request.json();
     if (!id) {
       return NextResponse.json({ error: "Missing tag id" }, { status: 400 });
@@ -92,6 +96,7 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const ctx = await getAuthorizedWorkspace();
+    await assertFeatureEnabled("tagsEnabled");
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     if (!id) {

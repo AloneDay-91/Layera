@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { db, tag, itemTag, file, folder, eq, and } from "@filecloud/db";
 import { getAuthorizedWorkspace } from "@/lib/services/permissions";
 import { jsonError } from "@/lib/services/http";
+import { assertFeatureEnabled } from "@/lib/services/instance-settings";
 
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthorizedWorkspace();
+    await assertFeatureEnabled("tagsEnabled");
     const { tagId, itemId, itemType } = await request.json();
     if (!tagId || !itemId || (itemType !== "file" && itemType !== "folder")) {
       return NextResponse.json({ error: "Missing or invalid tagId/itemId/itemType" }, { status: 400 });
@@ -44,6 +46,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const ctx = await getAuthorizedWorkspace();
+    await assertFeatureEnabled("tagsEnabled");
     const { searchParams } = new URL(request.url);
     const tagId = searchParams.get("tagId");
     const itemId = searchParams.get("itemId");

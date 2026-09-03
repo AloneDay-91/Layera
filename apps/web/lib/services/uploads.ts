@@ -16,7 +16,8 @@ import type { AuthorizedContext } from "./permissions";
 import { resolveFolderInWorkspace } from "./files";
 import { uniqueFileName } from "./names";
 import { recordAudit } from "./audit";
-import { MAX_UPLOAD_BYTES, STORAGE_QUOTA_BYTES, workspaceUsedBytes } from "./quota";
+import { workspaceUsedBytes } from "./quota";
+import { getQuotaLimits } from "./instance-settings";
 import { mimeMatchesDeclaration } from "@/lib/mime-sniff";
 
 const PRESIGN_EXPIRY_SECONDS = 15 * 60;
@@ -42,12 +43,13 @@ export async function presignUpload(
   const name = input.name.trim();
   if (!name) throw new ServiceError(400, "Name is required");
   if (!Number.isFinite(input.size) || input.size < 0) throw new ServiceError(400, "Invalid size");
-  if (input.size > MAX_UPLOAD_BYTES) {
+  const { maxUploadBytes, quotaBytes } = await getQuotaLimits();
+  if (input.size > maxUploadBytes) {
     throw new ServiceError(413, "File is too large");
   }
 
   const used = await workspaceUsedBytes(ctx.workspace.id);
-  if (used + input.size > STORAGE_QUOTA_BYTES) {
+  if (used + input.size > quotaBytes) {
     throw new ServiceError(413, "Workspace storage quota exceeded");
   }
 
@@ -125,13 +127,14 @@ export async function completeUpload(ctx: AuthorizedContext, uploadId: string) {
   }
 
   const storedSize = typeof stat.size === "number" ? stat.size : row.size;
-  if (storedSize !== row.size || storedSize > MAX_UPLOAD_BYTES) {
+  const { maxUploadBytes, quotaBytes } = await getQuotaLimits();
+  if (storedSize !== row.size || storedSize > maxUploadBytes) {
     await abortUpload(row.id, row.storageKey);
     throw new ServiceError(400, "Uploaded size does not match");
   }
 
   const used = await workspaceUsedBytes(ctx.workspace.id);
-  if (used + storedSize > STORAGE_QUOTA_BYTES) {
+  if (used + storedSize > quotaBytes) {
     await abortUpload(row.id, row.storageKey);
     throw new ServiceError(413, "Workspace storage quota exceeded");
   }

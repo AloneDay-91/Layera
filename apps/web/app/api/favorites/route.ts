@@ -5,6 +5,7 @@ import { jsonError } from "@/lib/services/http";
 import { hiddenItemIds } from "@/lib/services/hidden";
 import { usersByIds } from "@/lib/services/users";
 import { previewUrlsByFileId } from "@/lib/services/signed-read";
+import { assertFeatureEnabled } from "@/lib/services/instance-settings";
 
 export async function GET() {
   try {
@@ -110,8 +111,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthorizedWorkspace();
+    await assertFeatureEnabled("favoritesEnabled");
     const wsRecord = ctx.workspace;
-
     const { id, type } = await request.json();
     if (!id || (type !== "file" && type !== "folder")) {
       return NextResponse.json({ error: "Missing or invalid id/type" }, { status: 400 });
@@ -152,6 +153,7 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const ctx = await getAuthorizedWorkspace();
+    await assertFeatureEnabled("favoritesEnabled");
     const { id, pinned } = await request.json();
     if (!id || typeof pinned !== "boolean") {
       return NextResponse.json({ error: "Missing id or pinned" }, { status: 400 });

@@ -28,6 +28,7 @@ import {
   fileNameTaken,
 } from "./names";
 import { hiddenItemIds, notHidden } from "./hidden";
+import { getTrashRetentionDays } from "./instance-settings";
 import { usersByIds } from "./users";
 import { collectItemStorageKeys, deleteStoredFiles } from "./storage-cleanup";
 import { assertFolderMoveAllowed, collectDescendantItems, folderBreadcrumbs } from "./tree";
@@ -410,7 +411,7 @@ export async function trashItemsInWorkspace(
   const alreadyTrashed = new Set(existing.map((row) => row.itemId));
 
   const purgeAt = new Date();
-  purgeAt.setDate(purgeAt.getDate() + 30);
+  purgeAt.setDate(purgeAt.getDate() + (await getTrashRetentionDays()));
 
   const rows = uniqueItems
     .filter((item) => !alreadyTrashed.has(item.id))

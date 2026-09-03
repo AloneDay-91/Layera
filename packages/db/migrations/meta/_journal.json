@@ -99,6 +99,13 @@
       "when": 1786900000000,
       "tag": "0013_listing_perf",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1788500000000,
+      "tag": "0014_instance_settings",
+      "breakpoints": true
     }
   ]
 }

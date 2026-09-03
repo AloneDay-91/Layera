@@ -3,6 +3,10 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin, emailOTP, multiSession, organization, twoFactor } from "better-auth/plugins";
 import { db, provisionPersonalWorkspace, provisionOrganizationWorkspace, eq } from "@filecloud/db";
 import * as schema from "@filecloud/db";
+import { APIError } from "better-auth/api";
+import { assertRegistrationAllowed } from "./services/instance-settings";
+import { ServiceError } from "./services/errors";
+import { ADMIN_PLUGIN_ROLES, ac, authRoles } from "./auth-permissions";
 
 const betterAuthSecret = process.env.BETTER_AUTH_SECRET;
 if (!betterAuthSecret) {
@@ -78,7 +82,12 @@ export const auth = betterAuth({
       : {}),
   },
   plugins: [
-    admin(),
+    admin({
+      ac,
+      roles: authRoles,
+      adminRoles: [...ADMIN_PLUGIN_ROLES],
+      defaultRole: "user",
+    }),
     twoFactor({
       issuer: "Layera",
     }),
@@ -117,6 +126,17 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
+        before: async (user) => {
+          try {
+            await assertRegistrationAllowed();
+          } catch (error) {
+            if (error instanceof ServiceError) {
+              throw new APIError("FORBIDDEN", { message: error.message });
+            }
+            throw error;
+          }
+          return { data: user };
+        },
         after: async (user) => {
           await provisionPersonalWorkspace({ userId: user.id, userName: user.name });
           await syncAdminRoleForUser(user.id);

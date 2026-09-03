@@ -11,3 +11,4 @@ export * from "./tag";
 export * from "./archive-item";
 export * from "./item-share";
 export * from "./job";
+export * from "./instance-settings";
