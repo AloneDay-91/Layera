@@ -16,15 +16,25 @@ import {
   ArchiveIcon,
 } from "@phosphor-icons/react";
 import { WorkspaceSwitcher } from "./workspace-switcher";
-import { authClient } from "@/lib/auth-client";
 import { useNavigation } from "./navigation-provider";
 import type { DashboardUser } from "./dashboard-user";
+import type { AvailableUpdate } from "@/lib/updates";
+import { UpdateSidebarCard } from "./update-sidebar-card";
 
-export function DashboardSidebar({ initialUser }: { initialUser: DashboardUser | null }) {
+export function DashboardSidebar({
+  initialUser,
+  availableUpdate,
+  onDismissUpdate,
+  onUpdateHelp,
+}: {
+  initialUser: DashboardUser | null;
+  availableUpdate: AvailableUpdate | null;
+  onDismissUpdate: () => void;
+  onUpdateHelp: () => void;
+}) {
   const { displayedPath } = useNavigation();
   const t = useTranslations("sidebar");
-  const { data: session } = authClient.useSession();
-  const isAdmin = (session?.user.role ?? initialUser?.role) === "admin";
+  const isAdmin = initialUser?.role === "admin";
 
   const ORGANIZER_SUB_ITEMS = [
     { href: "/dashboard/links", label: t("shareLinks") },
@@ -33,12 +43,13 @@ export function DashboardSidebar({ initialUser }: { initialUser: DashboardUser |
   ];
 
   return (
-    <Sidebar className="h-full flex flex-col">
+    <Sidebar className="flex h-full flex-col [&_[data-sidebar=content]]:flex [&_[data-sidebar=content]]:min-h-0 [&_[data-sidebar=content]]:flex-1 [&_[data-sidebar=content]]:flex-col">
       <Sidebar.Header>
-        <WorkspaceSwitcher />
+        <WorkspaceSwitcher initialUser={initialUser} />
       </Sidebar.Header>
 
-      <Sidebar.Content className="flex-1 space-y-2">
+      <Sidebar.Content className="flex min-h-0 flex-1 flex-col pb-0! [&>[role=presentation]]:pb-0! [&_[role=presentation]]:flex [&_[role=presentation]]:h-full [&_[role=presentation]]:min-h-0 [&_[role=presentation]]:flex-col">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
         {/* Navigation Principale */}
         <Sidebar.Group>
           <Sidebar.Menu>
@@ -124,6 +135,16 @@ export function DashboardSidebar({ initialUser }: { initialUser: DashboardUser |
             ) : null}
           </Sidebar.Menu>
         </Sidebar.Group>
+        </div>
+        {availableUpdate ? (
+          <div className="mt-auto shrink-0">
+            <UpdateSidebarCard
+              update={availableUpdate}
+              onDismiss={onDismissUpdate}
+              onHelp={onUpdateHelp}
+            />
+          </div>
+        ) : null}
       </Sidebar.Content>
 
       <Sidebar.Footer>

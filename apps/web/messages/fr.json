@@ -907,6 +907,18 @@
     "copiedDescription": "Colle-la sur l'hôte qui lance docker compose.",
     "copyErrorTitle": "Impossible de copier",
     "copyErrorDescription": "Copie la commande depuis les notes de version.",
-    "dismissAria": "Masquer jusqu'à la prochaine version"
+    "dismissAria": "Masquer jusqu'à la prochaine version",
+    "help": "Aide",
+    "cardTitle": "Mise à jour disponible",
+    "cardVersion": "Layera {latest}",
+    "close": "Fermer",
+    "dialogTitle": "Comment mettre à jour",
+    "dialogIntro": "Cette instance tourne en {current}. Layera {latest} est disponible.",
+    "step1Title": "Connecte-toi à l'hôte",
+    "step1": "Ouvre un terminal SSH sur la machine qui lance docker compose.",
+    "step2Title": "Tire l'image et redémarre",
+    "step2": "À la racine du dépôt, lance cette commande :",
+    "step3Title": "Lis les notes de version",
+    "step3": "Vérifie ce qui change avant ou après le redémarrage."
   }
 }

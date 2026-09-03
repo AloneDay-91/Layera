@@ -24,6 +24,8 @@ export type UpdatesResponse =
       composeCommand: string;
     };
 
+export type AvailableUpdate = Extract<UpdatesResponse, { upToDate: false }>;
+
 type CacheEntry = { at: number; release: GitHubRelease | null };
 
 let releaseCache: CacheEntry | null = null;

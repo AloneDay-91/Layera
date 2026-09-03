@@ -7,6 +7,7 @@ import { Button, Dialog, DropdownMenu, Input, Loader, useKumoToastManager } from
 import { FoldersIcon, UsersThreeIcon, PlusIcon, CheckIcon, CaretUpDownIcon, XIcon } from "@phosphor-icons/react";
 import { authClient } from "@/lib/auth-client";
 import { AppLogo } from "./app-logo";
+import type { DashboardUser } from "./dashboard-user";
 
 type WorkspaceOption = {
   id: string;
@@ -16,7 +17,7 @@ type WorkspaceOption = {
   role: string;
 };
 
-export function WorkspaceSwitcher() {
+export function WorkspaceSwitcher({ initialUser }: { initialUser: DashboardUser | null }) {
   const router = useRouter();
   const toasts = useKumoToastManager();
   const { data: session } = authClient.useSession();
@@ -42,10 +43,10 @@ export function WorkspaceSwitcher() {
     loadWorkspaces();
   }, [session?.user.id, activeOrg?.id]);
 
+  const userName = initialUser?.name ?? session?.user?.name;
   const activeWorkspaceName =
     workspaces.find((workspace) => workspace.id === activeWorkspaceId)?.name ??
-    activeOrg?.name ??
-    (session?.user?.name ? t("personalWorkspaceOf", { name: session.user.name }) : t("personalWorkspace"));
+    (userName ? t("personalWorkspaceOf", { name: userName }) : t("personalWorkspace"));
 
   async function handleSelectWorkspace(workspace: WorkspaceOption) {
     const res = await fetch("/api/workspaces", {

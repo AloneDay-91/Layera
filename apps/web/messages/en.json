@@ -907,6 +907,18 @@
     "copiedDescription": "Paste it on the host that runs docker compose.",
     "copyErrorTitle": "Could not copy",
     "copyErrorDescription": "Copy the command from the release notes instead.",
-    "dismissAria": "Dismiss until the next version"
+    "dismissAria": "Dismiss until the next version",
+    "help": "Help",
+    "cardTitle": "Update available",
+    "cardVersion": "Layera {latest}",
+    "close": "Close",
+    "dialogTitle": "How to update",
+    "dialogIntro": "This instance is running {current}. Layera {latest} is available.",
+    "step1Title": "Sign in to the host",
+    "step1": "Open an SSH terminal on the machine that runs docker compose.",
+    "step2Title": "Pull the image and restart",
+    "step2": "From the repository root, run this command:",
+    "step3Title": "Read the release notes",
+    "step3": "Check what changed before or after the restart."
   }
 }
