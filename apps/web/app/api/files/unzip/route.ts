@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import JSZip from "jszip";
 import { db, folder, file, eq, and } from "@filecloud/db";
 import { ensureBucket, objectStorageKey, putStoredObject, minioClient, S3_BUCKET } from "@filecloud/storage";
-import { getMimeTypeFromFilename } from "@/lib/mime";
+import { getMimeTypeFromFilename, isBlockedUploadMimeType } from "@/lib/mime";
+import { mimeMatchesDeclaration } from "@/lib/mime-sniff";
 import { checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 import { getAuthorizedWorkspace } from "@/lib/services/permissions";
 import { jsonError } from "@/lib/services/http";
+import { getQuotaLimits } from "@/lib/services/instance-settings";
 import { uniqueFolderName, uniqueFileName } from "@/lib/services/names";
+import { workspaceUsedBytes } from "@/lib/services/quota";
 import { sanitizeZipDirPath, sanitizeZipEntryPath } from "@/lib/zip-path";
 
 const MAX_ZIP_ENTRIES = 500;
@@ -16,6 +19,20 @@ const MAX_TOTAL_UNCOMPRESSED_BYTES = 512 * 1024 * 1024;
 function declaredUncompressedSize(entry: JSZip.JSZipObject): number {
   const data = (entry as { _data?: { uncompressedSize?: number } })._data;
   return typeof data?.uncompressedSize === "number" ? data.uncompressedSize : 0;
+}
+
+/**
+ * Extraction bypasses the upload denylist entirely, so an archive was a way to
+ * land HTML, SVG or scripts in storage with a matching content type. Anything
+ * blocked, or whose magic bytes contradict its extension, is stored as an
+ * opaque blob instead: the bytes survive but the download path can only ever
+ * serve them as an attachment.
+ */
+function safeExtractedMimeType(fileName: string, content: Buffer): string {
+  const mimeType = getMimeTypeFromFilename(fileName);
+  if (isBlockedUploadMimeType(mimeType)) return "application/octet-stream";
+  if (!mimeMatchesDeclaration(mimeType, content.subarray(0, 16))) return "application/octet-stream";
+  return mimeType;
 }
 
 export async function POST(request: Request) {
@@ -81,6 +98,16 @@ export async function POST(request: Request) {
       }
     }
 
+    // Extraction used to write files without consulting the quota at all,
+    // which made an archive the simplest way to push a workspace past its
+    // storage limit.
+    const { quotaBytes } = await getQuotaLimits();
+    const usedBytes = await workspaceUsedBytes(workspaceId);
+    if (usedBytes + declaredTotal > quotaBytes) {
+      return NextResponse.json({ error: "Workspace storage quota exceeded" }, { status: 413 });
+    }
+    const remainingQuotaBytes = quotaBytes - usedBytes;
+
     const baseFolderName = await uniqueFolderName(
       workspaceId,
       zipFile.folderId,
@@ -137,10 +164,15 @@ export async function POST(request: Request) {
       if (totalUncompressedBytes > MAX_TOTAL_UNCOMPRESSED_BYTES) {
         return NextResponse.json({ error: "Archive is too large once extracted" }, { status: 413 });
       }
+      // The declared sizes checked above come from the archive itself and can
+      // lie, so hold the real byte count against the quota as we go.
+      if (totalUncompressedBytes > remainingQuotaBytes) {
+        return NextResponse.json({ error: "Workspace storage quota exceeded" }, { status: 413 });
+      }
 
       const parentId = await ensureFolder(parsed.dirPath);
       const finalName = await uniqueFileName(workspaceId, parentId, parsed.fileName);
-      const mimeType = getMimeTypeFromFilename(finalName);
+      const mimeType = safeExtractedMimeType(finalName, content);
       const storageKey = objectStorageKey(workspaceId, crypto.randomUUID());
 
       await putStoredObject(storageKey, content, content.length, mimeType);

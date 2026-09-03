@@ -1,4 +1,4 @@
-import { db, file, folder, trashItem, eq, and, sql, ne, exists } from "@filecloud/db";
+import { db, file, folder, trashItem, upload, eq, and, gt, sql, ne, exists } from "@filecloud/db";
 import { notInTrash } from "./hidden";
 
 export const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES ?? 5 * 1024 * 1024 * 1024);
@@ -27,14 +27,40 @@ function asNumber(value: unknown): number {
   return 0;
 }
 
-export async function workspaceUsedBytes(workspaceId: string): Promise<number> {
-  const [row] = await db
-    .select({
-      used: sql<number>`coalesce(sum(${file.size}), 0)`,
-    })
-    .from(file)
-    .where(and(eq(file.workspaceId, workspaceId), notInTrash(file.id, workspaceId)));
-  return asNumber(row?.used);
+/**
+ * Counts stored files plus the bytes reserved by uploads that are still
+ * pending. Ignoring reservations let a caller presign hundreds of
+ * max-size uploads at once, each one passing the quota check against the same
+ * stale total, and fill the object store well past the workspace limit.
+ */
+export async function workspaceUsedBytes(
+  workspaceId: string,
+  options: { excludeUploadId?: string } = {},
+): Promise<number> {
+  const pendingFilters = [
+    eq(upload.workspaceId, workspaceId),
+    eq(upload.status, "pending"),
+    gt(upload.expiresAt, new Date()),
+  ];
+  // The upload being completed already holds a reservation; counting it twice
+  // would reject the very upload that fits.
+  if (options.excludeUploadId) pendingFilters.push(ne(upload.id, options.excludeUploadId));
+
+  const [storedRow, pendingRow] = await Promise.all([
+    db
+      .select({
+        used: sql<number>`coalesce(sum(${file.size}), 0)`,
+      })
+      .from(file)
+      .where(and(eq(file.workspaceId, workspaceId), notInTrash(file.id, workspaceId))),
+    db
+      .select({
+        reserved: sql<number>`coalesce(sum(${upload.size}), 0)`,
+      })
+      .from(upload)
+      .where(and(...pendingFilters)),
+  ]);
+  return asNumber(storedRow[0]?.used) + asNumber(pendingRow[0]?.reserved);
 }
 
 export async function workspaceStorageStats(workspaceId: string) {

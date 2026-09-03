@@ -14,22 +14,15 @@ import {
 import { ServiceError } from "./errors";
 import type { AuthorizedContext } from "./permissions";
 import { resolveFolderInWorkspace } from "./files";
-import { uniqueFileName } from "./names";
+import { assertSafeItemName, uniqueFileName } from "./names";
 import { recordAudit } from "./audit";
 import { workspaceUsedBytes } from "./quota";
 import { getQuotaLimits } from "./instance-settings";
 import { mimeMatchesDeclaration } from "@/lib/mime-sniff";
+import { isBlockedUploadMimeType, normalizeMimeType } from "@/lib/mime";
 
 const PRESIGN_EXPIRY_SECONDS = 15 * 60;
 const THUMBNAIL_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
-const BLOCKED_UPLOAD_MIME_TYPES = new Set([
-  "text/html",
-  "application/xhtml+xml",
-  "image/svg+xml",
-  "text/javascript",
-  "application/javascript",
-  "application/x-msdownload",
-]);
 
 async function abortUpload(uploadId: string, storageKey: string) {
   await db.update(upload).set({ status: "aborted" }).where(eq(upload.id, uploadId));
@@ -40,8 +33,7 @@ export async function presignUpload(
   ctx: AuthorizedContext,
   input: { name: string; size: number; mimeType?: string; folderId?: string | null },
 ) {
-  const name = input.name.trim();
-  if (!name) throw new ServiceError(400, "Name is required");
+  const name = assertSafeItemName(input.name);
   if (!Number.isFinite(input.size) || input.size < 0) throw new ServiceError(400, "Invalid size");
   const { maxUploadBytes, quotaBytes } = await getQuotaLimits();
   if (input.size > maxUploadBytes) {
@@ -54,8 +46,8 @@ export async function presignUpload(
   }
 
   const folder = await resolveFolderInWorkspace(ctx.workspace.id, input.folderId);
-  const mimeType = input.mimeType?.trim() || "application/octet-stream";
-  if (BLOCKED_UPLOAD_MIME_TYPES.has(mimeType)) {
+  const mimeType = normalizeMimeType(input.mimeType) || "application/octet-stream";
+  if (isBlockedUploadMimeType(mimeType)) {
     throw new ServiceError(415, "This file type is not allowed");
   }
   const objectId = randomUUID();
@@ -110,10 +102,13 @@ async function getOwnedPendingUpload(ctx: AuthorizedContext, uploadId: string) {
   return row;
 }
 
-export async function putUploadStream(ctx: AuthorizedContext, uploadId: string, body: Readable, declaredType?: string | null) {
+// The stored content type comes from the upload row the server created at
+// presign time, never from the PUT header, so a client cannot relabel its
+// object as something the download path would treat differently.
+export async function putUploadStream(ctx: AuthorizedContext, uploadId: string, body: Readable) {
   const row = await getOwnedPendingUpload(ctx, uploadId);
   await ensureBucket();
-  await putStoredObject(row.storageKey, body, row.size, declaredType || row.mimeType);
+  await putStoredObject(row.storageKey, body, row.size, row.mimeType);
 }
 
 export async function completeUpload(ctx: AuthorizedContext, uploadId: string) {
@@ -133,7 +128,7 @@ export async function completeUpload(ctx: AuthorizedContext, uploadId: string) {
     throw new ServiceError(400, "Uploaded size does not match");
   }
 
-  const used = await workspaceUsedBytes(ctx.workspace.id);
+  const used = await workspaceUsedBytes(ctx.workspace.id, { excludeUploadId: row.id });
   if (used + storedSize > quotaBytes) {
     await abortUpload(row.id, row.storageKey);
     throw new ServiceError(413, "Workspace storage quota exceeded");
