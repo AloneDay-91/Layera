@@ -143,7 +143,23 @@ export async function revokeItemShare(ctx: AuthorizedContext, shareId: string) {
 }
 
 export async function listSharedWithMe(actorId: string) {
-  const rows = await db.select().from(itemShare).where(eq(itemShare.sharedWithUserId, actorId));
+  const allRows = await db.select().from(itemShare).where(eq(itemShare.sharedWithUserId, actorId));
+  if (allRows.length === 0) return [];
+
+  // Membership can end through paths that never touch `item_share` — an
+  // organization removal, say — and a leftover row would still expose the
+  // item's name, size and owner here even though its bytes are refused.
+  const memberships = await db
+    .select({ workspaceId: workspaceMember.workspaceId })
+    .from(workspaceMember)
+    .where(
+      and(
+        eq(workspaceMember.userId, actorId),
+        inArray(workspaceMember.workspaceId, [...new Set(allRows.map((row) => row.workspaceId))]),
+      ),
+    );
+  const memberOf = new Set(memberships.map((row) => row.workspaceId));
+  const rows = allRows.filter((row) => memberOf.has(row.workspaceId));
   if (rows.length === 0) return [];
 
   const people = await usersByIds(rows.map((row) => row.sharedBy));
