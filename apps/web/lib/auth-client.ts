@@ -7,9 +7,10 @@ import {
   twoFactorClient,
 } from "better-auth/client/plugins";
 import { ac, authRoles } from "./auth-permissions";
+import { authClientBaseURL } from "./auth-client-base-url";
 
 export const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL ?? "http://localhost:3000",
+  baseURL: authClientBaseURL,
   plugins: [
     adminClient({
       ac,

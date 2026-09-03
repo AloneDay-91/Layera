@@ -24,10 +24,14 @@ COPY --from=deps /repo ./
 COPY . .
 # next build collects route modules; the db client throws if DATABASE_URL is
 # missing. These values are build-time only and are not copied into the runner.
+#
+# Deliberately absent: NEXT_PUBLIC_BETTER_AUTH_URL. Next inlines NEXT_PUBLIC_*
+# into the bundle it ships to browsers, so a placeholder set here would leave
+# every visitor's auth client pointing at their own localhost, whatever the
+# operator configures at runtime. Unset, the client uses the page's origin.
 ENV DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build
 ENV BETTER_AUTH_SECRET=build-placeholder-not-a-real-secret
 ENV BETTER_AUTH_URL=http://localhost:3000
-ENV NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
 ENV S3_ENDPOINT=minio
 ENV S3_ACCESS_KEY=build-placeholder
 ENV S3_SECRET_KEY=build-placeholder

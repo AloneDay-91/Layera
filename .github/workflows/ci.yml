@@ -42,7 +42,6 @@ jobs:
           DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
           BETTER_AUTH_SECRET: ci-build-placeholder-not-a-real-secret
           BETTER_AUTH_URL: http://localhost:3000
-          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3000
           S3_ENDPOINT: minio
           S3_ACCESS_KEY: ci-placeholder
           S3_SECRET_KEY: ci-placeholder
