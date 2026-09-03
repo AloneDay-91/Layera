@@ -51,6 +51,44 @@ export function isBlockedUploadMimeType(value: string | null | undefined): boole
   return BLOCKED_UPLOAD_MIME_TYPES.has(normalizeMimeType(value));
 }
 
+// SVG and HTML are deliberately absent — they can embed <script> and execute it
+// when the browser navigates straight to them, unlike raster, media and plain
+// text formats.
+const INLINE_SAFE_MIME_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
+  "video/mp4",
+  "video/webm",
+  "video/ogg",
+  "audio/mpeg",
+  "audio/ogg",
+  "audio/wav",
+  "audio/webm",
+  "text/plain",
+  "text/markdown",
+  "text/csv",
+  "application/json",
+]);
+
+/**
+ * How stored bytes may be served back, derived from the type the server
+ * recorded at upload time. Anything not known to be inert is relabelled and
+ * pushed to a download, so a file the browser would execute cannot be rendered
+ * from a URL of ours.
+ */
+export function serveAs(mimeType: string | null | undefined): {
+  contentType: string;
+  disposition: "inline" | "attachment";
+} {
+  const normalized = normalizeMimeType(mimeType);
+  return INLINE_SAFE_MIME_TYPES.has(normalized)
+    ? { contentType: normalized, disposition: "inline" }
+    : { contentType: "application/octet-stream", disposition: "attachment" };
+}
+
 export function getMimeTypeFromFilename(name: string): string {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
   return EXTENSION_TO_MIME[ext] ?? "application/octet-stream";
