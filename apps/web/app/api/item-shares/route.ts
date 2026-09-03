@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthorizedWorkspace, requireSession } from "@/lib/services/permissions";
 import { jsonError } from "@/lib/services/http";
+import { checkRateLimit, rateLimitedResponse } from "@/lib/rate-limit";
 import {
   createItemShare,
   listItemSharesForItem,
@@ -34,6 +35,14 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const ctx = await getAuthorizedWorkspace();
+    // Resolving a share target by email reports whether an account exists, so
+    // throttle it rather than leaving an enumeration oracle wide open.
+    const { allowed, retryAfter } = await checkRateLimit(`item-share:${ctx.actor.id}`, {
+      windowSeconds: 60,
+      max: 20,
+    });
+    if (!allowed) return rateLimitedResponse(retryAfter!);
+
     const { itemId, itemType, email, userId } = await request.json();
     if (!itemId || (itemType !== "file" && itemType !== "folder")) {
       return NextResponse.json({ error: "Missing or invalid item" }, { status: 400 });

@@ -15,26 +15,38 @@ async function isWorkspaceMember(workspaceId: string, userId: string) {
   return Boolean(row);
 }
 
-async function hasDirectShare(actorId: string, itemId: string) {
-  const [row] = await db
-    .select({ id: itemShare.id })
-    .from(itemShare)
-    .where(and(eq(itemShare.itemId, itemId), eq(itemShare.sharedWithUserId, actorId)))
-    .limit(1);
-  return Boolean(row);
+/**
+ * An internal share can only ever be granted to a member of the item's
+ * workspace, so membership is the authority here. Reading the `item_share`
+ * row on its own would keep serving files to someone who has since been
+ * removed from the workspace.
+ */
+export async function canAccessFile(actorId: string, fileRow: { id: string; workspaceId: string; folderId: string }) {
+  return isWorkspaceMember(fileRow.workspaceId, actorId);
 }
 
-export async function canAccessFile(actorId: string, fileRow: { id: string; workspaceId: string; folderId: string }) {
-  if (await isWorkspaceMember(fileRow.workspaceId, actorId)) return true;
-  if (await hasDirectShare(actorId, fileRow.id)) return true;
+/** Only the item's creator and the workspace owner control who it is shared with. */
+async function assertMayManageShares(ctx: AuthorizedContext, itemId: string) {
+  if (ctx.role === "owner") return;
 
-  let folderId: string | null = fileRow.folderId;
-  while (folderId) {
-    if (await hasDirectShare(actorId, folderId)) return true;
-    const [parent] = await db.select({ parentId: folder.parentId }).from(folder).where(eq(folder.id, folderId)).limit(1);
-    folderId = parent?.parentId ?? null;
+  const [fileRow] = await db
+    .select({ createdBy: file.createdBy })
+    .from(file)
+    .where(and(eq(file.id, itemId), eq(file.workspaceId, ctx.workspace.id)))
+    .limit(1);
+  const [folderRow] = fileRow
+    ? []
+    : await db
+        .select({ createdBy: folder.createdBy })
+        .from(folder)
+        .where(and(eq(folder.id, itemId), eq(folder.workspaceId, ctx.workspace.id)))
+        .limit(1);
+
+  const createdBy = (fileRow ?? folderRow)?.createdBy;
+  if (!createdBy) throw new ServiceError(404, "Item not found");
+  if (createdBy !== ctx.actor.id) {
+    throw new ServiceError(403, "Only the item owner can manage its shares");
   }
-  return false;
 }
 
 export async function createItemShare(
@@ -46,6 +58,7 @@ export async function createItemShare(
   } else {
     await getFolderInWorkspace(ctx.workspace.id, input.itemId);
   }
+  await assertMayManageShares(ctx, input.itemId);
 
   let targetUserId = input.userId?.trim() || null;
   if (!targetUserId && input.email) {
@@ -91,6 +104,7 @@ export async function createItemShare(
 }
 
 export async function listItemSharesForItem(ctx: AuthorizedContext, itemId: string) {
+  await assertMayManageShares(ctx, itemId);
   const rows = await db
     .select()
     .from(itemShare)
@@ -106,6 +120,14 @@ export async function listItemSharesForItem(ctx: AuthorizedContext, itemId: stri
 }
 
 export async function revokeItemShare(ctx: AuthorizedContext, shareId: string) {
+  const [existing] = await db
+    .select()
+    .from(itemShare)
+    .where(and(eq(itemShare.id, shareId), eq(itemShare.workspaceId, ctx.workspace.id)))
+    .limit(1);
+  if (!existing) throw new ServiceError(404, "Share not found");
+  await assertMayManageShares(ctx, existing.itemId);
+
   const [updated] = await db
     .delete(itemShare)
     .where(and(eq(itemShare.id, shareId), eq(itemShare.workspaceId, ctx.workspace.id)))
