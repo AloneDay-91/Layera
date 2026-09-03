@@ -39,7 +39,9 @@ specs.
 - **Previews** — images, PDF, video/audio (with HTTP range seeking),
   Markdown (sanitized), and syntax-highlighted code
 - **Sharing** — public links with optional password and expiration
-- **Admin** — quota-aware storage dashboard, superadmin user/workspace panel
+- **Admin** — instance settings (registration, sharing, teams, favorites,
+  tags, archive, quotas), staff roles (admin / moderator / support),
+  user/workspace panel, in-app update banner from GitHub Releases
 
 ## Tech stack
 
@@ -73,8 +75,10 @@ layera/
 ## Local development
 
 1. `cp .env.example .env` and fill in `BETTER_AUTH_SECRET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`.
+   Put your email in `ADMIN_EMAILS` so the first login is promoted to admin.
 2. `cp .env apps/web/.env`, then edit `apps/web/.env` so `DATABASE_URL` uses `localhost` instead of
-   `postgres` as the host (the `postgres` hostname only resolves inside the Docker network).
+   `postgres` as the host (the `postgres` hostname only resolves inside the Docker network). Also
+   set `S3_ENDPOINT=localhost` and `S3_PORT=9010` there — Compose publishes MinIO on `9010`.
 3. `pnpm install`
 4. `docker compose up -d postgres minio`
 5. Create the `filecloud` bucket in the MinIO console at `http://localhost:9011`.
@@ -89,24 +93,87 @@ Or run everything in Docker: `docker compose up --build`. The `web` service runs
 
 ### Environment variables
 
-| Variable                        | Required | Notes                                                        |
-| -------------------------------- | :------: | -------------------------------------------------------------- |
-| `DATABASE_URL`                   |    ✅    | Postgres connection string                                     |
-| `BETTER_AUTH_SECRET`             |    ✅    | `openssl rand -base64 32`                                        |
-| `BETTER_AUTH_URL`                |    ✅    | Base URL Better Auth issues cookies for                          |
-| `NEXT_PUBLIC_BETTER_AUTH_URL`    |    ✅    | Same URL, exposed to the browser                                 |
-| `S3_ENDPOINT` / `S3_PORT`        |    ✅    | MinIO hostname/port (`minio` / `9000` inside Docker)             |
-| `S3_ACCESS_KEY` / `S3_SECRET_KEY`|    ✅    | MinIO credentials                                                 |
-| `S3_BUCKET`                      |    ✅    | Bucket name (create it once in the MinIO console)                 |
-| `S3_PUBLIC_ENDPOINT`             |    –     | Browser-facing MinIO URL for presigned PUT/GET (e.g. `http://localhost:9010`) |
-| `MAX_UPLOAD_BYTES`               |    –     | Per-file upload cap (default 5 GiB)                               |
-| `MAX_WORKSPACE_BYTES`            |    –     | Workspace quota (default 10 GiB)                                  |
-| `GITHUB_CLIENT_ID` / `_SECRET`   |    –     | Enables "Continue with GitHub"                                    |
-| `GOOGLE_CLIENT_ID` / `_SECRET`   |    –     | Enables "Continue with Google"                                    |
-| `ADMIN_EMAILS`                   |    –     | Comma-separated emails auto-promoted to the admin role on login   |
-| `GITHUB_REPO`                    |    –     | Override `AloneDay-91/filecloud-v2` for the update banner         |
-| `GITHUB_TOKEN`                   |    –     | Optional token for GitHub Releases API rate limits                |
-| `LAYERA_VERSION`                 |    –     | Prod compose image tag (`v1.2.0`); defaults to `latest`           |
+Copy [`.env.example`](.env.example) for local Compose / `pnpm dev`, and
+[`.env.production.example`](.env.production.example) for production.
+`NODE_ENV`, `PORT`, `HOSTNAME`, and `APP_VERSION` are set by Next.js or
+the Docker image — you do not need them in `.env`.
+
+#### Core (required)
+
+| Variable | Notes |
+| -------- | ----- |
+| `DATABASE_URL` | Postgres connection string. Host `postgres` inside Compose; `localhost` for `pnpm dev`. |
+| `BETTER_AUTH_SECRET` | `openssl rand -base64 32`. Also signs public-share unlock cookies. |
+| `BETTER_AUTH_URL` | Public origin Better Auth issues cookies for. |
+| `NEXT_PUBLIC_BETTER_AUTH_URL` | Same origin, exposed to the browser. |
+
+#### Object storage (required)
+
+| Variable | Notes |
+| -------- | ----- |
+| `S3_ENDPOINT` | MinIO hostname (`minio` in Docker, `localhost` for `pnpm dev`). |
+| `S3_PORT` | MinIO API port (`9000` in Docker, `9010` on the host). |
+| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | MinIO root credentials. |
+| `S3_BUCKET` | Bucket name (create it once in the MinIO console). |
+| `S3_USE_SSL` | `true` if MinIO is reached over HTTPS. Default `false`. |
+| `S3_PUBLIC_ENDPOINT` | Browser-facing MinIO URL for presigned PUT/GET (e.g. `http://localhost:9010`). Leave unset in production if MinIO is not reverse-proxied — uploads then go through `/api/uploads/[id]`. |
+
+#### Quotas
+
+These seed the instance defaults. Admins can change them later in
+**Admin → Settings**.
+
+| Variable | Default | Notes |
+| -------- | ------- | ----- |
+| `MAX_UPLOAD_BYTES` | 5 GiB | Per-file upload cap. |
+| `MAX_WORKSPACE_BYTES` | 10 GiB | Default workspace quota. |
+
+#### Database pool
+
+| Variable | Default | Notes |
+| -------- | ------- | ----- |
+| `DATABASE_POOL_MAX` | `10` | `pg` pool size. |
+| `DATABASE_SSL` | `false` | Set `true` for managed Postgres that requires TLS. |
+| `DATABASE_SSL_REJECT_UNAUTHORIZED` | `true` | Only used when `DATABASE_SSL=true`. Set `false` for a private CA. |
+
+#### Auth and admin
+
+| Variable | Required | Notes |
+| -------- | :------: | ----- |
+| `ADMIN_EMAILS` | bootstrap | Comma-separated emails promoted to `admin` on every login. This is the only way to create the first admin. |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | – | Enables "Continue with GitHub". |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | – | Enables "Continue with Google". |
+
+#### Reverse proxy and cron
+
+| Variable | Default | Notes |
+| -------- | ------- | ----- |
+| `TRUST_PROXY` | `false` (`true` in production) | Trust `X-Forwarded-For` when the app sits behind nginx/Caddy. |
+| `CRON_SECRET` | unset | Protects `POST /api/cron/purge-trash` (`Authorization: Bearer …`). The Compose worker already purges trash; set this only if you call the HTTP route instead. |
+
+#### In-app updates
+
+| Variable | Notes |
+| -------- | ----- |
+| `GITHUB_REPO` | Override `AloneDay-91/filecloud-v2` for the admin update banner. |
+| `GITHUB_TOKEN` | Optional GitHub token to raise Releases API rate limits. |
+| `APP_VERSION` | Stamped into the web image from the git tag (`v1.1.0` → `1.1.0`). Local fallback is `0.0.0-dev`. |
+
+#### Production Compose only
+
+Set these in `.env.production`. `DATABASE_URL` is built from the Postgres
+trio — do not set it yourself.
+
+| Variable | Notes |
+| -------- | ----- |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Credentials for the Postgres container. |
+| `LAYERA_VERSION` | GHCR web image tag (`v1.1.0`). Defaults to `latest`. |
+
+#### Tooling (not needed to run the app)
+
+| Variable | Notes |
+| -------- | ----- |
+| `ANTHROPIC_API_KEY` | Used only by `pnpm --filter @filecloud/web i18n:translate`. |
 
 ## Testing
 
@@ -143,14 +210,14 @@ deliberately locked-down network:
   and `/api/files/content` so the bucket can stay private.
 
 ```bash
-cp .env.production.example .env.production   # fill in real secrets
+cp .env.production.example .env.production   # fill in secrets and ADMIN_EMAILS
 docker login ghcr.io                         # if the package is private
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
 `--build` compiles the worker on the host. `web` comes from GHCR (`latest`,
-or pin `LAYERA_VERSION=v1.2.0` in the compose env).
+or pin `LAYERA_VERSION=v1.1.0` in the compose env).
 
 ### Releases and in-app updates
 
@@ -158,8 +225,8 @@ Tag a semver release after `main` is green. That publishes a GitHub Release
 and the image `ghcr.io/aloneday-91/filecloud-v2:vX.Y.Z` (and updates `latest`):
 
 ```bash
-git tag v1.2.0
-git push origin v1.2.0
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
 Admins see a banner when a newer release exists. Update the running app:
