@@ -221,12 +221,22 @@ or pin `LAYERA_VERSION=v1.1.0` in the compose env).
 
 ### Releases and in-app updates
 
-Tag a semver release after `main` is green. That publishes a GitHub Release
-and the image `ghcr.io/aloneday-91/filecloud-v2:vX.Y.Z` (and updates `latest`):
+A green CI run on `main` cuts the next semver tag, creates a GitHub Release
+whose notes list every change since the previous tag, and publishes
+`ghcr.io/aloneday-91/filecloud-v2:vX.Y.Z` (and `latest`).
+The bump comes from commit messages since the last tag:
+
+| Commits since last tag | Bump |
+| ---------------------- | ---- |
+| `feat!:` or `BREAKING CHANGE` | major (`1.2.0` → `2.0.0`) |
+| `feat:` | minor (`1.2.0` → `1.3.0`) |
+| anything else (`fix:`, `docs:`, …) | patch (`1.2.0` → `1.2.1`) |
+
+You can still publish an exact version by hand:
 
 ```bash
-git tag v1.1.0
-git push origin v1.1.0
+git tag v1.2.0
+git push origin v1.2.0
 ```
 
 Admins see a banner when a newer release exists. Update the running app:
@@ -237,8 +247,7 @@ docker compose -f docker-compose.prod.yml up -d
 ```
 
 Optional `GITHUB_TOKEN` in `.env.production` raises the GitHub API rate limit
-used by the banner. A push to `main` without a tag does not create a release
-and does not trigger the banner.
+used by the banner.
 
 ## Backups and restore
 
@@ -276,10 +285,9 @@ Three GitHub Actions workflows live under [`.github/workflows/`](.github/workflo
 
 - **`ci.yml`** — lint, typecheck, and build on every push/PR to `main`,
   plus a `pnpm audit --audit-level=high` gate.
-- **`docker-publish.yml`** — once CI is green on `main`, or on a `vX.Y.Z`
-  tag: builds the production image, stamps `APP_VERSION`, and pushes it to
-  `ghcr.io/aloneday-91/filecloud-v2`. Tags also create the GitHub Release
-  that feeds the admin update banner.
+- **`docker-publish.yml`** — once CI is green on `main` (or on a manual
+  `vX.Y.Z` tag): bumps semver, pushes the tag, creates the GitHub Release,
+  stamps `APP_VERSION`, and publishes `ghcr.io/aloneday-91/filecloud-v2`.
 - **`dependency-audit-fix.yml`** — weekly `pnpm audit --fix`, re-verified
   against lint/typecheck/build, opened as a PR for review (never pushed
   directly to `main`).

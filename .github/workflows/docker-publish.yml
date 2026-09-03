@@ -1,7 +1,8 @@
 name: Publish Docker image
 
-# Image on main: after CI is green. Image + GitHub Release on vX.Y.Z tags
-# (the tagged commit already passed CI on main).
+# After CI is green on main: bump semver, tag, GitHub Release, and image.
+# A manual `git push origin vX.Y.Z` still publishes that exact version.
+# Tag pushes made with GITHUB_TOKEN do not start a second run.
 on:
   workflow_run:
     workflows: ["CI"]
@@ -28,6 +29,7 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
+          fetch-tags: true
 
       - uses: docker/setup-buildx-action@v3
 
@@ -38,19 +40,69 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Resolve APP_VERSION
+      - name: Resolve or cut version
         id: ver
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" == v* ]]; then
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-          else
-            TAG=$(git describe --tags --match 'v*.*.*' --abbrev=0 2>/dev/null || true)
-            if [[ -n "$TAG" ]]; then
-              echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-            else
-              echo "version=0.0.0-dev" >> "$GITHUB_OUTPUT"
-            fi
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "push" && "$REF_TYPE" == "tag" && "$REF_NAME" == v* ]]; then
+            prev=$(git tag -l 'v*.*.*' --sort=-v:refname | grep -vx "$REF_NAME" | head -n1 || true)
+            echo "version=${REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "tag=$REF_NAME" >> "$GITHUB_OUTPUT"
+            echo "previous_tag=$prev" >> "$GITHUB_OUTPUT"
+            echo "cut_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          if exact=$(git describe --tags --exact-match --match 'v*.*.*' HEAD 2>/dev/null); then
+            echo "version=${exact#v}" >> "$GITHUB_OUTPUT"
+            echo "tag=$exact" >> "$GITHUB_OUTPUT"
+            echo "previous_tag=" >> "$GITHUB_OUTPUT"
+            echo "cut_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          last=$(git tag -l 'v*.*.*' --sort=-v:refname | head -n1 || true)
+          if [[ -z "$last" ]]; then
+            next="1.0.0"
+          else
+            ver=${last#v}
+            IFS=. read -r major minor patch <<< "$ver"
+            log=$(git log "$last"..HEAD --pretty=%s)
+            if [[ -z "$log" ]]; then
+              echo "version=$ver" >> "$GITHUB_OUTPUT"
+              echo "tag=$last" >> "$GITHUB_OUTPUT"
+              echo "previous_tag=" >> "$GITHUB_OUTPUT"
+              echo "cut_release=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            bump=patch
+            if printf '%s\n' "$log" | grep -qiE 'BREAKING CHANGE|^[a-z]+(\([^)]+\))?!:'; then
+              bump=major
+            elif printf '%s\n' "$log" | grep -qiE '^feat(\([^)]+\))?:'; then
+              bump=minor
+            fi
+            case "$bump" in
+              major) next="$((major + 1)).0.0" ;;
+              minor) next="${major}.$((minor + 1)).0" ;;
+              *) next="${major}.${minor}.$((patch + 1))" ;;
+            esac
+          fi
+
+          tag="v$next"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "$tag"
+          git push origin "$tag"
+
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "previous_tag=$last" >> "$GITHUB_OUTPUT"
+          echo "cut_release=true" >> "$GITHUB_OUTPUT"
 
       - name: Extract metadata (tags, labels)
         id: meta
@@ -60,7 +112,7 @@ jobs:
           tags: |
             type=raw,value=latest
             type=sha,format=short
-            type=raw,value=${{ github.ref_name }},enable=${{ github.ref_type == 'tag' }}
+            type=raw,value=${{ steps.ver.outputs.tag }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -75,8 +127,56 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Build release notes
+        id: notes
+        if: steps.ver.outputs.cut_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          PREV: ${{ steps.ver.outputs.previous_tag }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          range="${PREV:+$PREV..}HEAD"
+          {
+            if [[ -n "$PREV" ]]; then
+              echo "## Changes since $PREV"
+            else
+              echo "## Changes"
+            fi
+            echo
+            added=$(git log $range --pretty='- %s (%h)' --grep='^feat' --regexp-ignore-case || true)
+            fixed=$(git log $range --pretty='- %s (%h)' --grep='^fix' --regexp-ignore-case || true)
+            other=$(git log $range --pretty='- %s (%h)' -E --grep='^feat|^fix' --regexp-ignore-case --invert-grep || true)
+            if [[ -n "$added" ]]; then
+              echo "### Features"
+              echo "$added"
+              echo
+            fi
+            if [[ -n "$fixed" ]]; then
+              echo "### Fixes"
+              echo "$fixed"
+              echo
+            fi
+            if [[ -n "$other" ]]; then
+              echo "### Other"
+              echo "$other"
+              echo
+            fi
+          } > "$RUNNER_TEMP/changelog.md"
+
+          payload=$(jq -n --arg tag "$TAG" --arg target "$SHA" --arg prev "$PREV" \
+            'if $prev != "" then {tag_name:$tag,target_commitish:$target,previous_tag_name:$prev} else {tag_name:$tag,target_commitish:$target} end')
+          if notes=$(gh api "repos/$REPO/releases/generate-notes" --input - <<< "$payload" | jq -r '.body // empty'); then
+            if [[ -n "$notes" ]]; then
+              printf '\n%s\n' "$notes" >> "$RUNNER_TEMP/changelog.md"
+            fi
+          fi
+
       - name: Create GitHub Release
-        if: github.ref_type == 'tag'
+        if: steps.ver.outputs.cut_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          tag_name: ${{ steps.ver.outputs.tag }}
+          body_path: ${{ runner.temp }}/changelog.md
