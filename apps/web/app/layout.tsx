@@ -33,7 +33,7 @@ export default async function RootLayout({
   );
 
   return (
-    <html lang={locale} data-mode="light" className="h-full">
+    <html lang={locale} data-mode="light" className="h-full" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-kumo-base text-kumo-default h-full`}
       >

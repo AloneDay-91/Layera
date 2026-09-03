@@ -65,6 +65,7 @@ export function AccountSwitcher({ initialUser }: { initialUser: DashboardUser | 
   const [deviceSessions, setDeviceSessions] = useState<DeviceSession[]>([]);
   const [switchingToken, setSwitchingToken] = useState<string | null>(null);
   const [revokingToken, setRevokingToken] = useState<string | null>(null);
+  const [prefsReady, setPrefsReady] = useState(false);
 
   const loadDeviceSessions = useCallback(async () => {
     const { data } = await authClient.multiSession.listDeviceSessions();
@@ -74,6 +75,10 @@ export function AccountSwitcher({ initialUser }: { initialUser: DashboardUser | 
   useEffect(() => {
     loadDeviceSessions();
   }, [loadDeviceSessions]);
+
+  useEffect(() => {
+    setPrefsReady(true);
+  }, []);
 
   async function handleSwitchAccount(sessionToken: string) {
     setSwitchingToken(sessionToken);
@@ -121,11 +126,11 @@ export function AccountSwitcher({ initialUser }: { initialUser: DashboardUser | 
     });
   }
 
-  const user = session?.user ?? initialUser;
-  const userName = user?.name ?? t("defaultUserName");
-  const userEmail = user?.email ?? "utilisateur@filecloud.io";
-  const userImage = user?.image ?? null;
-  const activeWorkspaceLabel = activeOrg ? activeOrg.name : t("personalWorkspace");
+  const userName = initialUser?.name ?? session?.user?.name ?? t("defaultUserName");
+  const userEmail = initialUser?.email ?? session?.user?.email ?? "utilisateur@filecloud.io";
+  const userImage = initialUser?.image ?? session?.user?.image ?? null;
+  const activeWorkspaceLabel =
+    prefsReady && activeOrg ? activeOrg.name : t("personalWorkspace");
 
   const themeIcon = mode === "dark" ? MoonIcon : mode === "system" ? DesktopIcon : SunIcon;
 
