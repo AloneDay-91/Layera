@@ -5,6 +5,9 @@ import { useEffect, useState } from "react";
 export type PublicInstance = {
   instanceName: string;
   registrationEnabled: boolean;
+  version: string;
+  githubEnabled: boolean;
+  googleEnabled: boolean;
   loaded: boolean;
 };
 
@@ -14,6 +17,9 @@ export function usePublicInstance(): PublicInstance {
   const [state, setState] = useState<PublicInstance>({
     instanceName: DEFAULT_NAME,
     registrationEnabled: true,
+    version: "",
+    githubEnabled: false,
+    googleEnabled: false,
     loaded: false,
   });
 
@@ -30,6 +36,9 @@ export function usePublicInstance(): PublicInstance {
         setState({
           instanceName: name || DEFAULT_NAME,
           registrationEnabled: data.registrationEnabled !== false,
+          version: typeof data.version === "string" ? data.version : "",
+          githubEnabled: data.githubEnabled === true,
+          googleEnabled: data.googleEnabled === true,
           loaded: true,
         });
       })

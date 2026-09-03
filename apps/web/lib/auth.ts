@@ -5,9 +5,23 @@ import { db, provisionPersonalWorkspace, provisionOrganizationWorkspace, eq, sql
 import * as schema from "@filecloud/db";
 import { APIError } from "better-auth/api";
 import { assertRegistrationAllowed } from "./services/instance-settings";
+import { peekSocialProvider } from "./services/social-providers";
 import { ServiceError } from "./services/errors";
 import { ADMIN_PLUGIN_ROLES, ac, authRoles } from "./auth-permissions";
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "./password-policy";
+
+const SOCIAL_PLACEHOLDER = "unconfigured";
+
+function socialProviderOptions(id: "github" | "google") {
+  return {
+    get clientId() {
+      return peekSocialProvider(id).clientId || SOCIAL_PLACEHOLDER;
+    },
+    get clientSecret() {
+      return peekSocialProvider(id).clientSecret || SOCIAL_PLACEHOLDER;
+    },
+  };
+}
 
 const betterAuthSecret = process.env.BETTER_AUTH_SECRET;
 if (!betterAuthSecret) {
@@ -57,11 +71,6 @@ async function syncAdminRoleForUser(userId: string) {
   await db.update(schema.user).set({ role: "admin" }).where(eq(schema.user.id, userId));
 }
 
-const githubClientId = process.env.GITHUB_CLIENT_ID;
-const githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
-const googleClientId = process.env.GOOGLE_CLIENT_ID;
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -104,12 +113,8 @@ export const auth = betterAuth({
     },
   },
   socialProviders: {
-    ...(githubClientId && githubClientSecret
-      ? { github: { clientId: githubClientId, clientSecret: githubClientSecret } }
-      : {}),
-    ...(googleClientId && googleClientSecret
-      ? { google: { clientId: googleClientId, clientSecret: googleClientSecret } }
-      : {}),
+    github: socialProviderOptions("github"),
+    google: socialProviderOptions("google"),
   },
   plugins: [
     admin({

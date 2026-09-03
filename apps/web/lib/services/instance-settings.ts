@@ -1,5 +1,7 @@
 import { db, instanceSettings, INSTANCE_SETTINGS_ID, user, eq, sql } from "@filecloud/db";
+import { getAppVersion } from "@/lib/app-version";
 import { ServiceError } from "./errors";
+import { getSocialProvidersPublic, invalidateSocialProviderCache } from "./social-providers";
 
 const GIB = 1024 ** 3;
 const MIN_QUOTA_BYTES = Math.round(0.1 * GIB);
@@ -45,9 +47,19 @@ export type InstanceFeature = keyof Pick<
 export type PublicInstanceSettings = {
   instanceName: string;
   registrationEnabled: boolean;
+  version: string;
+  githubEnabled: boolean;
+  googleEnabled: boolean;
 };
 
-export type InstanceSettingsPatch = Partial<InstanceSettings>;
+export type InstanceSettingsPatch = Partial<InstanceSettings> & {
+  githubEnabled?: boolean;
+  githubClientId?: string;
+  githubClientSecret?: string;
+  googleEnabled?: boolean;
+  googleClientId?: string;
+  googleClientSecret?: string;
+};
 
 type CacheEntry = { at: number; value: InstanceSettings };
 
@@ -105,10 +117,13 @@ export async function getInstanceSettings(): Promise<InstanceSettings> {
 }
 
 export async function getPublicInstanceSettings(): Promise<PublicInstanceSettings> {
-  const settings = await getInstanceSettings();
+  const [settings, social] = await Promise.all([getInstanceSettings(), getSocialProvidersPublic()]);
   return {
     instanceName: settings.instanceName,
     registrationEnabled: settings.registrationEnabled,
+    version: getAppVersion(),
+    githubEnabled: social.github.enabled,
+    googleEnabled: social.google.enabled,
   };
 }
 
@@ -175,6 +190,16 @@ function parseDays(value: unknown, fallback: number): number {
   return parsed;
 }
 
+function parseOptionalText(value: unknown, fallback: string, { allowEmpty }: { allowEmpty: boolean }): string {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  if (!trimmed) return allowEmpty ? "" : fallback;
+  if (trimmed.length > 256) {
+    throw new ServiceError(400, "OAuth credential is too long");
+  }
+  return trimmed;
+}
+
 export async function updateInstanceSettings(
   patch: InstanceSettingsPatch,
   actorId: string,
@@ -209,6 +234,42 @@ export async function updateInstanceSettings(
     throw new ServiceError(400, "Max upload size cannot exceed the workspace quota");
   }
 
+  const [stored] = await db
+    .select({
+      githubEnabled: instanceSettings.githubEnabled,
+      githubClientId: instanceSettings.githubClientId,
+      githubClientSecret: instanceSettings.githubClientSecret,
+      googleEnabled: instanceSettings.googleEnabled,
+      googleClientId: instanceSettings.googleClientId,
+      googleClientSecret: instanceSettings.googleClientSecret,
+    })
+    .from(instanceSettings)
+    .where(eq(instanceSettings.id, INSTANCE_SETTINGS_ID))
+    .limit(1);
+
+  const githubClientId = parseOptionalText(patch.githubClientId, stored?.githubClientId ?? "", { allowEmpty: true });
+  const googleClientId = parseOptionalText(patch.googleClientId, stored?.googleClientId ?? "", { allowEmpty: true });
+  const githubClientSecret = parseOptionalText(patch.githubClientSecret, stored?.githubClientSecret ?? "", {
+    allowEmpty: false,
+  });
+  const googleClientSecret = parseOptionalText(patch.googleClientSecret, stored?.googleClientSecret ?? "", {
+    allowEmpty: false,
+  });
+  const githubReady = Boolean(
+    (githubClientId && githubClientSecret) || (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
+  );
+  const googleReady = Boolean(
+    (googleClientId && googleClientSecret) || (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+  );
+  if (patch.githubEnabled === true && !githubReady) {
+    throw new ServiceError(400, "GitHub sign-in needs a client ID and secret");
+  }
+  if (patch.googleEnabled === true && !googleReady) {
+    throw new ServiceError(400, "Google sign-in needs a client ID and secret");
+  }
+  const githubEnabled = githubReady && parseBoolean(patch.githubEnabled, stored?.githubEnabled ?? true);
+  const googleEnabled = googleReady && parseBoolean(patch.googleEnabled, stored?.googleEnabled ?? true);
+
   const values = {
     id: INSTANCE_SETTINGS_ID,
     instanceName: next.instanceName,
@@ -221,6 +282,12 @@ export async function updateInstanceSettings(
     defaultQuotaBytes: next.defaultQuotaBytes,
     maxUploadBytes: next.maxUploadBytes,
     trashRetentionDays: next.trashRetentionDays,
+    githubEnabled,
+    githubClientId: githubClientId || null,
+    githubClientSecret: githubClientSecret || null,
+    googleEnabled,
+    googleClientId: googleClientId || null,
+    googleClientSecret: googleClientSecret || null,
     updatedAt: new Date(),
     updatedBy: actorId,
   };
@@ -241,18 +308,18 @@ export async function updateInstanceSettings(
         defaultQuotaBytes: values.defaultQuotaBytes,
         maxUploadBytes: values.maxUploadBytes,
         trashRetentionDays: values.trashRetentionDays,
+        githubEnabled: values.githubEnabled,
+        githubClientId: values.githubClientId,
+        githubClientSecret: values.githubClientSecret,
+        googleEnabled: values.googleEnabled,
+        googleClientId: values.googleClientId,
+        googleClientSecret: values.googleClientSecret,
         updatedAt: values.updatedAt,
         updatedBy: values.updatedBy,
       },
     });
 
   invalidateInstanceSettingsCache();
+  invalidateSocialProviderCache();
   return next;
-}
-
-export function socialProvidersStatus() {
-  return {
-    githubConfigured: Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
-    googleConfigured: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
-  };
 }

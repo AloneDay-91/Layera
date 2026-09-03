@@ -2,21 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Badge, Button, Input, InputGroup, Loader, Switch, Text, useKumoToastManager } from "@cloudflare/kumo";
+import { Button, Input, InputGroup, Loader, SensitiveInput, Switch, Text, useKumoToastManager } from "@cloudflare/kumo";
 import { SettingsItem, SettingsList } from "@/components/shell/settings-list";
+import { VersionCheck } from "@/components/shell/version-check";
 import { useInstanceFeatures } from "@/components/shell/instance-features";
 import type { InstanceSettings } from "@/lib/services/instance-settings";
+import type { SocialProvidersPublic } from "@/lib/services/social-providers";
 
 const GIB = 1024 ** 3;
 
-type SocialStatus = {
-  githubConfigured: boolean;
-  googleConfigured: boolean;
-};
-
 type SettingsResponse = {
   settings: InstanceSettings;
-  social: SocialStatus;
+  social: SocialProvidersPublic;
+  version: string;
 };
 
 function bytesToGbInput(bytes: number): string {
@@ -45,7 +43,16 @@ export function AdminSettingsPanel() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [social, setSocial] = useState<SocialStatus>({ githubConfigured: false, googleConfigured: false });
+  const [version, setVersion] = useState("");
+  const [callbackOrigin, setCallbackOrigin] = useState("");
+  const [githubEnabled, setGithubEnabled] = useState(false);
+  const [githubClientId, setGithubClientId] = useState("");
+  const [githubClientSecret, setGithubClientSecret] = useState("");
+  const [githubSecretSet, setGithubSecretSet] = useState(false);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState("");
+  const [googleClientSecret, setGoogleClientSecret] = useState("");
+  const [googleSecretSet, setGoogleSecretSet] = useState(false);
   const [instanceName, setInstanceName] = useState("Layera");
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const [publicSharingEnabled, setPublicSharingEnabled] = useState(true);
@@ -70,7 +77,8 @@ export function AdminSettingsPanel() {
         const data = (await res.json()) as SettingsResponse;
         if (cancelled) return;
         applySettings(data.settings);
-        setSocial(data.social);
+        applySocial(data.social);
+        setVersion(data.version);
       } catch {
         if (!cancelled) {
           toasts.add({ title: tToasts("genericError"), description: tToasts("loadSettingsError") });
@@ -100,6 +108,23 @@ export function AdminSettingsPanel() {
     setTrashDays(String(settings.trashRetentionDays));
   }
 
+  function applySocial(social: SocialProvidersPublic) {
+    setCallbackOrigin(social.callbackOrigin);
+    setGithubEnabled(social.github.enabled);
+    setGithubClientId(social.github.clientId);
+    setGithubClientSecret("");
+    setGithubSecretSet(social.github.secretSet);
+    setGoogleEnabled(social.google.enabled);
+    setGoogleClientId(social.google.clientId);
+    setGoogleClientSecret("");
+    setGoogleSecretSet(social.google.secretSet);
+  }
+
+  function callbackHint(provider: "github" | "google") {
+    const path = `/api/auth/callback/${provider}`;
+    return callbackOrigin ? t("callbackUrl", { url: `${callbackOrigin}${path}` }) : t("callbackPath", { path });
+  }
+
   const payload = useMemo(() => {
     const defaultQuotaBytes = parseGbInput(quotaGb);
     const maxUploadBytes = parseGbInput(uploadGb);
@@ -115,6 +140,12 @@ export function AdminSettingsPanel() {
       defaultQuotaBytes,
       maxUploadBytes,
       trashRetentionDays,
+      githubEnabled,
+      githubClientId,
+      githubClientSecret,
+      googleEnabled,
+      googleClientId,
+      googleClientSecret,
     };
   }, [
     archiveEnabled,
@@ -127,6 +158,12 @@ export function AdminSettingsPanel() {
     teamsEnabled,
     trashDays,
     uploadGb,
+    githubEnabled,
+    githubClientId,
+    githubClientSecret,
+    googleEnabled,
+    googleClientId,
+    googleClientSecret,
   ]);
 
   async function handleSave() {
@@ -144,7 +181,11 @@ export function AdminSettingsPanel() {
       const res = await fetch("/api/admin/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...payload,
+          githubClientSecret: payload.githubClientSecret.trim() || undefined,
+          googleClientSecret: payload.googleClientSecret.trim() || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -154,14 +195,16 @@ export function AdminSettingsPanel() {
         });
         return;
       }
-      const saved = data.settings as InstanceSettings;
-      applySettings(saved);
+      const saved = data as SettingsResponse;
+      applySettings(saved.settings);
+      applySocial(saved.social);
+      setVersion(saved.version);
       setFeatures({
-        publicSharingEnabled: saved.publicSharingEnabled,
-        teamsEnabled: saved.teamsEnabled,
-        favoritesEnabled: saved.favoritesEnabled,
-        tagsEnabled: saved.tagsEnabled,
-        archiveEnabled: saved.archiveEnabled,
+        publicSharingEnabled: saved.settings.publicSharingEnabled,
+        teamsEnabled: saved.settings.teamsEnabled,
+        favoritesEnabled: saved.settings.favoritesEnabled,
+        tagsEnabled: saved.settings.tagsEnabled,
+        archiveEnabled: saved.settings.archiveEnabled,
       });
       toasts.add({ title: tToasts("settingsSavedTitle"), description: tToasts("settingsSavedDescription") });
     } catch {
@@ -266,15 +309,8 @@ export function AdminSettingsPanel() {
             <InputGroup.Suffix>{t("unitDays")}</InputGroup.Suffix>
           </InputGroup>
         </SettingsItem>
-        <SettingsItem label={t("githubLogin")} description={t("oauthDescription")}>
-          <Badge variant={social.githubConfigured ? "success" : "neutral"}>
-            {social.githubConfigured ? t("configured") : t("notConfigured")}
-          </Badge>
-        </SettingsItem>
-        <SettingsItem label={t("googleLogin")} description={t("oauthDescription")}>
-          <Badge variant={social.googleConfigured ? "success" : "neutral"}>
-            {social.googleConfigured ? t("configured") : t("notConfigured")}
-          </Badge>
+        <SettingsItem label={t("appVersion")} description={t("appVersionDescription")}>
+          <VersionCheck version={version} />
         </SettingsItem>
       </SettingsList>
 
@@ -308,6 +344,76 @@ export function AdminSettingsPanel() {
         </SettingsItem>
         <SettingsItem label={t("archive")} description={t("archiveDescription")}>
           <Switch checked={archiveEnabled} onCheckedChange={(checked) => setArchiveEnabled(checked === true)} aria-label={t("archive")} />
+        </SettingsItem>
+      </SettingsList>
+
+      <div className="grid gap-1.5">
+        <Text as="h2" variant="heading3">
+          {t("oauthTitle")}
+        </Text>
+        <Text variant="secondary">{t("oauthDescription")}</Text>
+      </div>
+
+      <SettingsList>
+        <SettingsItem label={t("githubLogin")} description={t("githubLoginDescription")}>
+          <Switch
+            checked={githubEnabled}
+            onCheckedChange={(checked) => setGithubEnabled(checked === true)}
+            aria-label={t("githubLogin")}
+          />
+        </SettingsItem>
+        <SettingsItem label={t("githubClientId")} description={callbackHint("github")}>
+          <Input
+            size="sm"
+            className="w-56"
+            value={githubClientId}
+            onChange={(event) => setGithubClientId(event.target.value)}
+            autoComplete="off"
+            aria-label={t("githubClientId")}
+          />
+        </SettingsItem>
+        <SettingsItem
+          label={t("githubClientSecret")}
+          description={githubSecretSet ? t("secretKept") : t("secretRequired")}
+        >
+          <SensitiveInput
+            size="sm"
+            className="w-56"
+            value={githubClientSecret}
+            onValueChange={setGithubClientSecret}
+            autoComplete="new-password"
+            aria-label={t("githubClientSecret")}
+          />
+        </SettingsItem>
+        <SettingsItem label={t("googleLogin")} description={t("googleLoginDescription")}>
+          <Switch
+            checked={googleEnabled}
+            onCheckedChange={(checked) => setGoogleEnabled(checked === true)}
+            aria-label={t("googleLogin")}
+          />
+        </SettingsItem>
+        <SettingsItem label={t("googleClientId")} description={callbackHint("google")}>
+          <Input
+            size="sm"
+            className="w-56"
+            value={googleClientId}
+            onChange={(event) => setGoogleClientId(event.target.value)}
+            autoComplete="off"
+            aria-label={t("googleClientId")}
+          />
+        </SettingsItem>
+        <SettingsItem
+          label={t("googleClientSecret")}
+          description={googleSecretSet ? t("secretKept") : t("secretRequired")}
+        >
+          <SensitiveInput
+            size="sm"
+            className="w-56"
+            value={googleClientSecret}
+            onValueChange={setGoogleClientSecret}
+            autoComplete="new-password"
+            aria-label={t("googleClientSecret")}
+          />
         </SettingsItem>
       </SettingsList>
     </div>

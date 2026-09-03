@@ -14,6 +14,10 @@ import { ConfirmDialog } from "@/components/kumo/confirm-dialog";
 import { authClient } from "@/lib/auth-client";
 import { usePageReady } from "@/components/shell/navigation-provider";
 import { useInstanceFeatures } from "@/components/shell/instance-features";
+import { SettingsItem, SettingsList } from "@/components/shell/settings-list";
+import { VersionCheck } from "@/components/shell/version-check";
+import { usePublicInstance } from "@/components/shell/use-public-instance";
+import { canManageInstanceSettings } from "@/lib/auth-permissions";
 
 type MemberUI = {
   id: string;
@@ -37,6 +41,8 @@ export default function SettingsPage() {
   const tToasts = useTranslations("settingsPage.toasts");
   const tBreadcrumbs = useTranslations("fileBreadcrumbs");
   const { features } = useInstanceFeatures();
+  const { version } = usePublicInstance();
+  const canCheckUpdates = canManageInstanceSettings(session?.user.role);
 
   const [activeTab, setActiveTab] = useState<"workspaces" | "storage">("workspaces");
   const [members, setMembers] = useState<MemberUI[]>([]);
@@ -499,6 +505,18 @@ export default function SettingsPage() {
           </LayerCard.Primary>
         </LayerCard>
       )}
+
+      <div className="grid gap-1.5">
+        <Text as="h2" variant="heading3">
+          {t("aboutTitle")}
+        </Text>
+        <Text variant="secondary">{t("aboutDescription")}</Text>
+      </div>
+      <SettingsList>
+        <SettingsItem label={t("appVersion")} description={t("appVersionDescription")}>
+          {canCheckUpdates ? <VersionCheck version={version} /> : <Text as="span">{version || "—"}</Text>}
+        </SettingsItem>
+      </SettingsList>
       </div>
 
       <ConfirmDialog

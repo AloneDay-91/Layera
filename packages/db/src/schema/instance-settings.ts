@@ -14,6 +14,12 @@ export const instanceSettings = pgTable("instance_settings", {
   defaultQuotaBytes: bigint("default_quota_bytes", { mode: "number" }).notNull(),
   maxUploadBytes: bigint("max_upload_bytes", { mode: "number" }).notNull(),
   trashRetentionDays: integer("trash_retention_days").notNull().default(30),
+  githubEnabled: boolean("github_enabled").notNull().default(true),
+  githubClientId: text("github_client_id"),
+  githubClientSecret: text("github_client_secret"),
+  googleEnabled: boolean("google_enabled").notNull().default(true),
+  googleClientId: text("google_client_id"),
+  googleClientSecret: text("google_client_secret"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   updatedBy: text("updated_by"),
 });

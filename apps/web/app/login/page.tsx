@@ -13,16 +13,16 @@ import {
   SensitiveInput,
   Tabs,
   Text,
-  useKumoToastManager,
 } from "@cloudflare/kumo";
 import { ArrowRightIcon, EnvelopeSimpleIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { AuthCard, AuthSocialButtons } from "@/components/shell/auth-card";
 import { OtpCodeField } from "@/components/shell/otp-code-field";
 import { usePublicInstance } from "@/components/shell/use-public-instance";
+import { useAuthFeedback } from "@/lib/use-auth-feedback";
 
 export default function LoginPage() {
   const router = useRouter();
-  const toasts = useKumoToastManager();
+  const { run, toasts } = useAuthFeedback();
 
   const [authMethod, setAuthMethod] = useState<"password" | "otp">("password");
 
@@ -37,19 +37,28 @@ export default function LoginPage() {
   const [sendingOtp, setSendingOtp] = useState(false);
 
   const t = useTranslations("loginPage");
-  const { registrationEnabled } = usePublicInstance();
+  const { registrationEnabled, githubEnabled, googleEnabled } = usePublicInstance();
   const tErrors = useTranslations("loginPage.errors");
   const tToasts = useTranslations("loginPage.toasts");
   const tShell = useTranslations("authShell");
+
+  const timeoutMessages = {
+    errorTitle: tToasts("errorTitle"),
+    timeoutTitle: tToasts("timeoutTitle"),
+    timeoutDescription: tToasts("timeoutDescription"),
+  };
 
   async function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    const { data, error: signInError } = await publicAuthClient.signIn.email({ email, password });
+    const { data, errorMessage } = await run(
+      () => publicAuthClient.signIn.email({ email, password }),
+      { ...timeoutMessages, fallbackError: tErrors("signInFailed") },
+    );
     setSubmitting(false);
-    if (signInError) {
-      setError(signInError.message ?? tErrors("signInFailed"));
+    if (errorMessage) {
+      setError(errorMessage);
       return;
     }
     if (data && "twoFactorRedirect" in data && data.twoFactorRedirect) {
@@ -63,13 +72,17 @@ export default function LoginPage() {
     e.preventDefault();
     setSendingOtp(true);
     setError(null);
-    const { error: otpError } = await publicAuthClient.emailOtp.sendVerificationOtp({
-      email: otpEmail,
-      type: "sign-in",
-    });
+    const { errorMessage } = await run(
+      () =>
+        publicAuthClient.emailOtp.sendVerificationOtp({
+          email: otpEmail,
+          type: "sign-in",
+        }),
+      { ...timeoutMessages, fallbackError: tErrors("otpSendFailed") },
+    );
     setSendingOtp(false);
-    if (otpError) {
-      setError(otpError.message ?? tErrors("otpSendFailed"));
+    if (errorMessage) {
+      setError(errorMessage);
       return;
     }
     setOtpSent(true);
@@ -83,13 +96,17 @@ export default function LoginPage() {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    const { error: verifyError } = await publicAuthClient.signIn.emailOtp({
-      email: otpEmail,
-      otp: otpCode,
-    });
+    const { errorMessage } = await run(
+      () =>
+        publicAuthClient.signIn.emailOtp({
+          email: otpEmail,
+          otp: otpCode,
+        }),
+      { ...timeoutMessages, fallbackError: tErrors("otpInvalid") },
+    );
     setSubmitting(false);
-    if (verifyError) {
-      setError(verifyError.message ?? tErrors("otpInvalid"));
+    if (errorMessage) {
+      setError(errorMessage);
       return;
     }
     toasts.add({ title: tToasts("otpSuccessTitle"), description: tToasts("otpSuccessDescription") });
@@ -97,14 +114,22 @@ export default function LoginPage() {
   }
 
   async function handleSocialSignIn(provider: "github" | "google") {
+    setError(null);
     toasts.add({
       title: tToasts("oauthRedirectTitle"),
       description: tToasts("oauthRedirectDescription", { provider: provider === "github" ? "GitHub" : "Google" }),
     });
-    await publicAuthClient.signIn.social({
-      provider,
-      callbackURL: "/dashboard",
-    });
+    const { errorMessage } = await run(
+      () =>
+        publicAuthClient.signIn.social({
+          provider,
+          callbackURL: "/dashboard",
+        }),
+      { ...timeoutMessages, fallbackError: tErrors("signInFailed") },
+    );
+    if (errorMessage) {
+      setError(errorMessage);
+    }
   }
 
   return (
@@ -113,12 +138,14 @@ export default function LoginPage() {
         <AuthSocialButtons
           githubLabel={t("continueWithGithub")}
           googleLabel={t("continueWithGoogle")}
+          githubEnabled={githubEnabled}
+          googleEnabled={googleEnabled}
           onGithub={() => handleSocialSignIn("github")}
           onGoogle={() => handleSocialSignIn("google")}
         />
 
         <div className="grid gap-4">
-          <Text variant="secondary">{t("orEmail")}</Text>
+          {githubEnabled || googleEnabled ? <Text variant="secondary">{t("orEmail")}</Text> : null}
           <Tabs
             variant="segmented"
             size="sm"

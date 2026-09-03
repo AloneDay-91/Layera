@@ -4,14 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { publicAuthClient } from "@/lib/public-auth-client";
-import { Banner, Button, Input, Link, Loader, Text, useKumoToastManager } from "@cloudflare/kumo";
+import { Banner, Button, Input, Link, Loader, Text } from "@cloudflare/kumo";
 import { ArrowRightIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { AuthCard } from "@/components/shell/auth-card";
 import { OtpCodeField } from "@/components/shell/otp-code-field";
+import { useAuthFeedback } from "@/lib/use-auth-feedback";
 
 export default function TwoFactorLoginPage() {
   const router = useRouter();
-  const toasts = useKumoToastManager();
+  const { run, toasts } = useAuthFeedback();
 
   const [useBackupCode, setUseBackupCode] = useState(false);
   const [code, setCode] = useState("");
@@ -20,6 +21,7 @@ export default function TwoFactorLoginPage() {
 
   const t = useTranslations("twoFactorPage");
   const tLogin = useTranslations("loginPage");
+  const tToasts = useTranslations("twoFactorPage.toasts");
   const tShell = useTranslations("authShell");
 
   async function verify(nextCode: string) {
@@ -29,13 +31,22 @@ export default function TwoFactorLoginPage() {
     setSubmitting(true);
     setError(null);
 
-    const { error: verifyError } = useBackupCode
-      ? await publicAuthClient.twoFactor.verifyBackupCode({ code: trimmed })
-      : await publicAuthClient.twoFactor.verifyTotp({ code: trimmed });
+    const { errorMessage } = await run(
+      () =>
+        useBackupCode
+          ? publicAuthClient.twoFactor.verifyBackupCode({ code: trimmed })
+          : publicAuthClient.twoFactor.verifyTotp({ code: trimmed }),
+      {
+        errorTitle: tToasts("errorTitle"),
+        fallbackError: t("errors.invalidCode"),
+        timeoutTitle: tToasts("timeoutTitle"),
+        timeoutDescription: tToasts("timeoutDescription"),
+      },
+    );
 
     setSubmitting(false);
-    if (verifyError) {
-      setError(verifyError.message ?? t("errors.invalidCode"));
+    if (errorMessage) {
+      setError(errorMessage);
       return;
     }
     toasts.add({ title: tLogin("toasts.signInSuccessTitle"), description: tLogin("toasts.signInSuccessDescription") });

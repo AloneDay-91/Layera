@@ -584,7 +584,10 @@
       "otpSuccessTitle": "Validation OTP réussie",
       "otpSuccessDescription": "Connexion autorisée.",
       "oauthRedirectTitle": "Redirection OAuth",
-      "oauthRedirectDescription": "Connexion avec {provider} en cours…"
+      "oauthRedirectDescription": "Connexion avec {provider} en cours…",
+      "errorTitle": "Échec de la connexion",
+      "timeoutTitle": "Connexion trop longue",
+      "timeoutDescription": "Le serveur n'a pas répondu à temps. Vérifie ta connexion et réessaie."
     }
   },
   "twoFactorPage": {
@@ -599,6 +602,11 @@
     "useBackupCode": "Utiliser un code de secours",
     "errors": {
       "invalidCode": "Code invalide."
+    },
+    "toasts": {
+      "errorTitle": "Vérification échouée",
+      "timeoutTitle": "Vérification trop longue",
+      "timeoutDescription": "Le serveur n'a pas répondu à temps. Vérifie ta connexion et réessaie."
     }
   },
   "registerPage": {
@@ -621,7 +629,10 @@
       "accountCreatedTitle": "Compte créé avec succès",
       "accountCreatedDescription": "Votre espace de travail personnel a été configuré.",
       "oauthSignUpTitle": "Inscription via OAuth",
-      "oauthSignUpDescription": "Connexion avec {provider}…"
+      "oauthSignUpDescription": "Connexion avec {provider}…",
+      "errorTitle": "Échec de la création du compte",
+      "timeoutTitle": "Inscription trop longue",
+      "timeoutDescription": "Le serveur n'a pas répondu à temps. Vérifie ta connexion et réessaie."
     }
   },
   "sharePage": {
@@ -693,6 +704,10 @@
     "s3Region": "Région S3",
     "accessKeyId": "Access Key ID",
     "testS3Connection": "Tester la connexion S3",
+    "aboutTitle": "À propos",
+    "aboutDescription": "Informations sur cette instance Layera.",
+    "appVersion": "Version",
+    "appVersionDescription": "Build Layera qui tourne sur cette instance.",
     "personalWorkspace": "Espace personnel",
     "toasts": {
       "createOrgErrorTitle": "Erreur de création",
@@ -837,9 +852,22 @@
       "trashRetentionDescription": "Délai avant purge définitive des éléments nouvellement mis à la corbeille.",
       "unitGb": "Gb",
       "unitDays": "jours",
+      "appVersion": "Version",
+      "appVersionDescription": "Build Layera qui tourne sur cette instance.",
       "githubLogin": "Connexion GitHub",
+      "githubLoginDescription": "Affiche Continuer avec GitHub sur les pages de connexion.",
+      "githubClientId": "Client ID GitHub",
+      "githubClientSecret": "Client secret GitHub",
       "googleLogin": "Connexion Google",
-      "oauthDescription": "Configuré via les variables d'environnement du serveur.",
+      "googleLoginDescription": "Affiche Continuer avec Google sur les pages de connexion.",
+      "googleClientId": "Client ID Google",
+      "googleClientSecret": "Client secret Google",
+      "oauthTitle": "Connexion sociale",
+      "oauthDescription": "Colle les identifiants de l'application OAuth. Les variables d'environnement restent un repli.",
+      "callbackUrl": "URL de callback : {url}",
+      "callbackPath": "Chemin de callback : {path}",
+      "secretKept": "Laisse vide pour conserver le secret actuel.",
+      "secretRequired": "Nécessaire pour activer ce fournisseur.",
       "configured": "Configuré",
       "notConfigured": "Non configuré",
       "publicSharing": "Liens de partage publics",
@@ -1049,6 +1077,18 @@
     "languageDescription": "Choisissez la langue utilisée dans l'interface.",
     "languageEnglish": "Anglais",
     "languageFrench": "Français"
+  },
+  "versionCheck": {
+    "check": "Vérifier",
+    "checking": "Vérification…",
+    "checkAria": "Vérifier s'il existe une version plus récente de Layera",
+    "upToDateTitle": "À jour",
+    "upToDate": "Cette instance tourne en {current}.",
+    "availableTitle": "Mise à jour disponible",
+    "available": "Layera {latest} est disponible.",
+    "errorTitle": "Vérification impossible",
+    "errorDescription": "GitHub n'a pas renvoyé de release. Réessaie plus tard.",
+    "forbidden": "Seuls les administrateurs peuvent vérifier les mises à jour."
   },
   "updateBanner": {
     "title": "Layera {latest} est disponible",

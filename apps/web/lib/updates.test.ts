@@ -83,8 +83,8 @@ describe("toUpdatesResponse", () => {
 
 describe("getAppVersion", () => {
   it("falls back to 0.0.0-dev", () => {
-    expect(getAppVersion(undefined)).toBe("0.0.0-dev");
     expect(getAppVersion("")).toBe("0.0.0-dev");
+    expect(getAppVersion("   ")).toBe("0.0.0-dev");
   });
 
   it("returns a stamped version", () => {
@@ -114,5 +114,21 @@ describe("fetchLatestRelease", () => {
     expect(first?.tag_name).toBe("v1.4.0");
     expect(second?.tag_name).toBe("v1.4.0");
     expect(calls).toBe(1);
+  });
+
+  it("bypasses the cache when refresh is set", async () => {
+    resetReleaseCache();
+    let calls = 0;
+    const fetcher = (async () => {
+      calls += 1;
+      return {
+        ok: true,
+        json: async () => ({ tag_name: `v1.4.${calls}`, html_url: "https://example.com" }),
+      };
+    }) as unknown as typeof fetch;
+    await fetchLatestRelease({ fetcher, now: 0, repo: "acme/app" });
+    const refreshed = await fetchLatestRelease({ fetcher, now: 1, repo: "acme/app", refresh: true });
+    expect(refreshed?.tag_name).toBe("v1.4.2");
+    expect(calls).toBe(2);
   });
 });

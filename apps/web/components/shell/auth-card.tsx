@@ -150,34 +150,44 @@ export function AuthSocialButtons({
   googleLabel,
   onGithub,
   onGoogle,
+  githubEnabled = true,
+  googleEnabled = true,
 }: {
   githubLabel: string;
   googleLabel: string;
   onGithub: () => void;
   onGoogle: () => void;
+  githubEnabled?: boolean;
+  googleEnabled?: boolean;
 }) {
+  if (!githubEnabled && !googleEnabled) return null;
+
   return (
-    <div className="grid grid-cols-2 gap-2">
-      <Button
-        variant="secondary"
-        size="sm"
-        icon={GithubLogoIcon}
-        onClick={onGithub}
-        aria-label={githubLabel}
-        className="w-full justify-center"
-      >
-        GitHub
-      </Button>
-      <Button
-        variant="secondary"
-        size="sm"
-        icon={GoogleLogoIcon}
-        onClick={onGoogle}
-        aria-label={googleLabel}
-        className="w-full justify-center"
-      >
-        Google
-      </Button>
+    <div className={githubEnabled && googleEnabled ? "grid grid-cols-2 gap-2" : "grid gap-2"}>
+      {githubEnabled ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={GithubLogoIcon}
+          onClick={onGithub}
+          aria-label={githubLabel}
+          className="w-full justify-center"
+        >
+          GitHub
+        </Button>
+      ) : null}
+      {googleEnabled ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={GoogleLogoIcon}
+          onClick={onGoogle}
+          aria-label={googleLabel}
+          className="w-full justify-center"
+        >
+          Google
+        </Button>
+      ) : null}
     </div>
   );
 }

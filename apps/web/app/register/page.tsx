@@ -12,16 +12,16 @@ import {
   Loader,
   SensitiveInput,
   Text,
-  useKumoToastManager,
 } from "@cloudflare/kumo";
 import { UserPlusIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { AuthCard, AuthSocialButtons } from "@/components/shell/auth-card";
 import { usePublicInstance } from "@/components/shell/use-public-instance";
 import { MIN_PASSWORD_LENGTH } from "@/lib/password-policy";
+import { useAuthFeedback } from "@/lib/use-auth-feedback";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const toasts = useKumoToastManager();
+  const { run, showError, toasts } = useAuthFeedback();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -32,23 +32,34 @@ export default function RegisterPage() {
 
   const t = useTranslations("registerPage");
   const tLogin = useTranslations("loginPage");
-  const { registrationEnabled, loaded } = usePublicInstance();
+  const { registrationEnabled, loaded, githubEnabled, googleEnabled } = usePublicInstance();
+
+  const timeoutMessages = {
+    errorTitle: t("toasts.errorTitle"),
+    timeoutTitle: t("toasts.timeoutTitle"),
+    timeoutDescription: t("toasts.timeoutDescription"),
+  };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
     if (password !== confirmPassword) {
-      setError(t("errors.passwordsDontMatch"));
+      const message = t("errors.passwordsDontMatch");
+      setError(message);
+      showError(t("toasts.errorTitle"), message);
       return;
     }
 
     setSubmitting(true);
-    const { error: signUpError } = await publicAuthClient.signUp.email({ name, email, password });
+    const { errorMessage } = await run(
+      () => publicAuthClient.signUp.email({ name, email, password }),
+      { ...timeoutMessages, fallbackError: t("errors.signUpFailed") },
+    );
     setSubmitting(false);
 
-    if (signUpError) {
-      setError(signUpError.message ?? t("errors.signUpFailed"));
+    if (errorMessage) {
+      setError(errorMessage);
       return;
     }
 
@@ -60,14 +71,22 @@ export default function RegisterPage() {
   }
 
   async function handleSocialSignUp(provider: "github" | "google") {
+    setError(null);
     toasts.add({
       title: t("toasts.oauthSignUpTitle"),
       description: t("toasts.oauthSignUpDescription", { provider: provider === "github" ? "GitHub" : "Google" }),
     });
-    await publicAuthClient.signIn.social({
-      provider,
-      callbackURL: "/dashboard",
-    });
+    const { errorMessage } = await run(
+      () =>
+        publicAuthClient.signIn.social({
+          provider,
+          callbackURL: "/dashboard",
+        }),
+      { ...timeoutMessages, fallbackError: t("errors.signUpFailed") },
+    );
+    if (errorMessage) {
+      setError(errorMessage);
+    }
   }
 
   return (
@@ -89,12 +108,14 @@ export default function RegisterPage() {
         <AuthSocialButtons
           githubLabel={tLogin("continueWithGithub")}
           googleLabel={tLogin("continueWithGoogle")}
+          githubEnabled={githubEnabled}
+          googleEnabled={googleEnabled}
           onGithub={() => handleSocialSignUp("github")}
           onGoogle={() => handleSocialSignUp("google")}
         />
 
         <div className="grid gap-4">
-          <Text variant="secondary">{tLogin("orEmail")}</Text>
+          {githubEnabled || googleEnabled ? <Text variant="secondary">{tLogin("orEmail")}</Text> : null}
 
           <form onSubmit={handleSubmit} className="grid gap-4">
             <Input

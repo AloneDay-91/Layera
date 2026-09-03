@@ -85,9 +85,10 @@ export async function fetchLatestRelease(options?: {
   fetcher?: typeof fetch;
   token?: string;
   repo?: string;
+  refresh?: boolean;
 }): Promise<GitHubRelease | null> {
   const now = options?.now ?? Date.now();
-  if (releaseCache && now - releaseCache.at < CACHE_MS) {
+  if (!options?.refresh && releaseCache && now - releaseCache.at < CACHE_MS) {
     return releaseCache.release;
   }
 

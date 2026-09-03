@@ -584,7 +584,10 @@
       "otpSuccessTitle": "OTP verified",
       "otpSuccessDescription": "Sign-in authorized.",
       "oauthRedirectTitle": "OAuth redirect",
-      "oauthRedirectDescription": "Signing in with {provider}…"
+      "oauthRedirectDescription": "Signing in with {provider}…",
+      "errorTitle": "Sign-in failed",
+      "timeoutTitle": "Sign-in timed out",
+      "timeoutDescription": "The server did not respond in time. Check your connection and try again."
     }
   },
   "twoFactorPage": {
@@ -599,6 +602,11 @@
     "useBackupCode": "Use a backup code",
     "errors": {
       "invalidCode": "Invalid code."
+    },
+    "toasts": {
+      "errorTitle": "Verification failed",
+      "timeoutTitle": "Verification timed out",
+      "timeoutDescription": "The server did not respond in time. Check your connection and try again."
     }
   },
   "registerPage": {
@@ -621,7 +629,10 @@
       "accountCreatedTitle": "Account created successfully",
       "accountCreatedDescription": "Your personal workspace has been set up.",
       "oauthSignUpTitle": "Signing up via OAuth",
-      "oauthSignUpDescription": "Signing in with {provider}…"
+      "oauthSignUpDescription": "Signing in with {provider}…",
+      "errorTitle": "Could not create the account",
+      "timeoutTitle": "Sign-up timed out",
+      "timeoutDescription": "The server did not respond in time. Check your connection and try again."
     }
   },
   "sharePage": {
@@ -693,6 +704,10 @@
     "s3Region": "S3 region",
     "accessKeyId": "Access Key ID",
     "testS3Connection": "Test S3 connection",
+    "aboutTitle": "About",
+    "aboutDescription": "Information about this Layera instance.",
+    "appVersion": "Version",
+    "appVersionDescription": "Layera build running on this instance.",
     "personalWorkspace": "Personal workspace",
     "toasts": {
       "createOrgErrorTitle": "Error creating organization",
@@ -837,9 +852,22 @@
       "trashRetentionDescription": "How long newly trashed items are kept before permanent purge.",
       "unitGb": "Gb",
       "unitDays": "days",
+      "appVersion": "Version",
+      "appVersionDescription": "Layera build running on this instance.",
       "githubLogin": "GitHub sign-in",
+      "githubLoginDescription": "Show Continue with GitHub on the sign-in pages.",
+      "githubClientId": "GitHub client ID",
+      "githubClientSecret": "GitHub client secret",
       "googleLogin": "Google sign-in",
-      "oauthDescription": "Configured through the server environment variables.",
+      "googleLoginDescription": "Show Continue with Google on the sign-in pages.",
+      "googleClientId": "Google client ID",
+      "googleClientSecret": "Google client secret",
+      "oauthTitle": "Social sign-in",
+      "oauthDescription": "Paste the OAuth app credentials. Environment variables still work as a fallback.",
+      "callbackUrl": "Callback URL: {url}",
+      "callbackPath": "Callback path: {path}",
+      "secretKept": "Leave empty to keep the current secret.",
+      "secretRequired": "Required to enable this provider.",
       "configured": "Configured",
       "notConfigured": "Not configured",
       "publicSharing": "Public share links",
@@ -1049,6 +1077,18 @@
     "languageDescription": "Choose the language used across the interface.",
     "languageEnglish": "English",
     "languageFrench": "French"
+  },
+  "versionCheck": {
+    "check": "Check",
+    "checking": "Checking…",
+    "checkAria": "Check for a newer Layera version",
+    "upToDateTitle": "Up to date",
+    "upToDate": "This instance is running {current}.",
+    "availableTitle": "Update available",
+    "available": "Layera {latest} is available.",
+    "errorTitle": "Could not check",
+    "errorDescription": "GitHub did not return a release. Try again later.",
+    "forbidden": "Only administrators can check for updates."
   },
   "updateBanner": {
     "title": "Layera {latest} is available",
