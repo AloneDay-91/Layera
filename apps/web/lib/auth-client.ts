@@ -6,10 +6,11 @@ import {
   organizationClient,
   twoFactorClient,
 } from "better-auth/client/plugins";
+import { publicAuthBaseUrl } from "./auth-base-url";
 import { ac, authRoles } from "./auth-permissions";
 
 export const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL ?? "http://localhost:3000",
+  baseURL: publicAuthBaseUrl(),
   plugins: [
     adminClient({
       ac,

@@ -24,10 +24,14 @@ COPY --from=deps /repo ./
 COPY . .
 # next build collects route modules; the db client throws if DATABASE_URL is
 # missing. These values are build-time only and are not copied into the runner.
+# NEXT_PUBLIC_* is inlined at build time — pass the public origin as a build
+# arg on Dokploy. When left empty, the client falls back to window.location.origin.
+ARG BETTER_AUTH_URL=http://localhost:3000
+ARG NEXT_PUBLIC_BETTER_AUTH_URL=
 ENV DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build
 ENV BETTER_AUTH_SECRET=build-placeholder-not-a-real-secret
-ENV BETTER_AUTH_URL=http://localhost:3000
-ENV NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
+ENV BETTER_AUTH_URL=$BETTER_AUTH_URL
+ENV NEXT_PUBLIC_BETTER_AUTH_URL=$NEXT_PUBLIC_BETTER_AUTH_URL
 ENV S3_ENDPOINT=minio
 ENV S3_ACCESS_KEY=build-placeholder
 ENV S3_SECRET_KEY=build-placeholder
