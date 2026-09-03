@@ -8,7 +8,9 @@
   "scripts": {
     "dev": "pnpm --filter @filecloud/web dev",
     "dev:worker": "pnpm --filter @filecloud/worker dev",
+    "dev:marketing": "pnpm --filter @filecloud/marketing dev",
     "build": "pnpm --filter @filecloud/web build",
+    "build:marketing": "pnpm --filter @filecloud/marketing build",
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",

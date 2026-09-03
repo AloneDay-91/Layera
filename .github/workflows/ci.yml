@@ -34,7 +34,7 @@ jobs:
         run: pnpm typecheck
 
       - name: Build
-        run: pnpm build
+        run: pnpm build && pnpm build:marketing
         env:
           # The web build doesn't hit a live DB/S3, but a couple of modules
           # read these env vars at import time — dummy values keep the

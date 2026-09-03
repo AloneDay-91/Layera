@@ -13,10 +13,25 @@ COPY packages/types/package.json packages/types/package.json
 COPY packages/config/package.json packages/config/package.json
 RUN pnpm install --frozen-lockfile
 
-FROM node:20-slim AS runner
+FROM node:20-slim AS builder
 WORKDIR /repo
 RUN corepack enable
-ENV NODE_ENV=production
 COPY --from=deps /repo ./
 COPY . .
-CMD ["pnpm", "--filter", "@filecloud/worker", "start"]
+RUN pnpm --filter @filecloud/marketing build
+
+FROM node:20-slim AS runner
+WORKDIR /repo
+ENV NODE_ENV=production
+RUN addgroup --system --gid 1001 nodejs \
+  && adduser --system --uid 1001 nextjs
+
+COPY --from=builder /repo/apps/marketing/public ./apps/marketing/public
+COPY --from=builder --chown=nextjs:nodejs /repo/apps/marketing/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /repo/apps/marketing/.next/static ./apps/marketing/.next/static
+
+USER nextjs
+EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+CMD ["node", "apps/marketing/server.js"]
