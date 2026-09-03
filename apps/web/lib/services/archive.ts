@@ -107,16 +107,19 @@ export async function restoreArchivedItem(ctx: AuthorizedContext, input: { id: s
     .where(and(eq(archiveItem.itemId, input.id), eq(archiveItem.workspaceId, ctx.workspace.id)))
     .limit(1);
   if (!row) throw new ServiceError(404, "Item not found");
+  // The archive row decides, not the caller: a mismatched type would leave the
+  // children archived behind a restored parent.
+  const itemType = row.itemType;
   const ids = [input.id];
-  if (input.type === "folder") {
+  if (itemType === "folder") {
     ids.push(...(await collectDescendantItems(ctx.workspace.id, input.id)).map((item) => item.id));
   }
   await db.delete(archiveItem).where(and(eq(archiveItem.workspaceId, ctx.workspace.id), inArray(archiveItem.itemId, ids)));
   await recordAudit({
     workspaceId: ctx.workspace.id,
     actorId: ctx.actor.id,
-    action: input.type === "file" ? "file.unarchive" : "folder.unarchive",
-    targetType: input.type,
+    action: itemType === "file" ? "file.unarchive" : "folder.unarchive",
+    targetType: itemType,
     targetId: input.id,
   });
 }
@@ -133,10 +136,11 @@ export async function permanentlyDeleteArchivedItem(
     .limit(1);
   if (!row) throw new ServiceError(404, "Item not found");
 
-  const storageKeys = await collectItemStorageKeys(ctx.workspace.id, input);
+  const itemType = row.itemType;
+  const storageKeys = await collectItemStorageKeys(ctx.workspace.id, { id: input.id, type: itemType });
   await deleteStoredFiles(storageKeys);
 
-  if (input.type === "file") {
+  if (itemType === "file") {
     await getFileInWorkspace(ctx.workspace.id, input.id);
     await db.delete(file).where(and(eq(file.id, input.id), eq(file.workspaceId, ctx.workspace.id)));
   } else {
@@ -148,8 +152,8 @@ export async function permanentlyDeleteArchivedItem(
   await recordAudit({
     workspaceId: ctx.workspace.id,
     actorId: ctx.actor.id,
-    action: input.type === "file" ? "file.delete" : "folder.delete",
-    targetType: input.type,
+    action: itemType === "file" ? "file.delete" : "folder.delete",
+    targetType: itemType,
     targetId: input.id,
   });
 }

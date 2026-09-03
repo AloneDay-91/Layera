@@ -10,23 +10,34 @@ import {
   statStoredObject,
 } from "@filecloud/storage";
 import { contentDisposition } from "@/lib/http-file";
+import { sniffMime } from "@/lib/mime-sniff";
+import { checkRateLimit, getClientIp, rateLimitedResponse } from "@/lib/rate-limit";
 
 // SVG is deliberately excluded — it can embed <script> and executes it when
 // navigated to directly (Content-Disposition: inline), unlike raster formats.
 const ALLOWED_AVATAR_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5 MB
+const USER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 function avatarStorageKey(userId: string) {
   return `avatars/${userId}`;
 }
 
+// Stays reachable without a session because public share pages show the
+// owner's avatar, so it is throttled and strictly validated instead.
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId");
-    if (!userId) {
+    if (!userId || !USER_ID_PATTERN.test(userId)) {
       return NextResponse.json({ error: "Missing userId" }, { status: 400 });
     }
+
+    const { allowed, retryAfter } = await checkRateLimit(`avatar:${getClientIp(request)}`, {
+      windowSeconds: 60,
+      max: 120,
+    });
+    if (!allowed) return rateLimitedResponse(retryAfter!);
 
     try {
       const storageKey = avatarStorageKey(userId);
@@ -80,6 +91,14 @@ export async function POST(request: Request) {
 
     const arrayBuffer = await uploadedFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+
+    // The multipart Content-Type is chosen by the client, so confirm the bytes
+    // really are the raster image they claim to be before storing them under
+    // that type.
+    if (sniffMime(buffer.subarray(0, 16)) !== uploadedFile.type) {
+      return NextResponse.json({ error: "File content does not match the image type" }, { status: 400 });
+    }
+
     const storageKey = avatarStorageKey(session.user.id);
 
     await ensureBucket();
