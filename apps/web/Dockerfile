@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- deps: install the full workspace's dependencies ----
-FROM node:20-slim AS deps
+FROM node:24.22.1-slim AS deps
 WORKDIR /repo
 RUN corepack enable
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
@@ -14,7 +14,7 @@ COPY packages/config/package.json packages/config/package.json
 RUN pnpm install --frozen-lockfile
 
 # ---- builder: build the standalone Next.js output ----
-FROM node:20-slim AS builder
+FROM node:24.22.1-slim AS builder
 WORKDIR /repo
 RUN corepack enable
 # pnpm symlinks each workspace member's own node_modules/.bin (e.g.
@@ -45,7 +45,7 @@ ENV APP_VERSION=$APP_VERSION
 RUN pnpm --filter @filecloud/web build
 
 # ---- runner: minimal production image ----
-FROM node:20-slim AS runner
+FROM node:24.22.1-slim AS runner
 WORKDIR /repo
 ARG APP_VERSION=
 ENV NODE_ENV=production

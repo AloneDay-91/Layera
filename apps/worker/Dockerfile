@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:20-slim AS deps
+FROM node:24.22.1-slim AS deps
 WORKDIR /repo
 RUN corepack enable
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
@@ -12,7 +12,7 @@ COPY packages/types/package.json packages/types/package.json
 COPY packages/config/package.json packages/config/package.json
 RUN pnpm install --frozen-lockfile
 
-FROM node:20-slim AS runner
+FROM node:24.22.1-slim AS runner
 WORKDIR /repo
 RUN corepack enable
 ENV NODE_ENV=production
