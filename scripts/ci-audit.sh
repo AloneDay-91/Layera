@@ -13,9 +13,11 @@ export npm_config_fetch_timeout="${npm_config_fetch_timeout:-20000}"
 
 attempt=1
 while [ "$attempt" -le "$max_attempts" ]; do
+  # braces 3.0.3 has no patched release (GHSA-vfj7-8cjw-p6xm). It is only
+  # pulled in by ESLint's fast-glob, at lint time.
   echo "pnpm audit --audit-level=high (attempt ${attempt}/${max_attempts})"
   set +e
-  output="$(pnpm audit --audit-level=high 2>&1)"
+  output="$(pnpm audit --audit-level=high --ignore GHSA-vfj7-8cjw-p6xm 2>&1)"
   code=$?
   set -e
   printf '%s\n' "$output"

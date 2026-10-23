@@ -321,8 +321,13 @@ export default function ProfilePage() {
     try {
       const { data, error } = await authClient.twoFactor.enable({ password: enablePassword });
       if (error) throw new Error(error.message ?? tErrors("unknown"));
-      setTotpURI(data?.totpURI ?? null);
-      setNewBackupCodes(data?.backupCodes ?? []);
+      if (data?.method === "totp") {
+        setTotpURI(data.totpURI);
+        setNewBackupCodes(data.backupCodes);
+      } else {
+        setTotpURI(null);
+        setNewBackupCodes([]);
+      }
       setEnableStep("setup");
     } catch (err) {
       console.error("Enable 2FA error:", err);

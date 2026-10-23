@@ -18,10 +18,10 @@
     "@filecloud/types": "workspace:*",
     "@phosphor-icons/react": "^2.1.10",
     "better-auth": "^1.1.0",
-    "dompurify": "^3.4.13",
+    "dompurify": "^3.4.17",
     "jszip": "^3.10.1",
     "marked": "^18.0.9",
-    "next": "15.5.23",
+    "next": "15.5.28",
     "next-intl": "^4.13.6",
     "qrcode.react": "^4.2.0",
     "react": "19.1.0",
@@ -35,9 +35,9 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.5.23",
+    "eslint-config-next": "15.5.28",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.12"
   }
 }

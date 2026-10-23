@@ -1,47 +1,76 @@
 name: Dependency audit fix
 
-# Weekly, plus on-demand: tries `pnpm audit --fix` and opens a PR with
-# whatever it managed to fix. Never pushes to main directly — a human
-# reviews and merges (or closes) the PR.
+# When the CI audit gate fails on main, and once a week, apply
+# `pnpm audit --fix`, re-verify, and push the result to main.
+# A push made with GITHUB_TOKEN does not start another workflow run.
 on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
   schedule:
     - cron: "0 6 * * 1" # Monday 06:00 UTC
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: write
-  pull-requests: write
 
 jobs:
   audit-fix:
     name: pnpm audit --fix
     runs-on: ubuntu-latest
+    if: >
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'failure' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     steps:
+      - name: Only continue when the audit job failed
+        id: gate
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/jobs" --paginate --jq '.jobs[] | select(.name == "pnpm audit") | .conclusion' | head -n1)"
+          if [[ "$conclusion" == "failure" ]]; then
+            echo "fix=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "fix=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
+        if: github.event_name != 'workflow_run' || steps.gate.outputs.fix == 'true'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: pnpm/action-setup@v4
+        if: github.event_name != 'workflow_run' || steps.gate.outputs.fix == 'true'
 
       - uses: actions/setup-node@v4
+        if: github.event_name != 'workflow_run' || steps.gate.outputs.fix == 'true'
         with:
           node-version: 24.22.1
           cache: pnpm
 
       - name: Install dependencies
+        if: github.event_name != 'workflow_run' || steps.gate.outputs.fix == 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Record vulnerabilities before fixing
-        run: pnpm audit || true
-
-      - name: Attempt automatic fix
-        run: pnpm audit --fix || true
+      - name: Apply pnpm audit --fix
+        if: github.event_name != 'workflow_run' || steps.gate.outputs.fix == 'true'
+        run: bash scripts/audit-fix.sh
 
       - name: Verify the fixed tree still installs, lints, and builds
+        if: github.event_name != 'workflow_run' || steps.gate.outputs.fix == 'true'
         run: |
-          pnpm install --no-frozen-lockfile
           pnpm lint
           pnpm typecheck
           pnpm build
+          bash scripts/ci-audit.sh
         env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
           BETTER_AUTH_SECRET: ci-build-placeholder-not-a-real-secret
           BETTER_AUTH_URL: http://localhost:3000
           S3_ENDPOINT: minio
@@ -49,20 +78,17 @@ jobs:
           S3_SECRET_KEY: ci-placeholder
           S3_BUCKET: filecloud
 
-      - name: Open pull request with the fix
-        uses: peter-evans/create-pull-request@v6
-        with:
-          commit-message: "chore: pnpm audit --fix"
-          title: "chore: pnpm audit --fix"
-          body: |
-            Automated weekly dependency audit.
-
-            `pnpm audit --fix` ran against the current lockfile and this PR
-            contains whatever it was able to resolve within existing semver
-            ranges. Lint, typecheck, and build were re-verified against the
-            result before opening this PR — still review the diff and the
-            remaining `pnpm audit` output (in the job log) before merging,
-            since some vulnerabilities may need a manual major-version bump.
-          branch: chore/pnpm-audit-fix
-          delete-branch: true
-          labels: dependencies, security
+      - name: Push the fix to main
+        if: github.event_name != 'workflow_run' || steps.gate.outputs.fix == 'true'
+        run: |
+          set -euo pipefail
+          git add pnpm-lock.yaml pnpm-workspace.yaml package.json
+          git add apps/*/package.json packages/*/package.json
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "chore: pnpm audit --fix"
+          git push origin "HEAD:main"
