@@ -44,3 +44,4 @@ overrides:
   tinypool@<=2.1.0: 2.2.0
   'vitest>vite': '7.3.7'
   vitest@>=2.1.0 <4.1.11: 4.1.12
+  stream-json: ^3.6.0
