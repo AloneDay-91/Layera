@@ -23,6 +23,7 @@ overrides:
   drizzle-orm@<0.45.2: '>=0.45.2'
   esbuild@<=0.24.2: '>=0.25.0'
   js-yaml@>=4.0.0 <4.3.2: 4.3.2
+  minio>stream-json: 1.9.1
   next@>=10.0.0 <15.5.24: 15.5.28
   next@>=10.0.0 <=15.5.27: 15.5.28
   next@>=13.0.0 <=15.5.27: 15.5.28
@@ -37,10 +38,7 @@ overrides:
   sharp@<0.35.5: 0.35.5
   shell-quote@>=1.8.4 <1.11.0: 1.12.0
   source-map-js@>=1.0.0 <1.2.2: 1.2.2
-  # minio 8 imports stream-json/jsonl/Parser.js, which only exists on the 1.x line.
-  # The 3.x security releases remove that path, so this parent pin wins over audit overrides.
-  'minio>stream-json': 1.9.1
   tinypool@<2.1.2: 2.2.0
   tinypool@<=2.1.0: 2.2.0
-  'vitest>vite': '7.3.7'
+  vitest>vite: 7.3.7
   vitest@>=2.1.0 <4.1.11: 4.1.12
